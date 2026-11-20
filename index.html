@@ -165,7 +165,7 @@ const SYMS=[
  {id:'BTC',name:'Bitcoin',pair:'BTC/USD',p:95000,v:.03,m:0,bn:'BTCUSDT'},
  {id:'ETH',name:'Ethereum',pair:'ETH/USD',p:3200,v:.04,m:0,bn:'ETHUSDT'},
  {id:'SOL',name:'Solana',pair:'SOL/USD',p:160,v:.05,m:0,bn:'SOLUSDT'},
- {id:'XAU',name:'Gold',pair:'XAU/USD',p:4050,v:.011,m:1,bn:'PAXGUSDT',lp:'Gold (PAXG/USDT)'},
+ {id:'XAU',name:'Gold',pair:'XAU/USD',p:4050,v:.011,m:1,bn:'PAXGUSDT',lp:'Gold (PAXG/USDT)',td:'XAU/USD'},
  {id:'XAG',name:'Silber',pair:'XAG/USD',p:50,v:.02,m:1,td:'XAG/USD'}];
 const TFS=[{id:'1h',h:1,l:'1 Std'},{id:'4h',h:4,l:'4 Std'},{id:'1D',h:24,l:'Tag'},{id:'1W',h:168,l:'Woche'},{id:'1M',h:730.5,l:'Monat'}];
 const COLORS=['#4c8dff','#f2c94c','#e573d8','#ffffff'];
@@ -407,22 +407,25 @@ function openWS(id){const w=new WebSocket(`wss://stream.binance.com:9443/ws/${sy
 async function tdFetch(n){const j=await getJSON(`https://api.twelvedata.com/time_series?symbol=${encodeURIComponent(sym.td)}&interval=${TDI[tf.id]}&outputsize=${n}&timezone=UTC&apikey=${encodeURIComponent(tdKey)}`);
  if(j.status!=='ok'||!j.values)throw new Error(j.message||'Twelve Data Fehler');
  return j.values.map(v=>{const d=v.datetime;return{t:Date.parse(d.length>10?d.replace(' ','T')+'Z':d+'T00:00:00Z'),o:+v.open,h:+v.high,l:+v.low,c:+v.close,v:+(v.volume||0)}}).reverse()}
+async function loadBn(id){const a=await getJSON(`${bnHost}/api/v3/klines?symbol=${sym.bn}&interval=${BNI[tf.id]}&limit=1000`);if(id!==loadId)return false;
+ data=a.map(k=>({t:k[0],o:+k[1],h:+k[2],l:+k[3],c:+k[4],v:+k[5]}));src='binance';openWS(id);return true}
 async function loadData(reset){
  const id=++loadId;stopLive();err='';
- const liveOk=net&&(sym.bn||(sym.td&&tdKey));
+ const useTd=!!(sym.td&&tdKey),liveOk=net&&(useTd||sym.bn);
  if(!liveOk){agg();src='sim';if(net&&sym.td)err='Schlüssel fehlt'}
  else{data=[];src='wait';ui();draw();
-  try{if(sym.bn){const a=await getJSON(`${bnHost}/api/v3/klines?symbol=${sym.bn}&interval=${BNI[tf.id]}&limit=1000`);if(id!==loadId)return;
-    data=a.map(k=>({t:k[0],o:+k[1],h:+k[2],l:+k[3],c:+k[4],v:+k[5]}));src='binance';openWS(id)}
-   else{const a=await tdFetch(1000);if(id!==loadId)return;data=a;src='twelve';
-    poll=setInterval(async()=>{try{const b=await tdFetch(3);if(id!==loadId)return;b.forEach(merge);schedule()}catch(e){}},60000)}}
+  try{
+   if(useTd){try{const a=await tdFetch(1000);if(id!==loadId)return;data=a;src='twelve';
+     poll=setInterval(async()=>{try{const b=await tdFetch(3);if(id!==loadId)return;b.forEach(merge);schedule()}catch(e){}},15*60000)}
+    catch(e){if(id!==loadId)return;if(!sym.bn)throw e;err='Twelve Data: '+String(e.message||e).slice(0,60);if(!await loadBn(id))return}}
+   else if(!await loadBn(id))return}
   catch(e){if(id!==loadId)return;agg();src='sim';err=String(e.message||e).slice(0,80)}}
  recalc();if(reset)resetView();clampView();ui();draw()}
 function status(){const b=$('#src'),t=b.querySelector('span');b.className='chip src'+(src==='binance'||src==='twelve'?' live':src==='wait'||net===null?' wait':'');
- t.textContent=net===null?'Prüfe Verbindung…':src==='wait'?'Lade…':src==='binance'?'Live · Binance':src==='twelve'?'Live · 1 Min.':err==='Schlüssel fehlt'?'Simuliert · Schlüssel fehlt':'Simuliert';
- $('#ntxt').textContent=src==='binance'?'Echtzeitkurse von Binance in USDT'+(sym.id==='XAU'?', Gold über den Token PAXG.':'.'):src==='twelve'?'Silberkurs von Twelve Data, Aktualisierung jede Minute.':'Simulierte Kurse zur Demonstration, keine echten Marktdaten.';
+ t.textContent=net===null?'Prüfe Verbindung…':src==='wait'?'Lade…':src==='binance'?'Live · Binance':src==='twelve'?'Live · 15 Min.':err==='Schlüssel fehlt'?'Simuliert · Schlüssel fehlt':'Simuliert';
+ $('#ntxt').textContent=src==='binance'?'Echtzeitkurse von Binance in USDT'+(sym.id==='XAU'?', Gold über den Token PAXG.':'.'):src==='twelve'?sym.name+'kurs (Spot '+sym.pair+') von Twelve Data, Aktualisierung alle 15 Minuten.':'Simulierte Kurse zur Demonstration, keine echten Marktdaten.';
  $('#pinfo').textContent=net?'Verbindung zu den Kursanbietern steht.':net===null?'Verbindung wird geprüft …':'Hier sind keine Verbindungen zu Kursanbietern möglich, deshalb laufen simulierte Kurse. Öffne Chartwerk als Datei auf deinem Computer oder auf einer eigenen Webadresse, dann laden Echtzeitkurse automatisch.';
- $('#plist').innerHTML=SYMS.map(s=>`<li><span>${s.name}</span><span>${!net?'simuliert':s.bn?'Binance live'+(s.id==='XAU'?' (PAXG)':''):tdKey?'Twelve Data, 1 Min.':'simuliert, Schlüssel fehlt'}</span></li>`).join('')+(err&&err!=='Schlüssel fehlt'?`<li><span>Letzter Fehler</span><span>${err.replace(/</g,'&lt;')}</span></li>`:'')}
+ $('#plist').innerHTML=SYMS.map(s=>`<li><span>${s.name}</span><span>${!net?'simuliert':s.td&&tdKey?'Twelve Data, alle 15 Min.':s.bn?'Binance live'+(s.id==='XAU'?' (PAXG)':''):'simuliert, Schlüssel fehlt'}</span></li>`).join('')+(err&&err!=='Schlüssel fehlt'?`<li><span>Letzter Fehler</span><span>${err.replace(/</g,'&lt;')}</span></li>`:'')}
 
 $('#syms').innerHTML=SYMS.map(s=>`<button class="chip" data-id="${s.id}">${s.name}</button>`).join('');
 $('#tfs').innerHTML=TFS.map(t=>`<button class="chip" data-id="${t.id}">${t.l}</button>`).join('');
