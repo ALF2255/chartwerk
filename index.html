@@ -290,35 +290,53 @@ function calcZZ(){
 const erf=z=>{const t=1/(1+.3275911*Math.abs(z)),v=1-(((((1.061405429*t-1.453152027)*t)+1.421413741)*t-.284496736)*t+.254829592)*t*Math.exp(-z*z);return z>=0?v:-v};
 const Phi=z=>.5*(1+erf(z/Math.SQRT2));
 function closeOf(t){if(tf.id==='1M'){const d=new Date(t);return Date.UTC(d.getUTCFullYear(),d.getUTCMonth()+1,1)}return t+ms()}
-let VSK='',VS=null;
-function getVS(){const n=data.length;if(n<45)return null;const key=sym.id+tf.id+n+'|'+data[0].t+'|'+data[n-2].c;if(key===VSK)return VS;VSK=key;
+let VSK='',VS=null;const GC=new Map();
+const lowB=(a,v)=>{let lo=0,hi=a.length;while(lo<hi){const m=(lo+hi)>>1;if(a[m]<v)lo=m+1;else hi=m}return lo};
+const qAbs=(a,p)=>{const x=p*(a.length-1),k=Math.floor(x);return a[k]+(a[Math.min(a.length-1,k+1)]-a[k])*(x-k)};
+function getVS(){const n=data.length;if(n<45)return null;const key=sym.id+tf.id+n+'|'+data[0].t+'|'+data[n-2].c;if(key===VSK)return VS;VSK=key;GC.clear();
  const r=new Float64Array(n);for(let i=1;i<n;i++){const a=data[i-1].c,b=data[i].c;r[i]=a>0&&b>0?Math.log(b/a):0}
  const last=n-2,start=Math.max(32,last-499);let init=0;for(let i=1;i<=30;i++)init+=r[i]*r[i];init=init/30||1e-8;
  const run=lam=>{const ev=new Float64Array(n);let v=init;for(let i=1;i<n-1;i++){v=lam*v+(1-lam)*r[i]*r[i];ev[i]=v}return ev};
  let best=null;for(const lam of[.9,.94,.97,.985]){const ev=run(lam);let ll=0;for(let k=start;k<=last;k++){const v=Math.max(ev[k-1],1e-14);ll+=Math.log(v)+r[k]*r[k]/v}if(!best||ll<best.ll)best={lam,ev,ll}}
- const bt={n:0,e68:0,e95:0,f68:0,f95:0};
- for(let k=start;k<=last;k++){const se=Math.sqrt(best.ev[k-1]);let s=0,s2=0,m=0;for(let j=Math.max(1,k-200);j<k;j++){s+=r[j];s2+=r[j]*r[j];m++}
-  const sf=Math.sqrt(Math.max(0,(s2-s*s/m)/(m-1))),a=Math.abs(r[k]);bt.n++;if(a<=se)bt.e68++;if(a<=1.96*se)bt.e95++;if(a<=sf)bt.f68++;if(a<=1.96*sf)bt.f95++}
- return VS={sig:Math.sqrt(best.ev[n-2]),lam:best.lam,hl:Math.log(.5)/Math.log(best.lam),bt}}
+ const ev=best.ev,pool=[],bt={n:0,e68:0,e95:0,f68:0,f95:0};
+ for(let k=32;k<=last;k++){const se=Math.sqrt(Math.max(ev[k-1],1e-14)),a=Math.abs(r[k]),z=a/se;
+  if(k>=start){let q1=1,q2=1.96;if(pool.length>=50){q1=qAbs(pool,.68);q2=qAbs(pool,.95)}
+   let s=0,s2=0,m=0;for(let j=Math.max(1,k-200);j<k;j++){s+=r[j];s2+=r[j]*r[j];m++}const sf=Math.sqrt(Math.max(0,(s2-s*s/m)/(m-1)));
+   bt.n++;if(z<=q1)bt.e68++;if(z<=q2)bt.e95++;if(a<=sf)bt.f68++;if(a<=1.96*sf)bt.f95++}
+  pool.splice(lowB(pool,z),0,z)}
+ const zs=[];for(let k=32;k<=last;k++){const z=r[k]/Math.sqrt(Math.max(ev[k-1],1e-14));zs.push(z,-z)}zs.sort((a,b)=>a-b);
+ let lr=0;for(let i=1;i<=last;i++)lr+=r[i]*r[i];lr/=last;
+ return VS={sig:Math.sqrt(ev[n-2]),lam:best.lam,hl:Math.log(.5)/Math.log(best.lam),bt,zs,q68:qAbs(pool,.68),q95:qAbs(pool,.95),lr}}
+const cdf=(V,x)=>{const a=V.zs,N=a.length;if(x<=a[0])return .5/N;if(x>=a[N-1])return 1-.5/N;const k=lowB(a,x);return(k-1+(x-a[k-1])/(a[k]-a[k-1]))/(N-1)};
 function forecast(){const n=data.length,V=getVS();if(!V||!(V.sig>0))return null;const L=data[n-1],m=ms(),sig=V.sig;
  let ct=closeOf(L.t),rem=ct-Date.now(),beat=L.o,next=false;const cur=L.c;
  if(rem<=0){next=true;beat=L.c;rem=m;ct=Date.now()+m}
- const s=sig*Math.sqrt(Math.min(1.5,rem/m)),pu=Phi(Math.log(cur/beat)/s);
- return{sig,beat,cur,rem,ct,next,pu,s,V}}
+ const s=sig*Math.sqrt(Math.min(1.5,rem/m)),pu=cdf(V,Math.log(cur/beat)/s);
+ return{sig,beat,cur,rem,ct,next,pu,s,V,q68:V.q68,q95:V.q95}}
 const pfmt=p=>p<.001?'<0,1 %':p>.999?'>99,9 %':(p<.1?(Math.round(p*1000)/10).toLocaleString('de-DE'):Math.round(p*100))+' %';
-function goalTxt(B){const n=data.length,V=getVS();if(!V||!(V.sig>0))return 'Ziel '+fmt(B);const S=data[n-1].c,L=Math.log(B/S),f=sym.m&&tf.h<168?5/7:1;
- const H=[['1W',7],['1M',30],['3M',91],['1J',365]].map(([l,dd])=>{const v=V.sig*Math.sqrt(dd*864e5/ms()*f);const t=pfmt(Math.min(1,2*Phi(-Math.abs(L)/v)));return l+' '+(W<520?t.replace(' %','%'):t)});
+const HZ=[['1W',7],['1M',30],['3M',91],['1J',365]];
+function goalProb(B){const V=getVS(),n=data.length;if(!V||!(V.sig>0))return null;const S=data[n-1].c,key=VSK+'|'+B.toFixed(6)+'|'+Math.round(S*1e4);
+ if(GC.has(key))return GC.get(key);const L=Math.log(B/S),f=sym.m&&tf.h<168?5/7:1,per=d=>d*864e5/ms()*f,K=per(365),g=Math.max(1,Math.ceil(K/400)),St=Math.ceil(K/g);
+ const R=rng(hash(key)),zs=V.zs,Z=zs.length,s0=V.sig*V.sig,lr=V.lr,lam=V.lam,nrm=()=>{let u=0,v=0;while(!u)u=R();while(!v)v=R();return Math.sqrt(-2*Math.log(u))*Math.cos(2*Math.PI*v)};
+ const vr=new Float64Array(St+1);for(let s=1;s<=St;s++){const t=(s-.5)*g;vr[s]=(lr+(s0-lr)*Math.pow(lam,t))*g}
+ const P=2000,hit=new Float64Array(St+2);
+ for(let p=0;p<P;p++){let x=0;for(let s=1;s<=St;s++){const sd=Math.sqrt(vr[s]),x1=x+(g===1?zs[Math.floor(R()*Z)]:nrm())*sd;
+   const d0=L-x,d1=L-x1;if(d0*d1<=0||R()<Math.exp(-2*d0*d1/vr[s])){hit[s]++;break}x=x1}}
+ for(let s=1;s<=St;s++)hit[s]+=hit[s-1];
+ const res=HZ.map(([l,d])=>[l,Math.min(1,hit[Math.min(St,Math.max(1,Math.round(per(d)/g)))]/P)]);GC.set(key,res);if(GC.size>60)GC.delete(GC.keys().next().value);return res}
+function goalTxt(B){const n=data.length,res=goalProb(B);if(!res)return 'Ziel '+fmt(B);const S=data[n-1].c;
+ const H=res.map(([l,p])=>{const t=pfmt(p);return l+' '+(W<520?t.replace(' %','%'):t)});
  if(W<520)return 'Ziel '+fmt(B)+' → '+H.join(' ');
- const pc=(B/S-1)*100;return 'Ziel '+fmt(B)+(W>=520?' ('+(pc>=0?'+':'−')+Math.abs(pc).toLocaleString('de-DE',{maximumFractionDigits:1})+' %)':'')+' · erreicht: '+H.join(' · ')}
+ const pc=(B/S-1)*100;return 'Ziel '+fmt(B)+' ('+(pc>=0?'+':'−')+Math.abs(pc).toLocaleString('de-DE',{maximumFractionDigits:1})+' %) · erreicht: '+H.join(' · ')}
 function progUI(){const el=$('#pg');const f=showPG&&data.length?forecast():null;if(!f){el.hidden=true;return}el.hidden=false;
  const pu=Math.min(99,Math.max(1,Math.round(f.pu*100)));$('#pgu').textContent=pu+' %';$('#pgd').textContent=(100-pu)+' %';$('#pgbar').style.width=pu+'%';
  $('#pgt').textContent=tf.l+'-Kerze';$('#pgbeat').textContent=fmt(f.beat);
  const S=Math.max(0,Math.floor((f.ct-Date.now())/1000)),d=Math.floor(S/86400),h=Math.floor(S%86400/3600),mi=Math.floor(S%3600/60),p2=v=>String(v).padStart(2,'0');
  $('#pgcl').textContent=f.next?'Gilt für':'Kerze schließt in';$('#pgcd').textContent=f.next?'nächste Kerze':d?d+' T '+h+' Std':(h?h+':':'')+p2(mi)+':'+p2(S%60);
- $('#pgrng').textContent=fmt(f.cur*Math.exp(-f.s))+' – '+fmt(f.cur*Math.exp(f.s));
+ $('#pgrng').textContent=fmt(f.cur*Math.exp(-f.q68*f.s))+' – '+fmt(f.cur*Math.exp(f.q68*f.s));
  const b=f.V.bt,q=v=>Math.round(v/b.n*100)+' %';$('#pgbn').textContent=b.n+' Kerzen';
  $('#pgb68').textContent=q(b.e68)+' (alt '+q(b.f68)+')';$('#pgb95').textContent=q(b.e95)+' (alt '+q(b.f95)+')';
- $('#pgf').textContent='Backtest: Anteil der Kerzen, die in der vorhergesagten Spanne schlossen. Neuere Kerzen zählen mehr (Halbwertszeit ≈ '+Math.round(f.V.hl)+' Kerzen, per Backtest gewählt). Ideal: 68 % und 95 %. Keine Anlageberatung.'}
+ $('#pgf').textContent='Backtest: Anteil der Kerzen, die in der vorhergesagten Spanne schlossen, jeweils nur mit Daten von davor gerechnet. Ideal: 68 % und 95 %. Neuere Kerzen zählen mehr (Halbwertszeit ≈ '+Math.round(f.V.hl)+' Kerzen), Ausreißer werden aus den eigenen Kursen gemessen. Keine Anlageberatung.'}
 function calcZones(){const n=data.length,out=[];if(n<10||!zz.length)return out;const cur=data[n-1].c,minH=cur*.002;
  for(const q of zz){if(q.open||q.i>=n)continue;const b=data[q.i];let lo,hi;
   if(q.u){lo=Math.max(b.o,b.c);hi=b.h;if(hi-lo<minH)lo=hi-minH}else{lo=b.l;hi=Math.min(b.o,b.c);if(hi-lo<minH)hi=lo+minH}
@@ -437,7 +455,7 @@ function draw(){
  const FC=showPG?forecast():null;
  if(FC){const c0=n-1,m=ms(),K=12,u1=[],d1=[],u2=[],d2=[];
   for(let k=0;k<=K;k++){const s=k?FC.sig*Math.sqrt((FC.rem+(k-1)*m)/m):0,xx=x(c0+k);
-   u1.push([xx,y(FC.cur*Math.exp(s))]);d1.push([xx,y(FC.cur*Math.exp(-s))]);u2.push([xx,y(FC.cur*Math.exp(1.96*s))]);d2.push([xx,y(FC.cur*Math.exp(-1.96*s))])}
+   u1.push([xx,y(FC.cur*Math.exp(FC.q68*s))]);d1.push([xx,y(FC.cur*Math.exp(-FC.q68*s))]);u2.push([xx,y(FC.cur*Math.exp(FC.q95*s))]);d2.push([xx,y(FC.cur*Math.exp(-FC.q95*s))])}
   const band=(a,b,c)=>{ctx.beginPath();a.forEach((q,j)=>j?ctx.lineTo(...q):ctx.moveTo(...q));for(let j=b.length-1;j>=0;j--)ctx.lineTo(...b[j]);ctx.closePath();ctx.fillStyle=c;ctx.fill()};
   band(u2,d2,'rgba(76,141,255,.08)');band(u1,d1,'rgba(76,141,255,.17)');
   ctx.lineWidth=1;ctx.strokeStyle='rgba(76,141,255,.55)';[u1,d1].forEach(a=>{ctx.beginPath();a.forEach((q,j)=>j?ctx.lineTo(...q):ctx.moveTo(...q));ctx.stroke()});
