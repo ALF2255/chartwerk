@@ -101,6 +101,7 @@ canvas{position:absolute;inset:0;width:100%;height:100%;touch-action:none;cursor
   <button class="chip" id="ma" aria-pressed="true">MA 20/50</button>
   <button class="chip" id="zzb" aria-pressed="true">Zickzack</button>
   <button class="chip" id="zzs" title="Zickzack-Einstellungen" aria-label="Zickzack-Einstellungen" style="padding:0 10px"><svg viewBox="0 0 22 22" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M3 5h9M3 11h13M3 17h9"/><circle cx="15.5" cy="5" r="2"/><circle cx="15.5" cy="17" r="2"/></svg></button>
+  <button class="chip" id="trb" aria-pressed="true">Trend</button>
   <button class="chip" id="znb" aria-pressed="true">Zonen</button>
   <button class="chip" id="pgb" aria-pressed="true">Prognose</button>
   <button class="chip" id="fit">Ansicht zurücksetzen</button></div>
@@ -140,9 +141,11 @@ canvas{position:absolute;inset:0;width:100%;height:100%;touch-action:none;cursor
   <div class="pgk"><span>Kurs zu schlagen</span><b id="pgbeat">–</b></div>
   <div class="pgk"><span id="pgcl">Kerze schließt in</span><b id="pgcd">–</b></div>
   <div class="pgk"><span>Spanne</span><b id="pgrng">–</b></div>
+  <div class="pgk"><span>Trend</span><b id="pgtr">–</b></div>
   <div class="pgs"><span>Backtest</span><span id="pgbn"></span></div>
   <div class="pgk"><span>68 %-Spanne</span><b id="pgb68">–</b></div>
   <div class="pgk"><span>95 %-Spanne</span><b id="pgb95">–</b></div>
+  <div class="pgk"><span>Richtung richtig</span><b id="pgacc">–</b></div>
   <div class="pgf" id="pgf"></div>
  </div>
  <div class="panel" id="zzp" role="dialog" aria-label="Zickzack-Einstellungen">
@@ -227,6 +230,7 @@ const HINTS={cross:'Fadenkreuz: ziehen bewegt das Kreuz. Im Auswahlmodus geht es
 
 let sym=SYMS[0],tf=TFS[2],data=[],ma20=[],ma50=[],tool='cursor',color=COLORS[0],drawings=[],sel=-1,undo=[],showMA=true,showZZ=true,zz=[];
 const ZZDEF={dev:5,depth:20,c:'#2962ff',w:1.6,proj:true,price:false,vol:false,chg:false,mode:'pct'};
+let showTR=true;try{showTR=localStorage.getItem('chartwerk:tr')!=='0'}catch(e){}
 let showZN=true;try{showZN=localStorage.getItem('chartwerk:zn')!=='0'}catch(e){}
 let showPG=true;try{showPG=localStorage.getItem('chartwerk:pg')!=='0'}catch(e){}
 let zzo=JSON.parse(JSON.stringify(ZZDEF));try{const z=JSON.parse(localStorage.getItem('chartwerk:zz')||'null');if(z&&isFinite(z.dev))zzo=Object.assign(zzo,z)}catch(e){}
@@ -306,13 +310,17 @@ function getVS(){const n=data.length;if(n<45)return null;const key=sym.id+tf.id+
   pool.splice(lowB(pool,z),0,z)}
  const zs=[];for(let k=32;k<=last;k++){const z=r[k]/Math.sqrt(Math.max(ev[k-1],1e-14));zs.push(z,-z)}zs.sort((a,b)=>a-b);
  let lr=0;for(let i=1;i<=last;i++)lr+=r[i]*r[i];lr/=last;
- return VS={sig:Math.sqrt(ev[n-2]),lam:best.lam,hl:Math.log(.5)/Math.log(best.lam),bt,zs,q68:qAbs(pool,.68),q95:qAbs(pool,.95),lr}}
+ let tb=null;for(const N of[20,50,100]){if(start-N<1)continue;let br=0,cn=0,ok=0,s=0;for(let j=start-N;j<start;j++)s+=r[j];
+  for(let k=start;k<=last;k++){const mu=s/N,se=Math.sqrt(Math.max(ev[k-1],1e-14)),P=Phi(mu/se);if(r[k]!==0){const y=r[k]>0?1:0;br+=(P-y)**2;cn++;if((mu>0)===(y===1))ok++}s+=r[k]-r[k-N]}
+  if(cn&&(!tb||br/cn<tb.br))tb={N,br:br/cn,acc:ok/cn}}
+ if(tb){let s=0;for(let j=n-1-tb.N;j<=n-2;j++)s+=r[j];tb.mu=s/tb.N;tb.on=tb.br<.2495}
+ return VS={sig:Math.sqrt(ev[n-2]),lam:best.lam,hl:Math.log(.5)/Math.log(best.lam),bt,zs,q68:qAbs(pool,.68),q95:qAbs(pool,.95),lr,tr:tb}}
 const cdf=(V,x)=>{const a=V.zs,N=a.length;if(x<=a[0])return .5/N;if(x>=a[N-1])return 1-.5/N;const k=lowB(a,x);return(k-1+(x-a[k-1])/(a[k]-a[k-1]))/(N-1)};
 function forecast(){const n=data.length,V=getVS();if(!V||!(V.sig>0))return null;const L=data[n-1],m=ms(),sig=V.sig;
  let ct=closeOf(L.t),rem=ct-Date.now(),beat=L.o,next=false;const cur=L.c;
  if(rem<=0){next=true;beat=L.c;rem=m;ct=Date.now()+m}
- const s=sig*Math.sqrt(Math.min(1.5,rem/m)),pu=cdf(V,Math.log(cur/beat)/s);
- return{sig,beat,cur,rem,ct,next,pu,s,V,q68:V.q68,q95:V.q95}}
+ const mu=V.tr&&V.tr.on?V.tr.mu:0,fr=Math.min(1.5,rem/m),s=sig*Math.sqrt(fr),pu=cdf(V,(Math.log(cur/beat)+mu*fr)/s);
+ return{sig,beat,cur,rem,ct,next,pu,s,V,q68:V.q68,q95:V.q95,mu,fr}}
 const pfmt=p=>p<.001?'<0,1 %':p>.999?'>99,9 %':(p<.1?(Math.round(p*1000)/10).toLocaleString('de-DE'):Math.round(p*100))+' %';
 const HZ=[['1W',7],['1M',30],['3M',91],['1J',365]];
 function goalProb(B){const V=getVS(),n=data.length;if(!V||!(V.sig>0))return null;const S=data[n-1].c,key=VSK+'|'+B.toFixed(6)+'|'+Math.round(S*1e4);
@@ -333,7 +341,9 @@ function progUI(){const el=$('#pg');const f=showPG&&data.length?forecast():null;
  $('#pgt').textContent=tf.l+'-Kerze';$('#pgbeat').textContent=fmt(f.beat);
  const S=Math.max(0,Math.floor((f.ct-Date.now())/1000)),d=Math.floor(S/86400),h=Math.floor(S%86400/3600),mi=Math.floor(S%3600/60),p2=v=>String(v).padStart(2,'0');
  $('#pgcl').textContent=f.next?'Gilt für':'Kerze schließt in';$('#pgcd').textContent=f.next?'nächste Kerze':d?d+' T '+h+' Std':(h?h+':':'')+p2(mi)+':'+p2(S%60);
- $('#pgrng').textContent=fmt(f.cur*Math.exp(-f.q68*f.s))+' – '+fmt(f.cur*Math.exp(f.q68*f.s));
+ const ce=f.cur*Math.exp(f.mu*f.fr);$('#pgrng').textContent=fmt(ce*Math.exp(-f.q68*f.s))+' – '+fmt(ce*Math.exp(f.q68*f.s));
+ const T=f.V.tr;$('#pgtr').textContent=!T?'–':T.on?(T.mu>=0?'↑ +':'↓ −')+Math.abs(T.mu*100).toLocaleString('de-DE',{maximumFractionDigits:3})+' %/Kerze':'aus, bringt nichts';
+ $('#pgacc').textContent=T?Math.round(T.acc*100)+' % (Zufall 50 %)':'–';
  const b=f.V.bt,q=v=>Math.round(v/b.n*100)+' %';$('#pgbn').textContent=b.n+' Kerzen';
  $('#pgb68').textContent=q(b.e68)+' (alt '+q(b.f68)+')';$('#pgb95').textContent=q(b.e95)+' (alt '+q(b.f95)+')';
  $('#pgf').textContent='Backtest: Anteil der Kerzen, die in der vorhergesagten Spanne schlossen, jeweils nur mit Daten von davor gerechnet. Ideal: 68 % und 95 %. Neuere Kerzen zählen mehr (Halbwertszeit ≈ '+Math.round(f.V.hl)+' Kerzen), Ausreißer werden aus den eigenen Kursen gemessen. Keine Anlageberatung.'}
@@ -452,14 +462,21 @@ function draw(){
     if(!ln.length)continue;const y0=y(q.p);
     ln.forEach((t,k)=>{const off=q.u?-6-(ln.length-1-k)*13:6+k*13;ctx.textBaseline=q.u?'bottom':'top';ctx.fillText(t,xx,y0+off)})}
    ctx.textAlign='left'}}
+ if(showTR){const pv=zz.filter(q=>!q.open&&q.i<n);ctx.font='11px "IBM Plex Sans",system-ui';
+  [[pv.filter(q=>q.u),0],[pv.filter(q=>!q.u),1]].forEach(([a,sup])=>{if(a.length<2)return;const A=a[a.length-2],B=a[a.length-1],f=i=>A.p+(B.p-A.p)*(i-A.i)/(B.i-A.i),ie=idx(w);
+   const now=f(n-1),brk=sup?data[n-1].c<now:data[n-1].c>now,col=sup?UP:DN;
+   ctx.strokeStyle=col;ctx.globalAlpha=brk?.45:.9;ctx.lineWidth=1.8;ctx.setLineDash([9,5]);seg(x(A.i),y(A.p),w,y(f(ie)));ctx.setLineDash([]);
+   [A,B].forEach(q=>{ctx.beginPath();ctx.arc(x(q.i),y(q.p),3.5,0,7);ctx.fillStyle=col;ctx.fill()});
+   ctx.fillStyle=col;ctx.textAlign='right';ctx.textBaseline=sup?'top':'bottom';ctx.fillText((sup?'Trend-Unterstützung ':'Trend-Widerstand ')+fmt(now)+(brk?' · gebrochen':''),w-6,y(f(ie))+(sup?5:-5));ctx.globalAlpha=1});
+  ctx.textAlign='left';ctx.textBaseline='middle'}
  const FC=showPG?forecast():null;
  if(FC){const c0=n-1,m=ms(),K=12,u1=[],d1=[],u2=[],d2=[];
-  for(let k=0;k<=K;k++){const s=k?FC.sig*Math.sqrt((FC.rem+(k-1)*m)/m):0,xx=x(c0+k);
-   u1.push([xx,y(FC.cur*Math.exp(FC.q68*s))]);d1.push([xx,y(FC.cur*Math.exp(-FC.q68*s))]);u2.push([xx,y(FC.cur*Math.exp(FC.q95*s))]);d2.push([xx,y(FC.cur*Math.exp(-FC.q95*s))])}
+  for(let k=0;k<=K;k++){const tk=k?(FC.rem+(k-1)*m)/m:0,s=k?FC.sig*Math.sqrt(tk):0,xx=x(c0+k),cc=FC.cur*Math.exp(FC.mu*tk);
+   u1.push([xx,y(cc*Math.exp(FC.q68*s))]);d1.push([xx,y(cc*Math.exp(-FC.q68*s))]);u2.push([xx,y(cc*Math.exp(FC.q95*s))]);d2.push([xx,y(cc*Math.exp(-FC.q95*s))])}
   const band=(a,b,c)=>{ctx.beginPath();a.forEach((q,j)=>j?ctx.lineTo(...q):ctx.moveTo(...q));for(let j=b.length-1;j>=0;j--)ctx.lineTo(...b[j]);ctx.closePath();ctx.fillStyle=c;ctx.fill()};
   band(u2,d2,'rgba(76,141,255,.08)');band(u1,d1,'rgba(76,141,255,.17)');
   ctx.lineWidth=1;ctx.strokeStyle='rgba(76,141,255,.55)';[u1,d1].forEach(a=>{ctx.beginPath();a.forEach((q,j)=>j?ctx.lineTo(...q):ctx.moveTo(...q));ctx.stroke()});
-  ctx.setLineDash([4,4]);ctx.strokeStyle='rgba(76,141,255,.8)';seg(x(c0),y(FC.cur),x(c0+K),y(FC.cur));
+  ctx.setLineDash([4,4]);ctx.strokeStyle='rgba(76,141,255,.8)';seg(x(c0),y(FC.cur),x(c0+K),y(FC.cur*Math.exp(FC.mu*(FC.rem+(K-1)*m)/m)));
   const by=Math.round(y(FC.beat))+.5,bx=x(c0)-view.bw*.6;ctx.setLineDash([2,3]);ctx.strokeStyle='#e7ecef';seg(bx,by,x(c0+K),by);ctx.setLineDash([]);
   ctx.font='11px "IBM Plex Sans",system-ui';ctx.fillStyle='#e7ecef';ctx.textAlign='right';ctx.textBaseline=FC.cur>=FC.beat?'top':'bottom';ctx.fillText('Zu schlagen',x(c0+K),by+(FC.cur>=FC.beat?3:-3));ctx.textAlign='left'}
  if(!hidden)drawings.forEach((d,k)=>shape(d,k===sel));
@@ -513,7 +530,7 @@ function ui(){
  document.querySelectorAll('.sw').forEach(b=>b.setAttribute('aria-pressed',b.dataset.c===color));
  $('#vis').setAttribute('aria-pressed',hidden);$('#vis').innerHTML='<svg viewBox="0 0 22 22"><path d="M2 11s3.5-6 9-6 9 6 9 6-3.5 6-9 6-9-6-9-6z"/><circle cx="11" cy="11" r="2.5"/>'+(hidden?'<path d="M4 3l14 16"/>':'')+'</svg>';$('#vis').title=hidden?'Zeichnungen einblenden':'Zeichnungen ausblenden';
  if($('#fibp').classList.contains('on'))fibUI();
- $('#ma').setAttribute('aria-pressed',showMA);$('#mag').setAttribute('aria-pressed',magnet>0);$('#magbd').textContent=['','•','••'][magnet];$('#mag').title=['Magnet aus','Magnet schwach','Magnet stark'][magnet];$('#zzb').setAttribute('aria-pressed',showZZ);$('#pgb').setAttribute('aria-pressed',showPG);$('#znb').setAttribute('aria-pressed',showZN);progUI();
+ $('#ma').setAttribute('aria-pressed',showMA);$('#mag').setAttribute('aria-pressed',magnet>0);$('#magbd').textContent=['','•','••'][magnet];$('#mag').title=['Magnet aus','Magnet schwach','Magnet stark'][magnet];$('#zzb').setAttribute('aria-pressed',showZZ);$('#pgb').setAttribute('aria-pressed',showPG);$('#znb').setAttribute('aria-pressed',showZN);$('#trb').setAttribute('aria-pressed',showTR);progUI();
  $('#undo').disabled=!undo.length;$('#del').disabled=sel<0||locked(drawings[sel]);$('#lock').disabled=sel<0||lockAll;$('#lock').setAttribute('aria-pressed',sel>=0&&!!drawings[sel]?.lk);$('#lockall').setAttribute('aria-pressed',lockAll);$('#clear').disabled=!drawings.length;
  status();
  $('#pair').textContent=src==='binance'&&sym.lp?sym.lp:sym.pair;
@@ -563,6 +580,7 @@ $('#syms').onclick=e=>{const b=e.target.closest('.chip');if(!b)return;sym=SYMS.f
 $('#tfs').onclick=e=>{const b=e.target.closest('.chip');if(!b)return;tf=TFS.find(t=>t.id===b.dataset.id);loadData(true)};
 $('#ma').onclick=()=>{showMA=!showMA;ui();draw()};
 $('#zzb').onclick=()=>{showZZ=!showZZ;ui();draw()};
+$('#trb').onclick=()=>{showTR=!showTR;try{localStorage.setItem('chartwerk:tr',showTR?'1':'0')}catch(e){}ui();draw()};
 $('#znb').onclick=()=>{showZN=!showZN;try{localStorage.setItem('chartwerk:zn',showZN?'1':'0')}catch(e){}ui();draw()};
 $('#pgb').onclick=()=>{showPG=!showPG;try{localStorage.setItem('chartwerk:pg',showPG?'1':'0')}catch(e){}ui();draw()};
 setInterval(()=>{if(showPG&&data.length){progUI();draw()}},1000);
