@@ -100,6 +100,7 @@ canvas{position:absolute;inset:0;width:100%;height:100%;touch-action:none;cursor
   <button class="chip" id="ma" aria-pressed="true">MA 20/50</button>
   <button class="chip" id="zzb" aria-pressed="true">Zickzack</button>
   <button class="chip" id="zzs" title="Zickzack-Einstellungen" aria-label="Zickzack-Einstellungen" style="padding:0 10px"><svg viewBox="0 0 22 22" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M3 5h9M3 11h13M3 17h9"/><circle cx="15.5" cy="5" r="2"/><circle cx="15.5" cy="17" r="2"/></svg></button>
+  <button class="chip" id="znb" aria-pressed="true">Zonen</button>
   <button class="chip" id="pgb" aria-pressed="true">Prognose</button>
   <button class="chip" id="fit">Ansicht zurücksetzen</button></div>
  </div>
@@ -221,6 +222,7 @@ const HINTS={cross:'Fadenkreuz: ziehen bewegt das Kreuz. Im Auswahlmodus geht es
 
 let sym=SYMS[0],tf=TFS[2],data=[],ma20=[],ma50=[],tool='cursor',color=COLORS[0],drawings=[],sel=-1,undo=[],showMA=true,showZZ=true,zz=[];
 const ZZDEF={dev:5,depth:20,c:'#2962ff',w:1.6,proj:true,price:false,vol:false,chg:false,mode:'pct'};
+let showZN=true;try{showZN=localStorage.getItem('chartwerk:zn')!=='0'}catch(e){}
 let showPG=true;try{showPG=localStorage.getItem('chartwerk:pg')!=='0'}catch(e){}
 let zzo=JSON.parse(JSON.stringify(ZZDEF));try{const z=JSON.parse(localStorage.getItem('chartwerk:zz')||'null');if(z&&isFinite(z.dev))zzo=Object.assign(zzo,z)}catch(e){}
 let view={end:0,bw:8},sc={lo:0,hi:1},W=0,H=0,dpr=1,hover=null,act=null,inited=false,clearArm=0,toastT=0;
@@ -296,6 +298,14 @@ function progUI(){const el=$('#pg');const f=showPG&&data.length?forecast():null;
  const S=Math.max(0,Math.floor((f.ct-Date.now())/1000)),d=Math.floor(S/86400),h=Math.floor(S%86400/3600),mi=Math.floor(S%3600/60),p2=v=>String(v).padStart(2,'0');
  $('#pgcl').textContent=f.next?'Gilt für':'Kerze schließt in';$('#pgcd').textContent=f.next?'nächste Kerze':d?d+' T '+h+' Std':(h?h+':':'')+p2(mi)+':'+p2(S%60);
  $('#pgrng').textContent=fmt(f.cur*Math.exp(-f.s))+' – '+fmt(f.cur*Math.exp(f.s))}
+function calcZones(){const n=data.length,out=[];if(n<10||!zz.length)return out;const cur=data[n-1].c,minH=cur*.002;
+ for(const q of zz){if(q.open||q.i>=n)continue;const b=data[q.i];let lo,hi;
+  if(q.u){lo=Math.max(b.o,b.c);hi=b.h;if(hi-lo<minH)lo=hi-minH}else{lo=b.l;hi=Math.min(b.o,b.c);if(hi-lo<minH)hi=lo+minH}
+  let ok=true;for(let k=q.i+1;k<n;k++){const c=data[k].c;if(q.u?c>hi:c<lo){ok=false;break}}
+  if(ok)out.push({i:q.i,lo,hi,buy:!q.u,d:q.u?Math.max(0,lo-cur):Math.max(0,cur-hi)})}
+ const mg=[];out.sort((a,c)=>a.lo-c.lo).forEach(z=>{const m=mg.find(q=>q.buy===z.buy&&z.lo<=q.hi&&z.hi>=q.lo);
+  if(m){m.lo=Math.min(m.lo,z.lo);m.hi=Math.max(m.hi,z.hi);m.i=Math.min(m.i,z.i);m.d=Math.min(m.d,z.d)}else mg.push({...z})});
+ const pick=b=>mg.filter(z=>z.buy===b).sort((a,c)=>a.d-c.d).slice(0,3);return[...pick(true),...pick(false)]}
 function sma(n){const o=[];let s=0;data.forEach((b,i)=>{s+=b.c;if(i>=n)s-=data[i-n].c;o.push(i>=n-1?s/n:null)});return o}
 function idxOfT(t){const n=data.length;if(t>=data[n-1].t)return n-1+(t-data[n-1].t)/ms();if(t<=data[0].t)return(t-data[0].t)/ms();
  let a=0,b=n-1;while(b-a>1){const m=(a+b)>>1;if(data[m].t<=t)a=m;else b=m}return a+(t-data[a].t)/(data[b].t-data[a].t)}
@@ -375,6 +385,12 @@ function draw(){
  for(let i=Math.ceil(i0/ev)*ev;i<=i1;i+=ev){const xx=Math.round(x(i))+.5;ctx.strokeStyle=GRID;seg(xx,TOP-24,xx,H-BX);if(xx>30&&xx<w-30){ctx.fillStyle=MUTE;ctx.fillText(tlabel(data[i].t),xx,H-8)}}
  ctx.strokeStyle='#2a333a';seg(w+.5,0,w+.5,H);seg(0,H-BX+.5,W,H-BX+.5);
  ctx.save();ctx.beginPath();ctx.rect(0,0,w,H-BX);ctx.clip();
+ if(showZN){ctx.font='11px "IBM Plex Sans",system-ui';ctx.textAlign='right';
+  calcZones().forEach(z=>{const x0=Math.max(0,x(z.i)-view.bw/2);if(x0>=w)return;const y0=y(z.hi),y1=y(z.lo),c=z.buy?'38,166,154':'239,83,80';
+   ctx.fillStyle=`rgba(${c},.13)`;ctx.fillRect(x0,y0,w-x0,y1-y0);ctx.strokeStyle=`rgba(${c},.6)`;ctx.lineWidth=1;ctx.setLineDash([]);seg(x0,y0,w,y0);seg(x0,y1,w,y1);
+   const t=(z.buy?'Kaufzone ':'Verkaufszone ')+fmt(z.lo)+' – '+fmt(z.hi);ctx.fillStyle=`rgb(${c})`;
+   if(y1-y0>15){ctx.textBaseline='middle';ctx.fillText(t,w-6,(y0+y1)/2)}else if(z.buy){ctx.textBaseline='top';ctx.fillText(t,w-6,y1+3)}else{ctx.textBaseline='bottom';ctx.fillText(t,w-6,y0-3)}});
+  ctx.textAlign='left';ctx.textBaseline='middle'}
  const bw=view.bw,cw=Math.max(1,bw*.7),vh=h*.16,bot=TOP+h;
  for(let i=i0;i<=i1;i++){const b=data[i],u=b.c>=b.o,xx=x(i);
   ctx.fillStyle=u?'rgba(38,166,154,.22)':'rgba(239,83,80,.22)';const vv=vmax?b.v/vmax*vh:0;ctx.fillRect(xx-cw/2,bot-vv,cw,vv)}
@@ -457,7 +473,7 @@ function ui(){
  document.querySelectorAll('.sw').forEach(b=>b.setAttribute('aria-pressed',b.dataset.c===color));
  $('#vis').setAttribute('aria-pressed',hidden);$('#vis').innerHTML='<svg viewBox="0 0 22 22"><path d="M2 11s3.5-6 9-6 9 6 9 6-3.5 6-9 6-9-6-9-6z"/><circle cx="11" cy="11" r="2.5"/>'+(hidden?'<path d="M4 3l14 16"/>':'')+'</svg>';$('#vis').title=hidden?'Zeichnungen einblenden':'Zeichnungen ausblenden';
  if($('#fibp').classList.contains('on'))fibUI();
- $('#ma').setAttribute('aria-pressed',showMA);$('#mag').setAttribute('aria-pressed',magnet>0);$('#magbd').textContent=['','•','••'][magnet];$('#mag').title=['Magnet aus','Magnet schwach','Magnet stark'][magnet];$('#zzb').setAttribute('aria-pressed',showZZ);$('#pgb').setAttribute('aria-pressed',showPG);progUI();
+ $('#ma').setAttribute('aria-pressed',showMA);$('#mag').setAttribute('aria-pressed',magnet>0);$('#magbd').textContent=['','•','••'][magnet];$('#mag').title=['Magnet aus','Magnet schwach','Magnet stark'][magnet];$('#zzb').setAttribute('aria-pressed',showZZ);$('#pgb').setAttribute('aria-pressed',showPG);$('#znb').setAttribute('aria-pressed',showZN);progUI();
  $('#undo').disabled=!undo.length;$('#del').disabled=sel<0||locked(drawings[sel]);$('#lock').disabled=sel<0||lockAll;$('#lock').setAttribute('aria-pressed',sel>=0&&!!drawings[sel]?.lk);$('#lockall').setAttribute('aria-pressed',lockAll);$('#clear').disabled=!drawings.length;
  status();
  $('#pair').textContent=src==='binance'&&sym.lp?sym.lp:sym.pair;
@@ -507,6 +523,7 @@ $('#syms').onclick=e=>{const b=e.target.closest('.chip');if(!b)return;sym=SYMS.f
 $('#tfs').onclick=e=>{const b=e.target.closest('.chip');if(!b)return;tf=TFS.find(t=>t.id===b.dataset.id);loadData(true)};
 $('#ma').onclick=()=>{showMA=!showMA;ui();draw()};
 $('#zzb').onclick=()=>{showZZ=!showZZ;ui();draw()};
+$('#znb').onclick=()=>{showZN=!showZN;try{localStorage.setItem('chartwerk:zn',showZN?'1':'0')}catch(e){}ui();draw()};
 $('#pgb').onclick=()=>{showPG=!showPG;try{localStorage.setItem('chartwerk:pg',showPG?'1':'0')}catch(e){}ui();draw()};
 setInterval(()=>{if(showPG&&data.length){progUI();draw()}},1000);
 function zzUI(){$('#zz-dev').value=zzo.dev;$('#zz-depth').value=zzo.depth;$('#zz-c').value=zzo.c;$('#zz-w').value=String(zzo.w);
