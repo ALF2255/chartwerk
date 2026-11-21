@@ -71,6 +71,14 @@ canvas{position:absolute;inset:0;width:100%;height:100%;touch-action:none;cursor
 .prow{display:flex;gap:8px;margin-top:10px}.prow .chip{flex:1}.chip.pri{background:var(--acc);color:#fff;border-color:var(--acc)}
 .panel a{color:#8fb4ff}
 .panel textarea{width:100%;min-height:84px;border-radius:8px;border:1px solid #34404b;background:var(--bg);color:var(--ink);font:16px/1.35 ui-monospace,Menlo,monospace;padding:8px;resize:vertical}
+.pg{position:absolute;left:12px;top:46px;width:220px;background:rgba(20,26,30,.92);border:1px solid #2a343c;border-radius:10px;padding:10px 12px;font-size:13px;pointer-events:none;z-index:3}
+.pg[hidden]{display:none}
+.pgh{display:flex;justify-content:space-between;align-items:baseline;gap:8px;margin-bottom:8px}.pgh b{font-weight:600}.pgh span{color:var(--mute);font-size:12px}
+.pgr{display:flex;justify-content:space-between}.pgr span{display:block;color:var(--mute);font-size:12px}.pgr b{font-size:20px;font-weight:600}.pgr div:last-child{text-align:right}
+.pgm{height:4px;border-radius:2px;background:var(--dn);margin:6px 0 8px;overflow:hidden}.pgm i{display:block;height:100%;background:var(--up)}
+.pgk{display:flex;justify-content:space-between;gap:8px;padding:3px 0;color:var(--mute);font-size:12px}.pgk b{color:var(--ink);font-weight:500;white-space:nowrap}
+.pgf{color:var(--mute);font-size:11px;margin-top:6px;line-height:1.3}
+@media(max-width:700px){.pg{top:58px;left:8px;width:186px;padding:8px 10px}.pgr b{font-size:17px}.pgf{display:none}}
 :focus-visible{outline:2px solid var(--acc);outline-offset:2px}
 @media(max-width:700px){
  .app{grid-template-columns:minmax(0,1fr);grid-template-areas:"h" "b" "s" "t" "n"}
@@ -92,6 +100,7 @@ canvas{position:absolute;inset:0;width:100%;height:100%;touch-action:none;cursor
   <button class="chip" id="ma" aria-pressed="true">MA 20/50</button>
   <button class="chip" id="zzb" aria-pressed="true">Zickzack</button>
   <button class="chip" id="zzs" title="Zickzack-Einstellungen" aria-label="Zickzack-Einstellungen" style="padding:0 10px"><svg viewBox="0 0 22 22" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M3 5h9M3 11h13M3 17h9"/><circle cx="15.5" cy="5" r="2"/><circle cx="15.5" cy="17" r="2"/></svg></button>
+  <button class="chip" id="pgb" aria-pressed="true">Prognose</button>
   <button class="chip" id="fit">Ansicht zurücksetzen</button></div>
  </div>
  <nav class="tools" aria-label="Zeichenwerkzeuge">
@@ -121,6 +130,15 @@ canvas{position:absolute;inset:0;width:100%;height:100%;touch-action:none;cursor
   <button class="tb" id="clear" title="Alle Zeichnungen löschen" aria-label="Alle Zeichnungen löschen"><svg viewBox="0 0 22 22"><rect x="3" y="3" width="16" height="16" rx="2.5"/><path d="M8 8l6 6M14 8l-6 6"/></svg></button>
  </nav>
  <main class="stage" id="stage"><canvas id="cv"></canvas><div class="legend" id="legend"></div><div class="toast" id="toast"></div>
+ <div class="pg" id="pg" hidden>
+  <div class="pgh"><b>Prognose</b><span id="pgt"></span></div>
+  <div class="pgr"><div><span>Höher</span><b class="up" id="pgu">–</b></div><div><span>Tiefer</span><b class="dn" id="pgd">–</b></div></div>
+  <div class="pgm"><i id="pgbar"></i></div>
+  <div class="pgk"><span>Kurs zu schlagen</span><b id="pgbeat">–</b></div>
+  <div class="pgk"><span id="pgcl">Kerze schließt in</span><b id="pgcd">–</b></div>
+  <div class="pgk"><span>Spanne</span><b id="pgrng">–</b></div>
+  <div class="pgf">Schätzung aus der Schwankung der letzten 200 Kerzen. Spanne und innerer Kegel: 68 %, äußerer Kegel: 95 %. Keine Anlageberatung.</div>
+ </div>
  <div class="panel" id="zzp" role="dialog" aria-label="Zickzack-Einstellungen">
   <h2>Zickzack</h2>
   <div class="frow"><label for="zz-dev">Preisabweichung für Umkehr (%)</label><input id="zz-dev" type="number" min="0.1" max="100" step="0.1" inputmode="decimal"></div>
@@ -203,6 +221,7 @@ const HINTS={cross:'Fadenkreuz: ziehen bewegt das Kreuz. Im Auswahlmodus geht es
 
 let sym=SYMS[0],tf=TFS[2],data=[],ma20=[],ma50=[],tool='cursor',color=COLORS[0],drawings=[],sel=-1,undo=[],showMA=true,showZZ=true,zz=[];
 const ZZDEF={dev:5,depth:20,c:'#2962ff',w:1.6,proj:true,price:false,vol:false,chg:false,mode:'pct'};
+let showPG=true;try{showPG=localStorage.getItem('chartwerk:pg')!=='0'}catch(e){}
 let zzo=JSON.parse(JSON.stringify(ZZDEF));try{const z=JSON.parse(localStorage.getItem('chartwerk:zz')||'null');if(z&&isFinite(z.dev))zzo=Object.assign(zzo,z)}catch(e){}
 let view={end:0,bw:8},sc={lo:0,hi:1},W=0,H=0,dpr=1,hover=null,act=null,inited=false,clearArm=0,toastT=0;
 const cv=$('#cv'),ctx=cv.getContext('2d'),stage=$('#stage');
@@ -261,6 +280,22 @@ function calcZZ(){
   if(hh&&ll){if(L&&L.u){add(i,data[i].l,0,open);add(i,data[i].h,1,open)}else{add(i,data[i].h,1,open);add(i,data[i].l,0,open)}}
   else if(hh)add(i,data[i].h,1,open);else if(ll)add(i,data[i].l,0,open)}
  return z}
+const erf=z=>{const t=1/(1+.3275911*Math.abs(z)),v=1-(((((1.061405429*t-1.453152027)*t)+1.421413741)*t-.284496736)*t+.254829592)*t*Math.exp(-z*z);return z>=0?v:-v};
+const Phi=z=>.5*(1+erf(z/Math.SQRT2));
+function closeOf(t){if(tf.id==='1M'){const d=new Date(t);return Date.UTC(d.getUTCFullYear(),d.getUTCMonth()+1,1)}return t+ms()}
+function forecast(){const n=data.length;if(n<30)return null;const L=data[n-1],m=ms(),N=Math.min(200,n-2),r=[];
+ for(let i=n-1-N;i<n-1;i++){const a=data[i-1].c,b=data[i].c;if(a>0&&b>0)r.push(Math.log(b/a))}
+ if(r.length<20)return null;const mu=r.reduce((s,v)=>s+v,0)/r.length,sig=Math.sqrt(r.reduce((s,v)=>s+(v-mu)**2,0)/(r.length-1));if(!(sig>0))return null;
+ let ct=closeOf(L.t),rem=ct-Date.now(),beat=L.o,next=false;const cur=L.c;
+ if(rem<=0){next=true;beat=L.c;rem=m;ct=Date.now()+m}
+ const s=sig*Math.sqrt(Math.min(1.5,rem/m)),pu=Phi(Math.log(cur/beat)/s);
+ return{sig,beat,cur,rem,ct,next,pu,s}}
+function progUI(){const el=$('#pg');const f=showPG&&data.length?forecast():null;if(!f){el.hidden=true;return}el.hidden=false;
+ const pu=Math.min(99,Math.max(1,Math.round(f.pu*100)));$('#pgu').textContent=pu+' %';$('#pgd').textContent=(100-pu)+' %';$('#pgbar').style.width=pu+'%';
+ $('#pgt').textContent=tf.l+'-Kerze';$('#pgbeat').textContent=fmt(f.beat);
+ const S=Math.max(0,Math.floor((f.ct-Date.now())/1000)),d=Math.floor(S/86400),h=Math.floor(S%86400/3600),mi=Math.floor(S%3600/60),p2=v=>String(v).padStart(2,'0');
+ $('#pgcl').textContent=f.next?'Gilt für':'Kerze schließt in';$('#pgcd').textContent=f.next?'nächste Kerze':d?d+' T '+h+' Std':(h?h+':':'')+p2(mi)+':'+p2(S%60);
+ $('#pgrng').textContent=fmt(f.cur*Math.exp(-f.s))+' – '+fmt(f.cur*Math.exp(f.s))}
 function sma(n){const o=[];let s=0;data.forEach((b,i)=>{s+=b.c;if(i>=n)s-=data[i-n].c;o.push(i>=n-1?s/n:null)});return o}
 function idxOfT(t){const n=data.length;if(t>=data[n-1].t)return n-1+(t-data[n-1].t)/ms();if(t<=data[0].t)return(t-data[0].t)/ms();
  let a=0,b=n-1;while(b-a>1){const m=(a+b)>>1;if(data[m].t<=t)a=m;else b=m}return a+(t-data[a].t)/(data[b].t-data[a].t)}
@@ -361,6 +396,16 @@ function draw(){
     if(!ln.length)continue;const y0=y(q.p);
     ln.forEach((t,k)=>{const off=q.u?-6-(ln.length-1-k)*13:6+k*13;ctx.textBaseline=q.u?'bottom':'top';ctx.fillText(t,xx,y0+off)})}
    ctx.textAlign='left'}}
+ const FC=showPG?forecast():null;
+ if(FC){const c0=n-1,m=ms(),K=12,u1=[],d1=[],u2=[],d2=[];
+  for(let k=0;k<=K;k++){const s=k?FC.sig*Math.sqrt((FC.rem+(k-1)*m)/m):0,xx=x(c0+k);
+   u1.push([xx,y(FC.cur*Math.exp(s))]);d1.push([xx,y(FC.cur*Math.exp(-s))]);u2.push([xx,y(FC.cur*Math.exp(1.96*s))]);d2.push([xx,y(FC.cur*Math.exp(-1.96*s))])}
+  const band=(a,b,c)=>{ctx.beginPath();a.forEach((q,j)=>j?ctx.lineTo(...q):ctx.moveTo(...q));for(let j=b.length-1;j>=0;j--)ctx.lineTo(...b[j]);ctx.closePath();ctx.fillStyle=c;ctx.fill()};
+  band(u2,d2,'rgba(76,141,255,.08)');band(u1,d1,'rgba(76,141,255,.17)');
+  ctx.lineWidth=1;ctx.strokeStyle='rgba(76,141,255,.55)';[u1,d1].forEach(a=>{ctx.beginPath();a.forEach((q,j)=>j?ctx.lineTo(...q):ctx.moveTo(...q));ctx.stroke()});
+  ctx.setLineDash([4,4]);ctx.strokeStyle='rgba(76,141,255,.8)';seg(x(c0),y(FC.cur),x(c0+K),y(FC.cur));
+  const by=Math.round(y(FC.beat))+.5,bx=x(c0)-view.bw*.6;ctx.setLineDash([2,3]);ctx.strokeStyle='#e7ecef';seg(bx,by,x(c0+K),by);ctx.setLineDash([]);
+  ctx.font='11px "IBM Plex Sans",system-ui';ctx.fillStyle='#e7ecef';ctx.textAlign='right';ctx.textBaseline=FC.cur>=FC.beat?'top':'bottom';ctx.fillText('Zu schlagen',x(c0+K),by+(FC.cur>=FC.beat?3:-3));ctx.textAlign='left'}
  if(!hidden)drawings.forEach((d,k)=>shape(d,k===sel));
  if(magnet&&mp&&tool!=='brush'&&(tool!=='cursor'||(act&&act.k==='pt'))&&(hover||act)){const sn=snapInfo(...mp);if(sn.hit){const[sx,sy]=P(sn.pt);ctx.beginPath();ctx.arc(sx,sy,6,0,7);ctx.strokeStyle='#fff';ctx.lineWidth=1.6;ctx.stroke()}}
  const ch=crossPt();
@@ -403,7 +448,7 @@ function save(){try{localStorage.setItem(key(),snap());localStorage.setItem('cha
 function load(){try{drawings=JSON.parse(localStorage.getItem(key())||'[]')}catch(e){drawings=[]}}
 function toast(s){const t=$('#toast');t.textContent=s;t.classList.add('on');clearTimeout(toastT);toastT=setTimeout(()=>t.classList.remove('on'),2600)}
 function clampView(){const n=data.length,w=pw();view.bw=Math.max(1.2,Math.min(48,view.bw));view.end=Math.max(Math.min(10,n),Math.min(n+.7*w/view.bw,view.end))}
-function resetView(){view.bw=W<520?7:9;const n=data.length;if(n*view.bw<pw()*.85)view.bw=Math.min(26,pw()*.85/(n+4));view.end=data.length-1+Math.max(4,Math.round(pw()/view.bw*.08));clampView()}
+function resetView(){view.bw=W<520?7:9;const n=data.length;if(n*view.bw<pw()*.85)view.bw=Math.min(26,pw()*.85/(n+4));view.end=data.length-1+Math.max(showPG?14:4,Math.round(pw()/view.bw*(showPG?.16:.08)));clampView()}
 
 function ui(){
  document.querySelectorAll('#syms .chip').forEach(b=>b.setAttribute('aria-pressed',b.dataset.id===sym.id));
@@ -412,7 +457,7 @@ function ui(){
  document.querySelectorAll('.sw').forEach(b=>b.setAttribute('aria-pressed',b.dataset.c===color));
  $('#vis').setAttribute('aria-pressed',hidden);$('#vis').innerHTML='<svg viewBox="0 0 22 22"><path d="M2 11s3.5-6 9-6 9 6 9 6-3.5 6-9 6-9-6-9-6z"/><circle cx="11" cy="11" r="2.5"/>'+(hidden?'<path d="M4 3l14 16"/>':'')+'</svg>';$('#vis').title=hidden?'Zeichnungen einblenden':'Zeichnungen ausblenden';
  if($('#fibp').classList.contains('on'))fibUI();
- $('#ma').setAttribute('aria-pressed',showMA);$('#mag').setAttribute('aria-pressed',magnet>0);$('#magbd').textContent=['','•','••'][magnet];$('#mag').title=['Magnet aus','Magnet schwach','Magnet stark'][magnet];$('#zzb').setAttribute('aria-pressed',showZZ);
+ $('#ma').setAttribute('aria-pressed',showMA);$('#mag').setAttribute('aria-pressed',magnet>0);$('#magbd').textContent=['','•','••'][magnet];$('#mag').title=['Magnet aus','Magnet schwach','Magnet stark'][magnet];$('#zzb').setAttribute('aria-pressed',showZZ);$('#pgb').setAttribute('aria-pressed',showPG);progUI();
  $('#undo').disabled=!undo.length;$('#del').disabled=sel<0||locked(drawings[sel]);$('#lock').disabled=sel<0||lockAll;$('#lock').setAttribute('aria-pressed',sel>=0&&!!drawings[sel]?.lk);$('#lockall').setAttribute('aria-pressed',lockAll);$('#clear').disabled=!drawings.length;
  status();
  $('#pair').textContent=src==='binance'&&sym.lp?sym.lp:sym.pair;
@@ -462,6 +507,8 @@ $('#syms').onclick=e=>{const b=e.target.closest('.chip');if(!b)return;sym=SYMS.f
 $('#tfs').onclick=e=>{const b=e.target.closest('.chip');if(!b)return;tf=TFS.find(t=>t.id===b.dataset.id);loadData(true)};
 $('#ma').onclick=()=>{showMA=!showMA;ui();draw()};
 $('#zzb').onclick=()=>{showZZ=!showZZ;ui();draw()};
+$('#pgb').onclick=()=>{showPG=!showPG;try{localStorage.setItem('chartwerk:pg',showPG?'1':'0')}catch(e){}ui();draw()};
+setInterval(()=>{if(showPG&&data.length){progUI();draw()}},1000);
 function zzUI(){$('#zz-dev').value=zzo.dev;$('#zz-depth').value=zzo.depth;$('#zz-c').value=zzo.c;$('#zz-w').value=String(zzo.w);
  ['proj','price','vol','chg'].forEach(k=>$('#zz-'+k).checked=!!zzo[k]);$('#zz-mode').value=zzo.mode;$('#zz-mode').disabled=!zzo.chg}
 function zzApply(){const dv=parseFloat(String($('#zz-dev').value).replace(',','.')),dp=parseInt($('#zz-depth').value,10);
