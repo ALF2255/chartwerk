@@ -76,7 +76,8 @@ canvas{position:absolute;inset:0;width:100%;height:100%;touch-action:none;cursor
 .pgh{display:flex;justify-content:space-between;align-items:baseline;gap:8px;margin-bottom:8px}.pgh b{font-weight:600}.pgh span{color:var(--mute);font-size:12px}
 .pgr{display:flex;justify-content:space-between}.pgr span{display:block;color:var(--mute);font-size:12px}.pgr b{font-size:20px;font-weight:600}.pgr div:last-child{text-align:right}
 .pgm{height:4px;border-radius:2px;background:var(--dn);margin:6px 0 8px;overflow:hidden}.pgm i{display:block;height:100%;background:var(--up)}
-.pgk{display:flex;justify-content:space-between;gap:8px;padding:3px 0;color:var(--mute);font-size:12px}.pgk b{color:var(--ink);font-weight:500;white-space:nowrap}
+.pgk{display:flex;justify-content:space-between;gap:8px;padding:3px 0;color:var(--mute);font-size:12px}.pgk b{color:var(--ink);font-weight:500;white-space:nowrap}.pgk span{white-space:nowrap}
+.pgs{display:flex;justify-content:space-between;margin-top:6px;padding-top:6px;border-top:1px solid var(--line);font-size:12px;font-weight:600}.pgs span:last-child{color:var(--mute);font-weight:400}
 .pgf{color:var(--mute);font-size:11px;margin-top:6px;line-height:1.3}
 @media(max-width:700px){.pg{top:58px;left:8px;width:186px;padding:8px 10px}.pgr b{font-size:17px}.pgf{display:none}}
 :focus-visible{outline:2px solid var(--acc);outline-offset:2px}
@@ -112,6 +113,7 @@ canvas{position:absolute;inset:0;width:100%;height:100%;touch-action:none;cursor
   <button class="tb" data-tool="ext" title="Erweiterte Linie" aria-label="Erweiterte Linie"><svg viewBox="0 0 22 22"><path d="M1 21L21 1"/><circle cx="7.5" cy="14.5" r="2"/><circle cx="14.5" cy="7.5" r="2"/></svg></button>
   <button class="tb" data-tool="info" title="Info-Linie (Preis, Prozent, Zeit)" aria-label="Info-Linie"><svg viewBox="0 0 22 22"><path d="M4 17L13 8"/><circle cx="4" cy="17" r="2"/><circle cx="13" cy="8" r="2"/><rect x="12" y="13" width="8" height="6" rx="1"/></svg></button>
   <button class="tb" data-tool="hline" title="Horizontale Linie" aria-label="Horizontale Linie"><svg viewBox="0 0 22 22"><path d="M2 11h18"/><circle cx="11" cy="11" r="2.2"/></svg></button>
+  <button class="tb" data-tool="goal" title="Ziel-Rechner: Wahrscheinlichkeit, einen Preis zu erreichen" aria-label="Ziel-Rechner"><svg viewBox="0 0 22 22"><path d="M5 20V3"/><path d="M5 4h11l-2.5 3.5L16 11H5"/></svg></button>
   <button class="tb" data-tool="rect" title="Rechteck" aria-label="Rechteck"><svg viewBox="0 0 22 22"><rect x="3" y="5" width="16" height="12" rx="1.5"/></svg></button>
   <button class="tb" data-tool="fib" title="Fibonacci-Retracement" aria-label="Fibonacci-Retracement"><svg viewBox="0 0 22 22"><path d="M3 4h16M3 8.5h16M3 12h16M3 15h16M3 19h16"/><path d="M5 19L17 4" stroke-dasharray="2 2"/></svg></button>
   <button class="tb" data-tool="fan" title="Fibonacci-Fächer (Speed Resistance Fan)" aria-label="Fibonacci-Fächer"><svg viewBox="0 0 22 22"><rect x="3" y="3" width="16" height="16" stroke-opacity=".5"/><path d="M3 19L19 3M3 19L19 9M3 19L19 13M3 19L9 3M3 19L13 3"/></svg></button>
@@ -138,7 +140,10 @@ canvas{position:absolute;inset:0;width:100%;height:100%;touch-action:none;cursor
   <div class="pgk"><span>Kurs zu schlagen</span><b id="pgbeat">–</b></div>
   <div class="pgk"><span id="pgcl">Kerze schließt in</span><b id="pgcd">–</b></div>
   <div class="pgk"><span>Spanne</span><b id="pgrng">–</b></div>
-  <div class="pgf">Schätzung aus der Schwankung der letzten 200 Kerzen. Spanne und innerer Kegel: 68 %, äußerer Kegel: 95 %. Keine Anlageberatung.</div>
+  <div class="pgs"><span>Backtest</span><span id="pgbn"></span></div>
+  <div class="pgk"><span>68 %-Spanne</span><b id="pgb68">–</b></div>
+  <div class="pgk"><span>95 %-Spanne</span><b id="pgb95">–</b></div>
+  <div class="pgf" id="pgf"></div>
  </div>
  <div class="panel" id="zzp" role="dialog" aria-label="Zickzack-Einstellungen">
   <h2>Zickzack</h2>
@@ -218,7 +223,7 @@ const fo=d=>d&&d.o||fib;
 const fibLv=d=>{const o=fo(d);return FIBL.filter(l=>o.on.includes(l.v)).map(l=>({v:l.v,c:o.mono?d.c:l.c}))};
 const GRID='#1b2227',MUTE='#8d98a1',UP='#26a69a',DN='#ef5350';
 const AX=70,BX=26;let TOP=34;
-const HINTS={cross:'Fadenkreuz: ziehen bewegt das Kreuz. Im Auswahlmodus geht es auch per langem Drücken.',cursor:'Zeichnung antippen zum Auswählen, Chart ziehen zum Verschieben',trend:'Im Chart von Punkt zu Punkt ziehen',hline:'Im Chart tippen, um eine Linie zu setzen',rect:'Diagonal ziehen, um ein Rechteck zu zeichnen',fib:'Vom Hoch zum Tief ziehen (oder umgekehrt)',brush:'Frei zeichnen, Stift bleibt aktiv',ray:'Ziehen: Linie läuft ab dem zweiten Punkt weiter',ext:'Ziehen: Linie läuft in beide Richtungen weiter',info:'Ziehen: zeigt Preis-, Prozent- und Zeitabstand',fan:'Vom Hoch zum Tief ziehen (oder umgekehrt)'};
+const HINTS={cross:'Fadenkreuz: ziehen bewegt das Kreuz. Im Auswahlmodus geht es auch per langem Drücken.',cursor:'Zeichnung antippen zum Auswählen, Chart ziehen zum Verschieben',trend:'Im Chart von Punkt zu Punkt ziehen',hline:'Im Chart tippen, um eine Linie zu setzen',rect:'Diagonal ziehen, um ein Rechteck zu zeichnen',fib:'Vom Hoch zum Tief ziehen (oder umgekehrt)',brush:'Frei zeichnen, Stift bleibt aktiv',ray:'Ziehen: Linie läuft ab dem zweiten Punkt weiter',ext:'Ziehen: Linie läuft in beide Richtungen weiter',info:'Ziehen: zeigt Preis-, Prozent- und Zeitabstand',fan:'Vom Hoch zum Tief ziehen (oder umgekehrt)',goal:'Auf einen Zielpreis tippen: zeigt, wie wahrscheinlich er erreicht wird'};
 
 let sym=SYMS[0],tf=TFS[2],data=[],ma20=[],ma50=[],tool='cursor',color=COLORS[0],drawings=[],sel=-1,undo=[],showMA=true,showZZ=true,zz=[];
 const ZZDEF={dev:5,depth:20,c:'#2962ff',w:1.6,proj:true,price:false,vol:false,chg:false,mode:'pct'};
@@ -285,19 +290,35 @@ function calcZZ(){
 const erf=z=>{const t=1/(1+.3275911*Math.abs(z)),v=1-(((((1.061405429*t-1.453152027)*t)+1.421413741)*t-.284496736)*t+.254829592)*t*Math.exp(-z*z);return z>=0?v:-v};
 const Phi=z=>.5*(1+erf(z/Math.SQRT2));
 function closeOf(t){if(tf.id==='1M'){const d=new Date(t);return Date.UTC(d.getUTCFullYear(),d.getUTCMonth()+1,1)}return t+ms()}
-function forecast(){const n=data.length;if(n<30)return null;const L=data[n-1],m=ms(),N=Math.min(200,n-2),r=[];
- for(let i=n-1-N;i<n-1;i++){const a=data[i-1].c,b=data[i].c;if(a>0&&b>0)r.push(Math.log(b/a))}
- if(r.length<20)return null;const mu=r.reduce((s,v)=>s+v,0)/r.length,sig=Math.sqrt(r.reduce((s,v)=>s+(v-mu)**2,0)/(r.length-1));if(!(sig>0))return null;
+let VSK='',VS=null;
+function getVS(){const n=data.length;if(n<45)return null;const key=sym.id+tf.id+n+'|'+data[0].t+'|'+data[n-2].c;if(key===VSK)return VS;VSK=key;
+ const r=new Float64Array(n);for(let i=1;i<n;i++){const a=data[i-1].c,b=data[i].c;r[i]=a>0&&b>0?Math.log(b/a):0}
+ const last=n-2,start=Math.max(32,last-499);let init=0;for(let i=1;i<=30;i++)init+=r[i]*r[i];init=init/30||1e-8;
+ const run=lam=>{const ev=new Float64Array(n);let v=init;for(let i=1;i<n-1;i++){v=lam*v+(1-lam)*r[i]*r[i];ev[i]=v}return ev};
+ let best=null;for(const lam of[.9,.94,.97,.985]){const ev=run(lam);let ll=0;for(let k=start;k<=last;k++){const v=Math.max(ev[k-1],1e-14);ll+=Math.log(v)+r[k]*r[k]/v}if(!best||ll<best.ll)best={lam,ev,ll}}
+ const bt={n:0,e68:0,e95:0,f68:0,f95:0};
+ for(let k=start;k<=last;k++){const se=Math.sqrt(best.ev[k-1]);let s=0,s2=0,m=0;for(let j=Math.max(1,k-200);j<k;j++){s+=r[j];s2+=r[j]*r[j];m++}
+  const sf=Math.sqrt(Math.max(0,(s2-s*s/m)/(m-1))),a=Math.abs(r[k]);bt.n++;if(a<=se)bt.e68++;if(a<=1.96*se)bt.e95++;if(a<=sf)bt.f68++;if(a<=1.96*sf)bt.f95++}
+ return VS={sig:Math.sqrt(best.ev[n-2]),lam:best.lam,hl:Math.log(.5)/Math.log(best.lam),bt}}
+function forecast(){const n=data.length,V=getVS();if(!V||!(V.sig>0))return null;const L=data[n-1],m=ms(),sig=V.sig;
  let ct=closeOf(L.t),rem=ct-Date.now(),beat=L.o,next=false;const cur=L.c;
  if(rem<=0){next=true;beat=L.c;rem=m;ct=Date.now()+m}
  const s=sig*Math.sqrt(Math.min(1.5,rem/m)),pu=Phi(Math.log(cur/beat)/s);
- return{sig,beat,cur,rem,ct,next,pu,s}}
+ return{sig,beat,cur,rem,ct,next,pu,s,V}}
+const pfmt=p=>p<.001?'<0,1 %':p>.999?'>99,9 %':(p<.1?(Math.round(p*1000)/10).toLocaleString('de-DE'):Math.round(p*100))+' %';
+function goalTxt(B){const n=data.length,V=getVS();if(!V||!(V.sig>0))return 'Ziel '+fmt(B);const S=data[n-1].c,L=Math.log(B/S),f=sym.m&&tf.h<168?5/7:1;
+ const H=[['1W',7],['1M',30],['3M',91],['1J',365]].map(([l,dd])=>{const v=V.sig*Math.sqrt(dd*864e5/ms()*f);const t=pfmt(Math.min(1,2*Phi(-Math.abs(L)/v)));return l+' '+(W<520?t.replace(' %','%'):t)});
+ if(W<520)return 'Ziel '+fmt(B)+' → '+H.join(' ');
+ const pc=(B/S-1)*100;return 'Ziel '+fmt(B)+(W>=520?' ('+(pc>=0?'+':'−')+Math.abs(pc).toLocaleString('de-DE',{maximumFractionDigits:1})+' %)':'')+' · erreicht: '+H.join(' · ')}
 function progUI(){const el=$('#pg');const f=showPG&&data.length?forecast():null;if(!f){el.hidden=true;return}el.hidden=false;
  const pu=Math.min(99,Math.max(1,Math.round(f.pu*100)));$('#pgu').textContent=pu+' %';$('#pgd').textContent=(100-pu)+' %';$('#pgbar').style.width=pu+'%';
  $('#pgt').textContent=tf.l+'-Kerze';$('#pgbeat').textContent=fmt(f.beat);
  const S=Math.max(0,Math.floor((f.ct-Date.now())/1000)),d=Math.floor(S/86400),h=Math.floor(S%86400/3600),mi=Math.floor(S%3600/60),p2=v=>String(v).padStart(2,'0');
  $('#pgcl').textContent=f.next?'Gilt für':'Kerze schließt in';$('#pgcd').textContent=f.next?'nächste Kerze':d?d+' T '+h+' Std':(h?h+':':'')+p2(mi)+':'+p2(S%60);
- $('#pgrng').textContent=fmt(f.cur*Math.exp(-f.s))+' – '+fmt(f.cur*Math.exp(f.s))}
+ $('#pgrng').textContent=fmt(f.cur*Math.exp(-f.s))+' – '+fmt(f.cur*Math.exp(f.s));
+ const b=f.V.bt,q=v=>Math.round(v/b.n*100)+' %';$('#pgbn').textContent=b.n+' Kerzen';
+ $('#pgb68').textContent=q(b.e68)+' (alt '+q(b.f68)+')';$('#pgb95').textContent=q(b.e95)+' (alt '+q(b.f95)+')';
+ $('#pgf').textContent='Backtest: Anteil der Kerzen, die in der vorhergesagten Spanne schlossen. Neuere Kerzen zählen mehr (Halbwertszeit ≈ '+Math.round(f.V.hl)+' Kerzen, per Backtest gewählt). Ideal: 68 % und 95 %. Keine Anlageberatung.'}
 function calcZones(){const n=data.length,out=[];if(n<10||!zz.length)return out;const cur=data[n-1].c,minH=cur*.002;
  for(const q of zz){if(q.open||q.i>=n)continue;const b=data[q.i];let lo,hi;
   if(q.u){lo=Math.max(b.o,b.c);hi=b.h;if(hi-lo<minH)lo=hi-minH}else{lo=b.l;hi=Math.min(b.o,b.c);if(hi-lo<minH)hi=lo+minH}
@@ -353,6 +374,7 @@ function shape(d,on){
  else if(d.k==='info'){seg(...ps[0],...ps[1]);infoBox(d,ps)}
  else if(d.k==='fan')fanShape(d,ps,on);
  else if(d.k==='hline'){const yy=ps[0][1];seg(0,yy,w,yy);ctx.fillText(fmt(d.pts[0].p),6,yy-3)}
+ else if(d.k==='goal'){const yy=ps[0][1];ctx.setLineDash([7,4]);seg(0,yy,w,yy);ctx.setLineDash([]);const t=goalTxt(d.pts[0].p),tw=ctx.measureText(t).width;ctx.fillStyle='rgba(15,19,22,.85)';ctx.fillRect(4,yy-17,tw+6,15);ctx.fillStyle=d.c;ctx.fillText(t,7,yy-3)}
  else if(d.k==='rect'){const[a,b]=ps;ctx.globalAlpha=.13;ctx.fillRect(a[0],a[1],b[0]-a[0],b[1]-a[1]);ctx.globalAlpha=1;ctx.strokeRect(a[0],a[1],b[0]-a[0],b[1]-a[1])}
  else if(d.k==='fib'){const o=fo(d),[a,b]=ps,x0=o.extL?0:Math.min(a[0],b[0]),x1=o.extR?w:Math.max(a[0],b[0]),A=d.pts[o.rev?1:0].p,B=d.pts[o.rev?0:1].p,L=fibLv(d);
   if(o.fill)L.forEach((l,j)=>{if(j===L.length-1)return;const y1=y(B+(A-B)*l.v),y2=y(B+(A-B)*L[j+1].v);ctx.globalAlpha=.09;ctx.fillStyle=l.c;ctx.fillRect(x0,y1,x1-x0,y2-y1)});
@@ -450,7 +472,7 @@ function hit(px,py,tol){
   else if(d.k==='ray'||d.k==='ext'){const e=extPts(ps[0],ps[1],d.k==='ext');seg(...e)}
  else if(d.k==='info'){seg(...ps[0],...ps[1]);infoBox(d,ps)}
  else if(d.k==='fan')fanShape(d,ps,on);
- else if(d.k==='hline')dd=Math.abs(py-ps[0][1]);
+ else if(d.k==='hline'||d.k==='goal')dd=Math.abs(py-ps[0][1]);
   else if(d.k==='rect'){const xa=Math.min(ps[0][0],ps[1][0]),xb=Math.max(ps[0][0],ps[1][0]),ya=Math.min(ps[0][1],ps[1][1]),yb=Math.max(ps[0][1],ps[1][1]);if(px>=xa-tol&&px<=xb+tol&&py>=ya-tol&&py<=yb+tol)dd=0}
   else if(d.k==='fib'){const o=fo(d),xa=o.extL?0:Math.min(ps[0][0],ps[1][0]),xb=o.extR?pw():Math.max(ps[0][0],ps[1][0]);if(px>=xa-tol&&px<=xb+tol){const A=d.pts[o.rev?1:0].p,B=d.pts[o.rev?0:1].p;fibLv(d).forEach(l=>{dd=Math.min(dd,Math.abs(py-y(B+(A-B)*l.v)))});dd=Math.min(dd,distSeg(px,py,...ps[0],...ps[1]))}}
   else for(let j=0;j<ps.length;j++)dd=Math.min(dd,distSeg(px,py,...ps[j],...(ps[j+1]||ps[j])));
@@ -556,7 +578,7 @@ FK.forEach(k=>$('#f-'+k).onchange=e=>{const c=e.target.checked;setOpt(o=>{o[k]=c
 $('#freset').onclick=()=>setOpt(o=>{const src=ftarget()?fib:FIBDEF;Object.keys(o).forEach(k=>delete o[k]);Object.assign(o,JSON.parse(JSON.stringify(src)))});
 $('#vis').onclick=()=>{hidden=!hidden;if(hidden)sel=-1;try{localStorage.setItem('chartwerk:hide',hidden?'1':'0')}catch(e){}ui();draw();toast(hidden?'Zeichnungen ausgeblendet':'Zeichnungen eingeblendet')};
 /* Backup */
-const KINDS=['trend','ray','ext','info','hline','rect','fib','fan','brush'];
+const KINDS=['trend','ray','ext','info','hline','goal','rect','fib','fan','brush'];
 function allDrawings(){const o={};SYMS.forEach(s=>{try{o[s.id]=JSON.parse(localStorage.getItem('chartwerk:'+s.id)||'[]')}catch(e){o[s.id]=[]}});if(!Object.keys(o).length||!o[sym.id])o[sym.id]=drawings;return o}
 function backupText(){return JSON.stringify({app:'chartwerk',v:1,date:new Date().toISOString(),drawings:allDrawings(),fib,magnet,lockAll})}
 const bkmsg=t=>{$('#bkmsg').textContent=t};
@@ -624,7 +646,7 @@ cv.addEventListener('pointerdown',e=>{
   if(e.pointerType!=='mouse')a.lp=setTimeout(()=>{if(act===a&&!a.mv){act={k:'cross'};cross=mp;draw()}},450);
   draw();return}
  if(hidden){hidden=false;try{localStorage.setItem('chartwerk:hide','0')}catch(e){}toast('Zeichnungen wieder eingeblendet')}
- const s=snap(),q=tool==='brush'?toPt(px,py):snapPt(px,py),nd={k:tool,c:color,pts:tool==='hline'||tool==='brush'?[q]:[q,{...q}]};
+ const s=snap(),q=tool==='brush'?toPt(px,py):snapPt(px,py),nd={k:tool,c:color,pts:tool==='hline'||tool==='goal'||tool==='brush'?[q]:[q,{...q}]};
  if(tool==='fib'||tool==='fan')nd.o=JSON.parse(JSON.stringify(fib));
  drawings.push(nd);sel=drawings.length-1;act={k:'new',s};draw();
 });
