@@ -295,7 +295,8 @@ const SYMS=[
  {id:'ETH',name:'Ethereum',pair:'ETH/USD',p:3200,v:.04,m:0,bn:'ETHUSDT'},
  {id:'SOL',name:'Solana',pair:'SOL/USD',p:160,v:.05,m:0,bn:'SOLUSDT'},
  {id:'XAU',name:'Gold',pair:'XAU/USD',p:4050,v:.011,m:1,bn:'PAXGUSDT',lp:'Gold (PAXG/USDT)',td:'XAU/USD'},
- {id:'XAG',name:'Silber',pair:'XAG/USD',p:50,v:.02,m:1,td:'XAG/USD',fb:'XAGUSDT'}];
+ {id:'XAG',name:'Silber',pair:'XAG/USD',p:50,v:.02,m:1,td:'XAG/USD',fb:'XAGUSDT'},
+ {id:'EUR',name:'EUR/USD',pair:'EUR/USD',p:1.09,v:.006,m:1,td:'EUR/USD',bn:'EURUSDT',lp:'EUR/USDT'}];
 const TFS=[{id:'1h',h:1,l:'1 Std'},{id:'4h',h:4,l:'4 Std'},{id:'1D',h:24,l:'Tag'},{id:'1W',h:168,l:'Woche'},{id:'1M',h:730.5,l:'Monat'}];
 const COLORS=['#4c8dff','#f2c94c','#e573d8','#ffffff'];
 const FIBL=[{v:-.618,c:'#2962ff'},{v:0,c:'#9aa0ab'},{v:.236,c:'#f23645'},{v:.382,c:'#ff9800'},{v:.5,c:'#4caf50'},{v:.618,c:'#089981'},{v:.65,c:'#5fd068'},{v:.786,c:'#00bcd4'},{v:1,c:'#9aa0ab'},{v:1.236,c:'#ff9800'},{v:1.618,c:'#2962ff'},{v:2.236,c:'#ff9800'},{v:2.618,c:'#f23645'},{v:3.618,c:'#9c27b0'},{v:4.236,c:'#e91e63'}];
@@ -360,7 +361,7 @@ const idx=px=>view.end-(pw()-px)/view.bw;
 const y=p=>TOP+(sc.hi-p)/(sc.hi-sc.lo)*ph();
 const pOf=py=>sc.hi-(py-TOP)/ph()*(sc.hi-sc.lo);
 const ms=()=>tf.h*36e5;
-const dec=()=>sym.p>=10000?0:sym.p>=100?2:3;
+const dec=()=>sym.p>=10000?0:sym.p>=100?2:sym.p>=10?3:5;
 const fmt=p=>p.toLocaleString('de-DE',{minimumFractionDigits:dec(),maximumFractionDigits:dec()});
 
 function rng(a){return()=>{a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296}}
@@ -690,7 +691,8 @@ const snap=()=>JSON.stringify(drawings);
 let lay='';
 const ek=(sid,lid)=>sid+(lid?'@'+lid:'');
 let cur='USD';try{cur=localStorage.getItem('chartwerk:cur')==='EUR'?'EUR':'USD'}catch(e){}
-const cl=lid=>lid+(cur==='EUR'?'eur':'');
+const curE=()=>sym&&sym.id==='EUR'?'USD':cur;
+const cl=lid=>lid+(curE()==='EUR'?'eur':'');
 function cleanLays(a){const o=(Array.isArray(a)?a:[]).filter(l=>l&&typeof l.id==='string'&&/^[a-z0-9]{0,12}$/.test(l.id)).map(l=>({id:l.id,n:String(l.n||'Layout').slice(0,30),...(typeof l.tf==='string'?{tf:l.tf}:{}),...(l.ind&&typeof l.ind==='object'?{ind:l.ind}:{})}));
  const s=o.findIndex(l=>l.id==='');const d=s>=0?o.splice(s,1)[0]:{id:'',n:'Standard'};o.unshift(d);return o.filter((l,i)=>o.findIndex(q=>q.id===l.id)===i)}
 function lays(sid){try{return cleanLays(JSON.parse(localStorage.getItem('chartwerk:lays:'+sid)||'null'))}catch(e){return cleanLays(null)}}
@@ -726,7 +728,7 @@ function ui(){
  $('#ma').setAttribute('aria-pressed',showMA);$('#mag').setAttribute('aria-pressed',magnet>0);$('#magbd').textContent=['','•','••'][magnet];$('#mag').title=['Magnet aus','Magnet schwach','Magnet stark'][magnet];$('#zzb').setAttribute('aria-pressed',showZZ);$('#pgb').setAttribute('aria-pressed',showPG);$('#scb').setAttribute('aria-pressed',showSC);$('#znb').setAttribute('aria-pressed',showZN);$('#trb').setAttribute('aria-pressed',showTR);$('#cyb').setAttribute('aria-pressed',showCY);$('#lqb').setAttribute('aria-pressed',showLQ);$('#lqb').style.display=LQS[sym.id]?'':'none';$('#cyb').style.display=sym.id==='BTC'?'':'none';progUI();
  $('#undo').disabled=!undo.length;$('#del').disabled=sel<0||locked(drawings[sel]);$('#lock').disabled=sel<0||lockAll;$('#lock').setAttribute('aria-pressed',sel>=0&&!!drawings[sel]?.lk);$('#lockall').setAttribute('aria-pressed',lockAll);$('#clear').disabled=!drawings.length;
  status();
- $('#pair').textContent=pairName();$('#curb').textContent=cur==='EUR'?'€ Euro':'$ Dollar';$('#curb').setAttribute('aria-pressed',cur==='EUR');if(cur==='EUR')$('#ntxt').textContent+=' In Euro umgerechnet (EUR/USDT von Binance, Kurs der jeweiligen Kerze).';
+ $('#pair').textContent=pairName();$('#curb').textContent=cur==='EUR'?'€ Euro':'$ Dollar';$('#curb').setAttribute('aria-pressed',cur==='EUR');$('#curb').style.display=sym.id==='EUR'?'none':'';if(curE()==='EUR')$('#ntxt').textContent+=' In Euro umgerechnet (EUR/USDT von Binance, Kurs der jeweiligen Kerze).';
  const n=data.length;if(!n){$('#last').textContent='…';$('#chg').textContent='';return}
  const L=data[n-1],r=tf.h<24?data[Math.max(0,Math.round(idxOfT(L.t-864e5)))].c:data[Math.max(0,n-2)].c,ch=L.c/r-1;
  $('#last').textContent=fmt(L.c);
@@ -746,9 +748,9 @@ async function loadFx(){const k=tf.id;if(fx.k===k&&Date.now()-fx.t<15*60e3&&fx.T
   fx={k,t:Date.now(),T:rows.map(q=>q[0]),C:rows.map(q=>q[1])};return true}catch(e){return false}}
 function rateAt(t){const T=fx.T,C=fx.C;if(!T.length)return 1;if(t<=T[0])return C[0];let a=0,b=T.length-1;if(t>=T[b])return C[b];while(b-a>1){const m=(a+b)>>1;if(T[m]<=t)a=m;else b=m}return C[a]}
 const fxB=b=>{const r=rateAt(b.t);return{...b,o:b.o/r,h:b.h/r,l:b.l/r,c:b.c/r}};
-const fxNow=()=>cur==='EUR'&&fx.C.length?fx.C[fx.C.length-1]:1;
-const pairName=()=>{const q=src==='binance'&&sym.lp?sym.lp:sym.pair;return cur==='EUR'?q.replace(/USDT|USD/,'EUR'):q};
-function merge(b){if(cur==='EUR'&&fx.T.length)b=fxB(b);const L=data[data.length-1];if(L&&b.t===L.t)Object.assign(L,b);else if(!L||b.t>L.t){if(view.end>data.length-3)view.end++;data.push(b)}}
+const fxNow=()=>curE()==='EUR'&&fx.C.length?fx.C[fx.C.length-1]:1;
+const pairName=()=>{const q=src==='binance'&&sym.lp?sym.lp:sym.pair;return curE()==='EUR'?q.replace(/USDT|USD/,'EUR'):q};
+function merge(b){if(curE()==='EUR'&&fx.T.length)b=fxB(b);const L=data[data.length-1];if(L&&b.t===L.t)Object.assign(L,b);else if(!L||b.t>L.t){if(view.end>data.length-3)view.end++;data.push(b)}}
 function openWS(id){const w=new WebSocket(`wss://stream.binance.com:9443/ws/${sym.bn.toLowerCase()}@kline_${BNI[tf.id]}`);ws=w;
  w.onmessage=ev=>{if(id!==loadId)return;try{const k=JSON.parse(ev.data).k;if(!k)return;merge({t:k.t,o:+k.o,h:+k.h,l:+k.l,c:+k.c,v:+k.v});schedule()}catch(e){}};
  w.onclose=()=>{if(id===loadId)setTimeout(()=>{if(id===loadId)openWS(id)},3000)}}
@@ -776,11 +778,11 @@ async function loadData(reset){
     catch(e){if(id!==loadId)return;err='Twelve Data: '+String(e.message||e).slice(0,60);if(transient(e.message||e))retryLater();else tdNo[sym.id]=Date.now();if(sym.fb){try{if(!await loadFut(id))return}catch(f){if(!sym.bn)throw e;if(!await loadBn(id))return}}else{if(!sym.bn)throw e;if(!await loadBn(id))return}}}
    else if(sym.fb&&!sym.bn){if(!await loadFut(id))return}else if(!await loadBn(id))return}
   catch(e){if(id!==loadId)return;agg();src='sim';err=String(e.message||e).slice(0,80);if(useTd&&transient(err))retryLater()}}
- if(cur==='EUR'&&data.length){if(!await loadFx()){if(id!==loadId)return;cur='USD';try{localStorage.setItem('chartwerk:cur','USD')}catch(e){}load();sel=-1;toast('Euro-Kurs nicht erreichbar, Anzeige in Dollar')}else{if(id!==loadId)return;data=data.map(fxB)}}
+ if(curE()==='EUR'&&data.length){if(!await loadFx()){if(id!==loadId)return;cur='USD';try{localStorage.setItem('chartwerk:cur','USD')}catch(e){}load();sel=-1;toast('Euro-Kurs nicht erreichbar, Anzeige in Dollar')}else{if(id!==loadId)return;data=data.map(fxB)}}
  recalc();if(reset)resetView();clampView();ui();draw();loadLQ()}
 function status(){const b=$('#src'),t=b.querySelector('span');b.className='chip src'+(src==='binance'||src==='bfut'||src==='twelve'?' live':src==='wait'||net===null?' wait':'');
  t.textContent=net===null?'Prüfe Verbindung…':src==='wait'?'Lade…':src==='bfut'?'Live · Binance Futures'+(retryP?' · Twelve gleich':''):src==='binance'?'Live · Binance'+(retryP?' · Twelve gleich':''):src==='twelve'?'Live · '+tdMin()+' Min.':err==='Schlüssel fehlt'?'Simuliert · Schlüssel fehlt':retryP?(src==='binance'?'Binance · neuer Versuch gleich':'Simuliert · neuer Versuch gleich'):'Simuliert';
- $('#ntxt').textContent=src==='binance'?'Echtzeitkurse von Binance in USDT'+(sym.id==='XAU'?', Gold über den Token PAXG.':'.'):src==='bfut'?sym.name+'kurs vom Binance-Kontrakt '+sym.fb+' (folgt dem Spotpreis), Aktualisierung alle 15 Minuten.':src==='twelve'?sym.name+'kurs (Spot '+sym.pair+') von Twelve Data, Aktualisierung alle '+tdMin()+' Minuten'+(mktOpen()?'':' (Markt geschlossen)')+'.':'Simulierte Kurse zur Demonstration, keine echten Marktdaten.';
+ $('#ntxt').textContent=src==='binance'?'Echtzeitkurse von Binance in USDT'+(sym.id==='XAU'?', Gold über den Token PAXG.':'.'):src==='bfut'?(sym.id==='EUR'?'Devisen':sym.name)+'kurs vom Binance-Kontrakt '+sym.fb+' (folgt dem Spotpreis), Aktualisierung alle 15 Minuten.':src==='twelve'?(sym.id==='EUR'?'Devisen':sym.name)+'kurs (Spot '+sym.pair+') von Twelve Data, Aktualisierung alle '+tdMin()+' Minuten'+(mktOpen()?'':' (Markt geschlossen)')+'.':'Simulierte Kurse zur Demonstration, keine echten Marktdaten.';
  $('#pinfo').textContent=net?'Verbindung zu den Kursanbietern steht.':net===null?'Verbindung wird geprüft …':'Hier sind keine Verbindungen zu Kursanbietern möglich, deshalb laufen simulierte Kurse. Öffne Chartwerk als Datei auf deinem Computer oder auf einer eigenen Webadresse, dann laden Echtzeitkurse automatisch.';
  $('#plist').innerHTML=SYMS.map(s=>`<li><span>${s.name}</span><span>${!net?'simuliert':s.td&&tdKey?'Twelve Data, alle '+tdMin()+' Min.'+(s.fb?' (sonst Binance Futures)':''):s.bn?'Binance live'+(s.id==='XAU'?' (PAXG)':''):'simuliert, Schlüssel fehlt'}</span></li>`).join('')+(err&&err!=='Schlüssel fehlt'?`<li><span>Letzter Fehler</span><span>${err.replace(/</g,'&lt;')}</span></li>`:'')}
 
