@@ -89,6 +89,12 @@ canvas{position:absolute;inset:0;width:100%;height:100%;touch-action:none;cursor
 .seg svg{width:30px;height:12px;fill:none}
 .panel .ck input[type=color]{width:30px;height:24px;padding:0;border:1px solid #34404b;border-radius:5px;background:none;cursor:pointer}
 .panel .sub{font-size:12px;color:var(--mute);letter-spacing:.06em;text-transform:uppercase;margin:8px 0 2px}
+.obl{margin:0 -6px 8px}.obr{display:flex;align-items:center;gap:6px;min-height:46px;padding:0 6px;border-bottom:1px solid var(--line);border-radius:6px}
+.obr.sel{background:#1f2830}.obr .nm{flex:1;display:flex;align-items:center;gap:9px;cursor:pointer;min-height:44px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+.obr .nm small{color:var(--mute);font-size:12px}.obr.off .nm{opacity:.4}.obr .dot{width:11px;height:11px;flex:none}
+.ib{appearance:none;width:40px;height:40px;flex:none;display:grid;place-items:center;border:0;border-radius:8px;background:transparent;color:var(--mute);cursor:pointer;padding:0}
+.ib:hover{color:var(--ink);background:#232c33}.ib svg{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
+.ib.on{color:var(--ink)}
 :focus-visible{outline:2px solid var(--acc);outline-offset:2px}
 @media(max-width:700px){
  .app{grid-template-columns:minmax(0,1fr);grid-template-areas:"h" "b" "s" "t" "n"}
@@ -135,6 +141,7 @@ canvas{position:absolute;inset:0;width:100%;height:100%;touch-action:none;cursor
   <button class="tb" id="lock" title="Auswahl sperren / entsperren" aria-label="Auswahl sperren" aria-pressed="false"><svg viewBox="0 0 22 22"><rect x="5" y="10" width="12" height="9" rx="1.5"/><path d="M8 10V7a3 3 0 016 0v3"/></svg></button>
   <button class="tb" id="lockall" title="Alle Zeichnungen sperren" aria-label="Alle Zeichnungen sperren" aria-pressed="false"><svg viewBox="0 0 22 22"><rect x="8" y="11" width="11" height="8" rx="1.5"/><path d="M10.5 11V8.5a3 3 0 016 0V11"/><path d="M3 7h4M3 11h3M3 15h3"/></svg><span class="bd">alle</span></button>
   <button class="tb" id="vis" title="Zeichnungen aus- / einblenden" aria-label="Zeichnungen ausblenden" aria-pressed="false"></button>
+  <button class="tb" id="obt" title="Objektbaum: Zeichnungen einzeln ausblenden" aria-label="Objektbaum"><svg viewBox="0 0 22 22"><path d="M11 3l8 4-8 4-8-4z"/><path d="M3 11l8 4 8-4"/><path d="M3 15l8 4 8-4"/></svg></button>
   <button class="tb" id="bk" title="Backup und Übertragung" aria-label="Backup"><svg viewBox="0 0 22 22"><path d="M11 3v10M7 9l4 4 4-4"/><path d="M4 14v4.5h14V14"/></svg></button>
   <button class="tb" id="fibset" title="Einstellungen für Fibonacci oder ausgewählten Kanal" aria-label="Fibonacci- und Kanal-Einstellungen"><svg viewBox="0 0 22 22"><path d="M3 5h9M3 11h13M3 17h9"/><circle cx="15.5" cy="5" r="2"/><circle cx="18.5" cy="11" r="2" stroke-opacity="0"/><circle cx="15.5" cy="17" r="2"/></svg></button>
   <div class="sep"></div>
@@ -187,6 +194,12 @@ canvas{position:absolute;inset:0;width:100%;height:100%;touch-action:none;cursor
    <label class="ck"><input type="checkbox" id="f-mono">Nur gewählte Zeichenfarbe</label>
   </div>
   <div class="prow"><button class="chip" id="freset">Standard</button><button class="chip pri" id="fclose">Fertig</button></div>
+ </div>
+ <div class="panel" id="obp" role="dialog" aria-label="Objektbaum">
+  <h2 id="obh">Objektbaum</h2>
+  <div class="sub">Indikatoren</div><div class="obl" id="obi"></div>
+  <div class="sub">Zeichnungen</div><div class="obl" id="obd"></div>
+  <div class="prow"><button class="chip" id="obshow">Alle einblenden</button><button class="chip pri" id="obok">Fertig</button></div>
  </div>
  <div class="panel" id="colp" role="dialog" aria-label="Farbe und Linie">
   <h2 id="colh">Farbe und Linie</h2>
@@ -571,7 +584,7 @@ function draw(){
   ctx.font='11px "IBM Plex Sans",system-ui';ctx.fillStyle='#e7ecef';ctx.textAlign='right';ctx.textBaseline=FC.cur>=FC.beat?'top':'bottom';ctx.fillText('Zu schlagen',x(c0+K),by+(FC.cur>=FC.beat?3:-3));ctx.textAlign='left'}
  if(scL.length){ctx.textBaseline='middle';scL.forEach(([t,c,yy,r])=>{ctx.font=(r?'600 ':'')+'11px "IBM Plex Sans",system-ui';const tw=ctx.measureText(t).width,tx=r?Math.max(4,w-tw-10):Math.max(6,Math.min(w*.42,w-tw-10));
   ctx.fillStyle='rgba(15,19,22,.82)';ctx.fillRect(tx-4,yy-9,tw+8,18);ctx.fillStyle=c;ctx.textAlign='left';ctx.fillText(t,tx,yy)})}
- if(!hidden)drawings.forEach((d,k)=>shape(d,k===sel));
+ if(!hidden)drawings.forEach((d,k)=>{if(!d.hd)shape(d,k===sel)});
  if(magnet&&mp&&tool!=='brush'&&(tool!=='cursor'||(act&&act.k==='pt'))&&(hover||act)){const sn=snapInfo(...mp);if(sn.hit){const[sx,sy]=P(sn.pt);ctx.beginPath();ctx.arc(sx,sy,6,0,7);ctx.strokeStyle='#fff';ctx.lineWidth=1.6;ctx.stroke()}}
  const ch=crossPt();
  if(ch){ctx.strokeStyle='#6b7680';ctx.lineWidth=1;ctx.setLineDash([4,4]);seg(ch[0],0,ch[0],H-BX);seg(0,ch[1],w,ch[1]);ctx.setLineDash([]);if(!hover){ctx.beginPath();ctx.arc(ch[0],ch[1],3.5,0,7);ctx.fillStyle='#e7ecef';ctx.fill()}}
@@ -592,7 +605,7 @@ function legend(){
 function distSeg(px,py,ax,ay,bx,by){const dx=bx-ax,dy=by-ay,l=dx*dx+dy*dy;let t=l?((px-ax)*dx+(py-ay)*dy)/l:0;t=Math.max(0,Math.min(1,t));return Math.hypot(px-ax-t*dx,py-ay-t*dy)}
 function hit(px,py,tol){
  if(hidden)return -1;
- for(let k=drawings.length-1;k>=0;k--){const d=drawings[k],ps=d.pts.map(P);let dd=Infinity;
+ for(let k=drawings.length-1;k>=0;k--){const d=drawings[k];if(d.hd)continue;const ps=d.pts.map(P);let dd=Infinity;
   if(d.k==='trend'||d.k==='info')dd=distSeg(px,py,...ps[0],...ps[1]);
   else if(d.k==='ray'||d.k==='ext')dd=distSeg(px,py,...extPts(ps[0],ps[1],d.k==='ext'));
   else if(d.k==='fan'){const xa=Math.min(ps[0][0],ps[1][0]),xb=Math.max(ps[0][0],ps[1][0]),ya=Math.min(ps[0][1],ps[1][1]),yb=Math.max(ps[0][1],ps[1][1]);dd=(px>=xa-tol&&px<=xb+tol&&py>=ya-tol&&py<=yb+tol)?0:distSeg(px,py,...extPts(ps[0],ps[1],false))}
@@ -622,7 +635,7 @@ function ui(){
  document.querySelectorAll('[data-tool]').forEach(b=>b.setAttribute('aria-pressed',b.dataset.tool===tool));
  penUI();
  $('#vis').setAttribute('aria-pressed',hidden);$('#vis').innerHTML='<svg viewBox="0 0 22 22"><path d="M2 11s3.5-6 9-6 9 6 9 6-3.5 6-9 6-9-6-9-6z"/><circle cx="11" cy="11" r="2.5"/>'+(hidden?'<path d="M4 3l14 16"/>':'')+'</svg>';$('#vis').title=hidden?'Zeichnungen einblenden':'Zeichnungen ausblenden';
- if($('#fibp').classList.contains('on'))fibUI();if($('#chp').classList.contains('on'))chUI();if($('#fnp').classList.contains('on'))fnUI();
+ if($('#fibp').classList.contains('on'))fibUI();if($('#chp').classList.contains('on'))chUI();obUI();if($('#fnp').classList.contains('on'))fnUI();
  $('#ma').setAttribute('aria-pressed',showMA);$('#mag').setAttribute('aria-pressed',magnet>0);$('#magbd').textContent=['','•','••'][magnet];$('#mag').title=['Magnet aus','Magnet schwach','Magnet stark'][magnet];$('#zzb').setAttribute('aria-pressed',showZZ);$('#pgb').setAttribute('aria-pressed',showPG);$('#scb').setAttribute('aria-pressed',showSC);$('#znb').setAttribute('aria-pressed',showZN);$('#trb').setAttribute('aria-pressed',showTR);progUI();
  $('#undo').disabled=!undo.length;$('#del').disabled=sel<0||locked(drawings[sel]);$('#lock').disabled=sel<0||lockAll;$('#lock').setAttribute('aria-pressed',sel>=0&&!!drawings[sel]?.lk);$('#lockall').setAttribute('aria-pressed',lockAll);$('#clear').disabled=!drawings.length;
  status();
@@ -711,7 +724,7 @@ function setOpt(mut){const d=ftarget();
  if(d){if(locked(d)){toast('Gesperrt: erst entsperren');fibUI();return}undo.push(snap());d.o=d.o||JSON.parse(JSON.stringify(fib));mut(d.o);save()}
  else{mut(fib);try{lsSet('chartwerk:fib',JSON.stringify(fib))}catch(e){}}
  ui();draw()}
-function openPanel(id){['#fibp','#panel','#bkp','#zzp','#chp','#colp','#fnp'].forEach(p=>{if(p!==id)$(p).classList.remove('on')});return $(id).classList.toggle('on')}
+function openPanel(id){['#fibp','#panel','#bkp','#zzp','#chp','#colp','#fnp','#obp'].forEach(p=>{if(p!==id)$(p).classList.remove('on')});return $(id).classList.toggle('on')}
 $('#fibset').onclick=()=>{if(ctarget()||tool==='chan'){chUI();openPanel('#chp');return}if(fntarget()||tool==='fan'){fnUI(true);openPanel('#fnp');return}fibUI();openPanel('#fibp')};
 const fntarget=()=>sel>=0&&!hidden&&drawings[sel]&&drawings[sel].k==='fan'?drawings[sel]:null;let fnT;
 function fnUI(force){const d=fntarget();if(!force&&d===fnT)return;fnT=d;const o=d?fanOpt(d):fand;
@@ -761,7 +774,7 @@ function validD(d){return d&&KINDS.includes(d.k)&&Array.isArray(d.pts)&&d.pts.le
 function doImport(replace){let b;try{b=JSON.parse($('#bktxt').value.trim())}catch(e){bkmsg('Das ist kein gültiges Backup.');return}
  if(!b||b.app!=='chartwerk'||typeof b.drawings!=='object'){bkmsg('Das ist kein Chartwerk-Backup.');return}
  const cur=allDrawings();let n=0;undo.push(snap());
- SYMS.forEach(s=>{const inc=(Array.isArray(b.drawings[s.id])?b.drawings[s.id]:[]).filter(validD).map(d=>({k:d.k,c:typeof d.c==='string'&&/^#[0-9a-f]{3,8}$/i.test(d.c)?d.c:COLORS[0],pts:d.pts.map(q=>({t:+q.t,p:+q.p})),...(d.lk?{lk:true}:{}),...(d.o&&typeof d.o==='object'&&(Array.isArray(d.o.on)||Array.isArray(d.o.fp))?{o:Object.assign(JSON.parse(JSON.stringify(d.k==='chan'?CHDEF:d.k==='fan'&&Array.isArray(d.o.fp)?FANDEF:FIBDEF)),d.o)}:{}),...(['dash','dot'].includes(d.ls)?{ls:d.ls}:{}),...(d.lw>0&&d.lw<6?{lw:+d.lw}:{})}));
+ SYMS.forEach(s=>{const inc=(Array.isArray(b.drawings[s.id])?b.drawings[s.id]:[]).filter(validD).map(d=>({k:d.k,c:typeof d.c==='string'&&/^#[0-9a-f]{3,8}$/i.test(d.c)?d.c:COLORS[0],pts:d.pts.map(q=>({t:+q.t,p:+q.p})),...(d.lk?{lk:true}:{}),...(d.hd?{hd:true}:{}),...(d.o&&typeof d.o==='object'&&(Array.isArray(d.o.on)||Array.isArray(d.o.fp))?{o:Object.assign(JSON.parse(JSON.stringify(d.k==='chan'?CHDEF:d.k==='fan'&&Array.isArray(d.o.fp)?FANDEF:FIBDEF)),d.o)}:{}),...(['dash','dot'].includes(d.ls)?{ls:d.ls}:{}),...(d.lw>0&&d.lw<6?{lw:+d.lw}:{})}));
   n+=inc.length;const out=replace?inc:[...(cur[s.id]||[]),...inc];try{localStorage.setItem('chartwerk:'+s.id,JSON.stringify(out));localStorage.setItem('chartwerk:u:'+s.id,Date.now())}catch(e){}});
  queueSync();
  if(b.fib&&Array.isArray(b.fib.on)){fib=Object.assign(JSON.parse(JSON.stringify(FIBDEF)),b.fib);try{lsSet('chartwerk:fib',JSON.stringify(fib))}catch(e){}}
@@ -793,6 +806,30 @@ $('#colc').onchange=e=>penSet('c',e.target.value);
 $('#lss').onclick=e=>{const b=e.target.closest('button');if(b)penSet('ls',b.dataset.ls)};
 $('#lws').onclick=e=>{const b=e.target.closest('button');if(b)penSet('lw',+b.dataset.lw)};
 $('#colok').onclick=()=>$('#colp').classList.remove('on');
+const KN={trend:'Trendlinie',ray:'Strahl',ext:'Erweiterte Linie',chan:'Parallelkanal',info:'Info-Linie',hline:'Horizontale Linie',goal:'Ziel',rect:'Rechteck',fib:'Fibonacci-Retracement',fan:'Fib-Fächer',brush:'Freihand'};
+const IND=[['ma','MA 20/50'],['zzb','Zickzack'],['trb','Trendlinien (automatisch)'],['znb','Kauf- und Verkaufszonen'],['pgb','Prognose'],['scb','Szenarien']];
+const EYE=(on)=>'<svg viewBox="0 0 22 22"><path d="M2 11s3.5-6 9-6 9 6 9 6-3.5 6-9 6-9-6-9-6z"/><circle cx="11" cy="11" r="2.5"/>'+(on?'':'<path d="M4 3l14 16"/>')+'</svg>';
+const LCK='<svg viewBox="0 0 22 22"><rect x="5" y="10" width="12" height="9" rx="1.5"/><path d="M8 10V7a3 3 0 016 0v3"/></svg>',BIN='<svg viewBox="0 0 22 22"><path d="M4 6h14M8.5 6V4h5v2M6 6l1 13h8l1-13"/></svg>';
+let obSig='';
+function obUI(){if(!$('#obp').classList.contains('on')){obSig='';return}
+ const ind=IND.filter(([id])=>$('#'+id)).map(([id,n])=>{const on=$('#'+id).getAttribute('aria-pressed')==='true';
+  return`<div class="obr${on?'':' off'}"><span class="nm" data-ind="${id}">${n}</span><button class="ib${on?' on':''}" data-ind="${id}" aria-label="${n} ${on?'ausblenden':'einblenden'}" title="${on?'Ausblenden':'Einblenden'}">${EYE(on)}</button></div>`}).join('');
+ const dr=drawings.map((d,k)=>({d,k})).reverse().map(({d,k})=>{const on=!d.hd,det=d.k==='hline'||d.k==='goal'?' <small>'+fmt(d.pts[0].p)+'</small>':'';
+  return`<div class="obr${on?'':' off'}${k===sel?' sel':''}"><span class="nm" data-k="${k}"><span class="dot" style="--c:${d.c}"></span>${KN[d.k]||d.k}${det}</span>`+
+  `<button class="ib${d.lk?' on':''}" data-lk="${k}" aria-label="Sperren" title="${d.lk?'Entsperren':'Sperren'}">${LCK}</button>`+
+  `<button class="ib${on?' on':''}" data-hd="${k}" aria-label="${on?'Ausblenden':'Einblenden'}" title="${on?'Ausblenden':'Einblenden'}">${EYE(on)}</button>`+
+  `<button class="ib" data-del="${k}" aria-label="Löschen" title="Löschen">${BIN}</button></div>`}).join('')||'<p style="color:var(--mute);margin:8px 6px">Noch keine Zeichnungen in diesem Markt.</p>';
+ const s=ind+'|'+dr;if(s===obSig)return;obSig=s;
+ $('#obh').textContent='Objektbaum · '+sym.name;$('#obi').innerHTML=ind;$('#obd').innerHTML=dr}
+$('#obt').onclick=()=>{if(openPanel('#obp')){obSig='';obUI()}};
+$('#obok').onclick=()=>$('#obp').classList.remove('on');
+$('#obshow').onclick=()=>{if(!drawings.some(d=>d.hd)&&!hidden)return;undo.push(snap());drawings.forEach(d=>delete d.hd);hidden=false;try{localStorage.setItem('chartwerk:hide','0')}catch(e){}save();ui();draw()};
+$('#obp').addEventListener('click',e=>{const t=e.target.closest('[data-ind],[data-k],[data-hd],[data-del],[data-lk]');if(!t)return;
+ if(t.dataset.ind){$('#'+t.dataset.ind).click();obSig='';ui();return}
+ if(t.dataset.k!==undefined){const k=+t.dataset.k;if(drawings[k].hd||hidden){toast('Erst einblenden, dann auswählen');return}tool='cursor';sel=k;ui();draw();return}
+ if(t.dataset.hd!==undefined){const d=drawings[+t.dataset.hd];undo.push(snap());if(d.hd)delete d.hd;else{d.hd=true;if(sel===+t.dataset.hd)sel=-1}save();ui();draw();return}
+ if(t.dataset.lk!==undefined){const d=drawings[+t.dataset.lk];undo.push(snap());d.lk=!d.lk;if(!d.lk)delete d.lk;save();ui();draw();return}
+ if(t.dataset.del!==undefined){const k=+t.dataset.del;if(locked(drawings[k])){toast('Gesperrt: erst entsperren, dann löschen');return}undo.push(snap());drawings.splice(k,1);if(sel===k)sel=-1;else if(sel>k)sel--;save();ui();draw();toast('Gelöscht. Rückgängig ist möglich.')}});
 function doUndo(){if(!undo.length)return;drawings=JSON.parse(undo.pop());sel=-1;save();ui();draw()}
 function doDel(){if(sel<0)return;if(locked(drawings[sel])){toast('Gesperrt: erst entsperren, dann löschen');return}undo.push(snap());drawings.splice(sel,1);sel=-1;save();ui();draw()}
 $('#undo').onclick=doUndo;$('#del').onclick=doDel;
