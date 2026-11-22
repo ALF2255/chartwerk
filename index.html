@@ -964,14 +964,14 @@ let ghTok='',gistId='',syncT=0,syncing=false,syncAgain=false,lastSync=0,syncErr=
 try{ghTok=localStorage.getItem('chartwerk:gh')||'';gistId=localStorage.getItem('chartwerk:gist')||''}catch(e){}
 const lsGet=k=>{try{return localStorage.getItem(k)}catch(e){return null}};
 function lsSet(k,v){try{localStorage.setItem(k,v);localStorage.setItem('chartwerk:us',Date.now())}catch(e){}queueSync()}
-async function gh(path,opt={}){const r=await fetch(GH+path,{...opt,headers:{Authorization:'Bearer '+ghTok,Accept:'application/vnd.github+json',...(opt.body?{'Content-Type':'application/json'}:{})}});
+async function gh(path,opt={}){const r=await fetch(GH+path,{cache:'no-store',...opt,headers:{Authorization:'Bearer '+ghTok,Accept:'application/vnd.github+json',...(opt.body?{'Content-Type':'application/json'}:{})}});
  if(r.status===401)throw new Error('Schlüssel ungültig oder abgelaufen');if(r.status===403)throw new Error('Schlüssel hat keine Gist-Berechtigung');if(r.status===404)throw new Error('nicht gefunden (404)');
  if(!r.ok)throw new Error('GitHub-Fehler '+r.status);return r.json()}
 function localState(){const m={};SYMS.forEach(s=>{lays(s.id).forEach(l=>{const e=ek(s.id,l.id);let d=[];try{d=JSON.parse(lsGet('chartwerk:'+e)||'[]')}catch(x){}m[e]={u:+lsGet('chartwerk:u:'+e)||0,d}});m['L:'+s.id]={u:+lsGet('chartwerk:u:L:'+s.id)||0,d:lays(s.id)}});
  return{app:'chartwerk',v:2,markets:m,settings:{u:+lsGet('chartwerk:us')||0,fib,magnet,lockAll,zz:zzo}}}
 async function findGist(){for(let p=1;p<=5;p++){const a=await gh(`/gists?per_page=100&page=${p}`);const g=a.find(x=>x.files&&x.files[GF]);if(g)return g.id;if(a.length<100)break}return ''}
 async function readGist(){const g=await gh('/gists/'+gistId);const f=g.files&&g.files[GF];if(!f)return null;let t=f.content;
- if(f.truncated){const r=await fetch(f.raw_url);t=await r.text()}try{return JSON.parse(t)}catch(e){return null}}
+ if(f.truncated){const r=await fetch(f.raw_url,{cache:'no-store'});t=await r.text()}try{return JSON.parse(t)}catch(e){return null}}
 function applySettings(rs){try{if(rs.fib&&Array.isArray(rs.fib.on)){fib=Object.assign(JSON.parse(JSON.stringify(FIBDEF)),rs.fib);localStorage.setItem('chartwerk:fib',JSON.stringify(fib))}
  if([0,1,2].includes(rs.magnet)){magnet=rs.magnet;localStorage.setItem('chartwerk:mag',magnet)}
  lockAll=!!rs.lockAll;localStorage.setItem('chartwerk:lockall',lockAll?'1':'0');
