@@ -969,8 +969,16 @@ async function gh(path,opt={}){const r=await fetch(GH+path,{cache:'no-store',...
  if(!r.ok)throw new Error('GitHub-Fehler '+r.status);return r.json()}
 function localState(){const m={};SYMS.forEach(s=>{lays(s.id).forEach(l=>{const e=ek(s.id,l.id);let d=[];try{d=JSON.parse(lsGet('chartwerk:'+e)||'[]')}catch(x){}m[e]={u:+lsGet('chartwerk:u:'+e)||0,d}});m['L:'+s.id]={u:+lsGet('chartwerk:u:L:'+s.id)||0,d:lays(s.id)}});
  return{app:'chartwerk',v:2,markets:m,settings:{u:+lsGet('chartwerk:us')||0,fib,magnet,lockAll,zz:zzo}}}
-async function findGist(){for(let p=1;p<=5;p++){const a=await gh(`/gists?per_page=100&page=${p}`);const g=a.find(x=>x.files&&x.files[GF]);if(g)return g.id;if(a.length<100)break}return ''}
-async function readGist(){const g=await gh('/gists/'+gistId);const f=g.files&&g.files[GF];if(!f)return null;let t=f.content;
+// Alle Gists mit der Abgleich-Datei, älteste zuerst. Alle Geräte nehmen so immer dasselbe (das älteste) Gist,
+// auch wenn früher versehentlich mehrere angelegt wurden.
+async function findGists(){const o=[];for(let p=1;p<=5;p++){const a=await gh(`/gists?per_page=100&page=${p}`);a.forEach(x=>{if(x.files&&x.files[GF])o.push(x)});if(a.length<100)break}
+ return o.sort((x,y)=>String(x.created_at).localeCompare(String(y.created_at))).map(x=>x.id)}
+// Zwei Gist-Stände zusammenführen: je Markt/Layout und für die Einstellungen gewinnt der neuere Stand.
+function mergeStates(A,B){if(!A)return B;if(!B)return A;const m=Object.assign({},A.markets||{});
+ Object.entries(B.markets||{}).forEach(([k,v])=>{if(!m[k]||((v&&v.u)||0)>((m[k]&&m[k].u)||0))m[k]=v});
+ const s=((B.settings&&B.settings.u)||0)>((A.settings&&A.settings.u)||0)?B.settings:A.settings;return{app:'chartwerk',v:2,markets:m,settings:s}}
+let gistDup=[];
+async function readGist(id){const g=await gh('/gists/'+(id||gistId));const f=g.files&&g.files[GF];if(!f)return null;let t=f.content;
  if(f.truncated){const r=await fetch(f.raw_url,{cache:'no-store'});t=await r.text()}try{return JSON.parse(t)}catch(e){return null}}
 function applySettings(rs){try{if(rs.fib&&Array.isArray(rs.fib.on)){fib=Object.assign(JSON.parse(JSON.stringify(FIBDEF)),rs.fib);localStorage.setItem('chartwerk:fib',JSON.stringify(fib))}
  if([0,1,2].includes(rs.magnet)){magnet=rs.magnet;localStorage.setItem('chartwerk:mag',magnet)}
@@ -979,10 +987,12 @@ function applySettings(rs){try{if(rs.fib&&Array.isArray(rs.fib.on)){fib=Object.a
 async function sync(){
  if(!ghTok)return;if(syncing){syncAgain=true;return}syncing=true;syncErr='';syncUI();
  try{
-  if(!gistId){gistId=await findGist();
-   if(!gistId){const g=await gh('/gists',{method:'POST',body:JSON.stringify({description:'Chartwerk Abgleich',public:false,files:{[GF]:{content:JSON.stringify(localState())}}})});gistId=g.id}
-   try{localStorage.setItem('chartwerk:gist',gistId)}catch(e){}}
-  const R=await readGist(),L=localState(),M={};let push=!R,changed=false;
+  const ids=await findGists();
+  if(ids.length){if(gistId!==ids[0]){gistId=ids[0];try{localStorage.setItem('chartwerk:gist',gistId)}catch(e){}}}
+  else{const g=await gh('/gists',{method:'POST',body:JSON.stringify({description:'Chartwerk Abgleich',public:false,files:{[GF]:{content:JSON.stringify(localState())}}})});gistId=g.id;try{localStorage.setItem('chartwerk:gist',gistId)}catch(e){}}
+  let R=await readGist();gistDup=ids.slice(1);
+  for(const id of gistDup){try{R=mergeStates(R,await readGist(id))}catch(e){}} // doppelte Gists einsammeln
+  const L=localState(),M={};let push=!R||gistDup.length>0,changed=false;
   const ER=new RegExp('^(L:('+SYMS.map(s=>s.id).join('|')+')|('+SYMS.map(s=>s.id).join('|')+')(@[a-z0-9]{1,12})?)$');
   const ks=[...new Set([...Object.keys(L.markets),...Object.keys(R&&R.markets||{})])].filter(k=>ER.test(k)).sort((a,b)=>(b.startsWith('L:')?1:0)-(a.startsWith('L:')?1:0));
   ks.forEach(k=>{const r=R&&R.markets&&R.markets[k],l=L.markets[k]||{u:0,d:[]},isL=k.startsWith('L:');
@@ -993,6 +1003,8 @@ async function sync(){
   let S=L.settings;const rs=R&&R.settings;
   if(rs&&(rs.u||0)>S.u){applySettings(rs);S=rs}else if(!rs||S.u>(rs.u||0))push=true;
   if(push)await gh('/gists/'+gistId,{method:'PATCH',body:JSON.stringify({files:{[GF]:{content:JSON.stringify({app:'chartwerk',v:2,markets:M,settings:S})}}})});
+  // Doppelte Gists nach dem Zusammenführen stilllegen (nicht löschen): Datei umbenennen, damit sie nicht mehr gefunden werden
+  for(const id of gistDup){try{await gh('/gists/'+id,{method:'PATCH',body:JSON.stringify({description:'Chartwerk Abgleich (alt – zusammengeführt in '+gistId.slice(0,7)+')',files:{[GF]:{filename:'chartwerk-sync-alt.json'}}})})}catch(e){}}
   if(changed&&!lays(sym.id).some(l=>l.id===lay)){lay='';try{localStorage.setItem('chartwerk:lay:'+sym.id,'')}catch(e){}}
   if(changed&&!act){load();sel=-1;undo=[]}else if(changed)syncAgain=true;
   lastSync=Date.now();
@@ -1000,7 +1012,7 @@ async function sync(){
  syncing=false;ui();draw();syncUI();if(syncAgain){syncAgain=false;queueSync()}}
 function queueSync(){if(!ghTok)return;clearTimeout(syncT);syncT=setTimeout(sync,1500)}
 function syncUI(){const t=lastSync?new Date(lastSync).toLocaleTimeString('de-DE',{hour:'2-digit',minute:'2-digit'}):'';
- $('#ghmsg').textContent=!ghTok?'Nicht verbunden. Zeichnungen bleiben nur auf diesem Gerät.':syncing?'Gleiche ab …':syncErr?'Fehler: '+syncErr:lastSync?'Verbunden. Zuletzt abgeglichen um '+t+'.':'Verbunden.';
+ $('#ghmsg').textContent=!ghTok?'Nicht verbunden. Zeichnungen bleiben nur auf diesem Gerät.':syncing?'Gleiche ab …':syncErr?'Fehler: '+syncErr:lastSync?'Verbunden mit Gist '+gistId.slice(0,7)+'. Zuletzt abgeglichen um '+t+'.'+(gistDup.length?' '+gistDup.length+' doppelte(s) Gist zusammengeführt.':''):'Verbunden.';
  $('#ghk').placeholder=ghTok?'Schlüssel gespeichert':'ghp_…';
  $('#syn').textContent=!ghTok?'':syncErr?' Abgleich: Fehler.':lastSync?' Abgeglichen um '+t+'.':'';}
 $('#ghcon').onclick=()=>{const v=$('#ghk').value.trim();if(v){ghTok=v;try{localStorage.setItem('chartwerk:gh',v)}catch(e){}}if(!ghTok){$('#ghmsg').textContent='Bitte zuerst den Schlüssel einfügen.';return}$('#ghk').value='';gistId='';try{localStorage.removeItem('chartwerk:gist')}catch(e){}sync()};
