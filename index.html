@@ -98,6 +98,10 @@ canvas{position:absolute;inset:0;width:100%;height:100%;touch-action:none;cursor
 .panel .obr .lin{flex:1;width:auto;height:38px;border-radius:8px;border:1px solid transparent;background:transparent;color:var(--ink);font:15px "IBM Plex Sans",system-ui;padding:0 8px}
 .panel .obr .lin:focus{border-color:#34404b;background:var(--bg)}
 #layb{margin-left:auto;color:var(--ink)}#layb svg{width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:1.7;vertical-align:-3px;margin-right:6px}
+.app.fs header,.app.fs .bar,.app.fs .note{display:none}
+#fsb{padding:0 11px;color:var(--ink)}#fsb svg,#fsx svg{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+#fsx{position:absolute;right:80px;top:8px;z-index:4;width:44px;height:44px;border-radius:10px;border:1px solid #2f3a43;background:rgba(20,26,30,.85);color:var(--ink);display:none;place-items:center;cursor:pointer;padding:0}
+.app.fs #fsx{display:grid}
 :focus-visible{outline:2px solid var(--acc);outline-offset:2px}
 @media(max-width:700px){
  .app{grid-template-columns:minmax(0,1fr);grid-template-areas:"h" "b" "s" "t" "n"}
@@ -112,7 +116,7 @@ canvas{position:absolute;inset:0;width:100%;height:100%;touch-action:none;cursor
 @media(prefers-reduced-motion:reduce){.toast{transition:none}}
 </style></head><body>
 <div class="app">
- <header><div class="brand">Chart<i>werk</i></div><div class="row" id="syms"></div><button class="chip" id="layb" title="Strategie-Layouts"><svg viewBox="0 0 22 22"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="12" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="12" width="7" height="7" rx="1.5"/><rect x="12" y="12" width="7" height="7" rx="1.5"/></svg><span id="laybt">Standard</span></button></header>
+ <header><div class="brand">Chart<i>werk</i></div><div class="row" id="syms"></div><button class="chip" id="layb" title="Strategie-Layouts"><svg viewBox="0 0 22 22"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="12" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="12" width="7" height="7" rx="1.5"/><rect x="12" y="12" width="7" height="7" rx="1.5"/></svg><span id="laybt">Standard</span></button><button class="chip" id="fsb" title="Vollbild" aria-label="Vollbild"><svg viewBox="0 0 22 22"><path d="M3 8V3h5M14 3h5v5M19 14v5h-5M8 19H3v-5"/></svg></button></header>
  <div class="bar">
   <div class="quote"><span id="pair">BTC/USD</span><b id="last">–</b><em id="chg"></em></div>
   <div class="row"><button class="chip src" id="src"><i></i><span>Prüfe Verbindung…</span></button><div class="row" id="tfs"></div>
@@ -156,7 +160,7 @@ canvas{position:absolute;inset:0;width:100%;height:100%;touch-action:none;cursor
   <button class="tb" id="del" title="Auswahl löschen (Entf)" aria-label="Auswahl löschen"><svg viewBox="0 0 22 22"><path d="M4 6h14M8.5 6V4h5v2M6 6l1 13h8l1-13"/></svg></button>
   <button class="tb" id="clear" title="Alle Zeichnungen löschen" aria-label="Alle Zeichnungen löschen"><svg viewBox="0 0 22 22"><rect x="3" y="3" width="16" height="16" rx="2.5"/><path d="M8 8l6 6M14 8l-6 6"/></svg></button>
  </nav>
- <main class="stage" id="stage"><canvas id="cv"></canvas><div class="legend" id="legend"></div><div class="toast" id="toast"></div>
+ <main class="stage" id="stage"><canvas id="cv"></canvas><button id="fsx" title="Vollbild beenden" aria-label="Vollbild beenden"><svg viewBox="0 0 22 22"><path d="M8 3v5H3M19 8h-5V3M14 19v-5h5M3 14h5v5"/></svg></button><div class="legend" id="legend"></div><div class="toast" id="toast"></div>
  <div class="pg" id="pg" hidden>
   <div class="pgh"><b>Prognose</b><span id="pgt"></span></div>
   <div class="pgr"><div><span>Höher</span><b class="up" id="pgu">–</b></div><div><span>Tiefer</span><b class="dn" id="pgd">–</b></div></div>
@@ -789,6 +793,11 @@ function layUI(){$('#laybt').textContent=curLay().n;if(!$('#layp').classList.con
   return`<div class="obr${on?' sel':''}"><button class="ib${on?' on':''}" data-go="${l.id}" aria-label="Layout öffnen" title="Öffnen"><svg viewBox="0 0 22 22">${on?'<circle cx="11" cy="11" r="7"/><path d="M7.5 11l2.5 2.5 4.5-5"/>':'<circle cx="11" cy="11" r="7"/>'}</svg></button>`+
   `<input class="lin" data-rn="${l.id}" value="${esc(l.n)}" maxlength="30" aria-label="Name des Layouts"><span style="color:var(--mute);font-size:12px;white-space:nowrap">${cnt} Zeichn.</span>`+
   (l.id?`<button class="ib" data-rm="${l.id}" aria-label="Layout löschen" title="${rmArm===l.id?'Nochmal tippen zum Löschen':'Löschen'}" style="${rmArm===l.id?'color:#fff;background:var(--dn)':''}">${BIN}</button>`:'<span style="width:40px"></span>')+'</div>'}).join('')}
+function setFS(on){const a=document.querySelector('.app');a.classList.toggle('fs',on);
+ try{if(on&&document.documentElement.requestFullscreen&&!document.fullscreenElement)document.documentElement.requestFullscreen({navigationUI:'hide'}).catch(()=>{});
+  else if(!on&&document.fullscreenElement)document.exitFullscreen().catch(()=>{})}catch(e){}}
+$('#fsb').onclick=()=>setFS(true);$('#fsx').onclick=()=>setFS(false);
+document.addEventListener('fullscreenchange',()=>{if(!document.fullscreenElement)document.querySelector('.app').classList.remove('fs')});
 $('#layb').onclick=()=>{if(openPanel('#layp')){laySig='';layUI()}};
 $('#layok').onclick=()=>$('#layp').classList.remove('on');
 function newLay(copy){const n=($('#layn').value.trim()||'Layout '+lays(sym.id).length).slice(0,30),id=Math.random().toString(36).slice(2,10),a=lays(sym.id);
