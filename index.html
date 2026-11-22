@@ -80,6 +80,15 @@ canvas{position:absolute;inset:0;width:100%;height:100%;touch-action:none;cursor
 .pgs{display:flex;justify-content:space-between;margin-top:6px;padding-top:6px;border-top:1px solid var(--line);font-size:12px;font-weight:600}.pgs span:last-child{color:var(--mute);font-weight:400}
 .pgf{color:var(--mute);font-size:11px;margin-top:6px;line-height:1.3}
 @media(max-width:700px){.pg{top:58px;left:8px;width:186px;padding:8px 10px}.pgr b{font-size:17px}.pgf{display:none}}
+.pal{display:grid;grid-template-columns:repeat(10,1fr);gap:5px;margin:4px 0 12px}
+.pal button{appearance:none;aspect-ratio:1;min-height:24px;border-radius:6px;border:1px solid #0007;background:var(--c);cursor:pointer;padding:0}
+.pal button[aria-pressed=true]{box-shadow:0 0 0 2px #182027,0 0 0 4px var(--ink)}
+.seg{display:flex;gap:4px;flex:none}
+.seg button{appearance:none;width:46px;height:40px;border-radius:8px;border:1px solid #34404b;background:var(--bg);color:var(--ink);display:grid;place-items:center;cursor:pointer;padding:0}
+.seg button[aria-pressed=true]{background:var(--acc);border-color:var(--acc);color:#fff}
+.seg svg{width:30px;height:12px;fill:none}
+.panel .ck input[type=color]{width:30px;height:24px;padding:0;border:1px solid #34404b;border-radius:5px;background:none;cursor:pointer}
+.panel .sub{font-size:12px;color:var(--mute);letter-spacing:.06em;text-transform:uppercase;margin:8px 0 2px}
 :focus-visible{outline:2px solid var(--acc);outline-offset:2px}
 @media(max-width:700px){
  .app{grid-template-columns:minmax(0,1fr);grid-template-areas:"h" "b" "s" "t" "n"}
@@ -179,6 +188,32 @@ canvas{position:absolute;inset:0;width:100%;height:100%;touch-action:none;cursor
   </div>
   <div class="prow"><button class="chip" id="freset">Standard</button><button class="chip pri" id="fclose">Fertig</button></div>
  </div>
+ <div class="panel" id="colp" role="dialog" aria-label="Farbe und Linie">
+  <h2 id="colh">Farbe und Linie</h2>
+  <div class="pal" id="pal"></div>
+  <div class="frow"><label for="colc">Eigene Farbe</label><input type="color" id="colc"></div>
+  <div class="frow"><label>Linienart</label><div class="seg" id="lss"></div></div>
+  <div class="frow"><label>Stärke</label><div class="seg" id="lws"></div></div>
+  <div class="prow"><button class="chip pri" id="colok">Fertig</button></div>
+ </div>
+ <div class="panel" id="fnp" role="dialog" aria-label="Fib-Speed-Resistance-Fächer">
+  <h2 id="fnh">Fib-Fächer</h2>
+  <div class="sub">Preisniveaus</div>
+  <div class="fgrid" id="fnlp"></div>
+  <div class="opts"><label class="ck"><input type="checkbox" id="fn-lblL">Beschriftungen links</label><label class="ck"><input type="checkbox" id="fn-lblR">Beschriftungen rechts</label></div>
+  <div class="sub">Zeit-Ebenen</div>
+  <div class="fgrid" id="fnlt"></div>
+  <div class="opts">
+   <label class="ck"><input type="checkbox" id="fn-lblT">Beschriftungen oben</label>
+   <label class="ck"><input type="checkbox" id="fn-lblB">Beschriftungen unten</label>
+   <label class="ck"><input type="checkbox" id="fn-mono">Eine Farbe verwenden (Zeichenfarbe)</label>
+   <label class="ck"><input type="checkbox" id="fn-fill">Hintergrund</label>
+   <div class="frow"><label for="fn-fa">Deckkraft Hintergrund</label><input type="range" id="fn-fa" min="0.03" max="0.5" step="0.01"></div>
+   <label class="ck"><input type="checkbox" id="fn-grid">Gitter</label>
+   <label class="ck"><input type="checkbox" id="fn-rev">Umkehren</label>
+  </div>
+  <div class="prow"><button class="chip" id="fnreset">Standard</button><button class="chip pri" id="fnok">Fertig</button></div>
+ </div>
  <div class="panel" id="chp" role="dialog" aria-label="Parallelkanal">
   <h2 id="chh">Parallelkanal</h2>
   <div class="fgrid" id="chl"></div>
@@ -241,6 +276,9 @@ const HINTS={cross:'Fadenkreuz: ziehen bewegt das Kreuz. Im Auswahlmodus geht es
 
 let sym=SYMS[0],tf=TFS[2],data=[],ma20=[],ma50=[],tool='cursor',color=COLORS[0],drawings=[],sel=-1,undo=[],showMA=true,showZZ=true,zz=[];
 const ZZDEF={dev:5,depth:20,c:'#2962ff',w:1.6,proj:true,price:false,vol:false,chg:false,mode:'pct'};
+let lstyle='solid',lwidth=1.6;
+try{const q=JSON.parse(localStorage.getItem('chartwerk:pen')||'null');if(q){if(typeof q.color==='string'&&/^#[0-9a-f]{3,8}$/i.test(q.color))color=q.color;if(['solid','dash','dot'].includes(q.lstyle))lstyle=q.lstyle;if(q.lwidth>0&&q.lwidth<6)lwidth=+q.lwidth}}catch(e){}
+const dashOf=d=>d.ls==='dash'?[8,5]:d.ls==='dot'?[.5,4.5]:[];
 let showTR=true;try{showTR=localStorage.getItem('chartwerk:tr')!=='0'}catch(e){}
 let showZN=true;try{showZN=localStorage.getItem('chartwerk:zn')!=='0'}catch(e){}
 let showPG=true;try{showPG=localStorage.getItem('chartwerk:pg')!=='0'}catch(e){}
@@ -403,16 +441,29 @@ function infoBox(d,ps){const[A,B]=d.pts,dp=B.p-A.p,pc=dp/A.p*100,bars=Math.round
  ctx.fillStyle='rgba(20,26,30,.94)';ctx.fillRect(bx,by,bw2,38);ctx.strokeStyle=d.c;ctx.lineWidth=1;ctx.strokeRect(bx+.5,by+.5,bw2,38);
  ctx.textBaseline='top';ctx.textAlign='left';ctx.fillStyle=dp>=0?UP:DN;ctx.fillText(l1,bx+8,by+5);ctx.fillStyle=MUTE;ctx.fillText(l2,bx+8,by+21);ctx.strokeStyle=ctx.fillStyle=d.c}
 const FANL=[[.25,'#f23645'],[.382,'#ff9800'],[.5,'#4caf50'],[.618,'#089981'],[.75,'#00bcd4']];
-function fanShape(d,ps,on){const o=fo(d),[a,b]=ps,lw=on?1.8:1.2,f=l=>l.toLocaleString('de-DE');
- const ray=(tx,ty,c)=>{ctx.strokeStyle=c;ctx.lineWidth=lw;seg(...extPts(a,[tx,ty],false))};
- ctx.globalAlpha=.45;ctx.strokeStyle=d.c;ctx.lineWidth=1;ctx.strokeRect(a[0],a[1],b[0]-a[0],b[1]-a[1]);ctx.globalAlpha=1;
- ray(b[0],b[1],o.mono?d.c:'#9aa0ab');ctx.font='11px "IBM Plex Sans",system-ui';
- FANL.forEach(([l,c])=>{c=o.mono?d.c:c;const py=a[1]+(b[1]-a[1])*l,px=a[0]+(b[0]-a[0])*l;
-  if(o.fill){ctx.globalAlpha=.3;ctx.strokeStyle=c;ctx.lineWidth=1;seg(a[0],py,b[0],py);seg(px,a[1],px,b[1]);ctx.globalAlpha=1}
-  ray(b[0],py,c);ray(px,b[1],c);ctx.fillStyle=c;
-  if(Math.abs(b[1]-a[1])*.118>12){ctx.textBaseline='middle';ctx.textAlign=b[0]>=a[0]?'left':'right';ctx.fillText(f(l),b[0]+(b[0]>=a[0]?4:-4),py)}
-  if(Math.abs(b[0]-a[0])*.118>30){ctx.textAlign='center';ctx.textBaseline=b[1]>=a[1]?'top':'bottom';ctx.fillText(f(l),px,b[1]+(b[1]>=a[1]?4:-4))}});
- ctx.textAlign='left';ctx.textBaseline='bottom';ctx.strokeStyle=ctx.fillStyle=d.c}
+const FANDEF={fp:[{v:0,on:0,c:'#9598a1'},{v:.25,on:1,c:'#ff9800'},{v:.382,on:0,c:'#80deea'},{v:.5,on:1,c:'#4caf50'},{v:.618,on:1,c:'#089981'},{v:.75,on:0,c:'#90bff9'},{v:1,on:1,c:'#9598a1'}],
+ ft:[{v:0,on:1,c:'#9598a1'},{v:.25,on:1,c:'#ff9800'},{v:.382,on:1,c:'#00bcd4'},{v:.5,on:1,c:'#4caf50'},{v:.618,on:1,c:'#089981'},{v:.75,on:1,c:'#2962ff'},{v:1,on:0,c:'#9598a1'}],
+ lblL:true,lblR:true,lblT:true,lblB:true,mono:false,fill:false,fa:.12,grid:false,rev:false};
+let fand=JSON.parse(JSON.stringify(FANDEF));try{const f=JSON.parse(localStorage.getItem('chartwerk:fan')||'null');if(f&&Array.isArray(f.fp)&&Array.isArray(f.ft))fand=Object.assign(fand,f)}catch(e){}
+function fanOpt(d){const o=d&&d.o;if(o&&Array.isArray(o.fp)&&Array.isArray(o.ft))return o;const r=JSON.parse(JSON.stringify(fand));if(o){r.mono=!!o.mono;r.grid=!!o.fill}return r}
+function fanShape(d,ps,on){const o=fanOpt(d),[a,b]=ps,base=d.lw||1.6,lw=on?base+.4:base*.8,f=l=>l.toLocaleString('de-DE',{maximumFractionDigits:3});
+ const R=l=>o.rev?1-l:l,pT=l=>[b[0],b[1]+(a[1]-b[1])*R(l.v)],tT=l=>[b[0]+(a[0]-b[0])*R(l.v),b[1]],col=l=>o.mono?d.c:l.c;
+ const P=o.fp.filter(l=>l.on).sort((p,q)=>p.v-q.v),T=o.ft.filter(l=>l.on).sort((p,q)=>p.v-q.v);
+ ctx.setLineDash([]);
+ if(o.grid){ctx.globalAlpha=.35;ctx.lineWidth=1;ctx.strokeStyle=d.c;ctx.strokeRect(a[0],a[1],b[0]-a[0],b[1]-a[1]);
+  P.forEach(l=>{const t=pT(l);ctx.strokeStyle=col(l);seg(a[0],t[1],b[0],t[1])});T.forEach(l=>{const t=tT(l);ctx.strokeStyle=col(l);seg(t[0],a[1],t[0],b[1])});ctx.globalAlpha=1}
+ if(o.fill){[[P,pT],[T,tT]].forEach(([L,fn])=>{for(let j=1;j<L.length;j++){const e0=extPts(a,fn(L[j-1]),false),e1=extPts(a,fn(L[j]),false);
+   ctx.globalAlpha=+o.fa||.12;ctx.fillStyle=col(L[j]);ctx.beginPath();ctx.moveTo(a[0],a[1]);ctx.lineTo(e0[2],e0[3]);ctx.lineTo(e1[2],e1[3]);ctx.closePath();ctx.fill()}});ctx.globalAlpha=1}
+ ctx.setLineDash(dashOf(d));ctx.lineWidth=lw;
+ P.forEach(l=>{ctx.strokeStyle=col(l);seg(...extPts(a,pT(l),false))});T.forEach(l=>{ctx.strokeStyle=col(l);seg(...extPts(a,tT(l),false))});ctx.setLineDash([]);
+ ctx.font='11px "IBM Plex Sans",system-ui';const dx=b[0]>=a[0]?1:-1,dy=b[1]>=a[1]?1:-1;
+ if(Math.abs(b[1]-a[1])>24)P.forEach(l=>{const t=pT(l);ctx.fillStyle=col(l);ctx.textBaseline='middle';
+  if(o.lblL){ctx.textAlign=dx>0?'right':'left';ctx.fillText(f(l.v),a[0]-4*dx,t[1])}
+  if(o.lblR){ctx.textAlign=dx>0?'left':'right';ctx.fillText(f(l.v),b[0]+4*dx,t[1])}});
+ if(Math.abs(b[0]-a[0])>40)T.forEach(l=>{const t=tT(l);ctx.fillStyle=col(l);ctx.textAlign='center';
+  if(o.lblT){ctx.textBaseline=dy>0?'bottom':'top';ctx.fillText(f(l.v),t[0],a[1]-4*dy)}
+  if(o.lblB){ctx.textBaseline=dy>0?'top':'bottom';ctx.fillText(f(l.v),t[0],b[1]+4*dy)}});
+ ctx.textAlign='left';ctx.textBaseline='bottom';ctx.strokeStyle=ctx.fillStyle=d.c;ctx.lineWidth=lw;ctx.setLineDash(dashOf(d))}
 const CHDEF={on:[.25,.5,.65],ext:'right',fill:false},CHL=[-.25,0,.25,.5,.65,1,1.25];
 let chd=JSON.parse(JSON.stringify(CHDEF)),chanP=-1;try{const c=JSON.parse(localStorage.getItem('chartwerk:chan')||'null');if(c&&Array.isArray(c.on))chd=Object.assign(chd,c)}catch(e){}
 function chanSegs(d){const o=d.o||chd,A=d.pts[0],B=d.pts[1],C=d.pts[2]||B,ia=idxOfT(A.t),ib=idxOfT(B.t),ic=idxOfT(C.t),
@@ -421,10 +472,10 @@ function chanSegs(d){const o=d.o||chd,A=d.pts[0],B=d.pts[1],C=d.pts[2]||B,ia=idx
   const q=o.ext==='right'?extPts(a,b,false):o.ext==='both'?extPts(a,b,true):o.ext==='left'?[...extPts(b,a,false).slice(2),...b]:[...a,...b];return[v,q]})}
 function chanShape(d,on){const o=d.o||chd,S=chanSegs(d);
  if(o.fill){const s0=S.find(s=>s[0]===0)[1],s1=S.find(s=>s[0]===1)[1];ctx.globalAlpha=.1;ctx.beginPath();ctx.moveTo(s0[0],s0[1]);ctx.lineTo(s0[2],s0[3]);ctx.lineTo(s1[2],s1[3]);ctx.lineTo(s1[0],s1[1]);ctx.closePath();ctx.fill();ctx.globalAlpha=1}
- S.forEach(([v,q])=>{const m=v===0||v===1;ctx.setLineDash(m?[]:[6,4]);ctx.lineWidth=m?(on?2.4:1.6):(on?1.5:1.1);seg(...q)});ctx.setLineDash([]);ctx.lineWidth=on?2.4:1.6}
+ const LW=d.lw||1.6;S.forEach(([v,q])=>{const m=v===0||v===1;ctx.setLineDash(m?dashOf(d):[6,4]);ctx.lineWidth=m?(on?LW+.8:LW):(on?1.5:1.1);seg(...q)});ctx.setLineDash([]);ctx.lineWidth=on?LW+.8:LW}
 function shape(d,on){
  const ps=d.pts.map(P),w=pw();
- ctx.strokeStyle=d.c;ctx.fillStyle=d.c;ctx.lineWidth=on?2.4:1.6;ctx.setLineDash([]);
+ const LW=d.lw||1.6;ctx.strokeStyle=d.c;ctx.fillStyle=d.c;ctx.lineWidth=on?LW+.8:LW;ctx.setLineDash(dashOf(d));ctx.lineCap=d.ls==='dot'?'round':'butt';
  ctx.font='11px "IBM Plex Sans",system-ui';ctx.textBaseline='bottom';ctx.textAlign='left';
  if(d.k==='trend')seg(...ps[0],...ps[1]);
  else if(d.k==='ray'||d.k==='ext'){const e=extPts(ps[0],ps[1],d.k==='ext');seg(...e)}
@@ -437,12 +488,13 @@ function shape(d,on){
  else if(d.k==='fib'){const o=fo(d),[a,b]=ps,x0=o.extL?0:Math.min(a[0],b[0]),x1=o.extR?w:Math.max(a[0],b[0]),A=d.pts[o.rev?1:0].p,B=d.pts[o.rev?0:1].p,L=fibLv(d);
   if(o.fill)L.forEach((l,j)=>{if(j===L.length-1)return;const y1=y(B+(A-B)*l.v),y2=y(B+(A-B)*L[j+1].v);ctx.globalAlpha=.09;ctx.fillStyle=l.c;ctx.fillRect(x0,y1,x1-x0,y2-y1)});
   ctx.globalAlpha=1;ctx.textBaseline='middle';
-  L.forEach(l=>{const p=B+(A-B)*l.v,yy=y(p);ctx.strokeStyle=ctx.fillStyle=l.c;ctx.lineWidth=on?1.8:1.2;seg(x0,yy,x1,yy);
+  L.forEach(l=>{const p=B+(A-B)*l.v,yy=y(p);ctx.strokeStyle=ctx.fillStyle=l.c;ctx.lineWidth=(d.lw||1.6)*(on?1.1:.75);ctx.setLineDash(dashOf(d));seg(x0,yy,x1,yy);ctx.setLineDash([]);
    const t=l.v.toLocaleString('de-DE',{maximumFractionDigits:3})+(o.price?` (${fmt(p)})`:''),tw=ctx.measureText(t).width;
    if(!o.lblR){if(!o.extL&&x0-tw-8>0){ctx.textAlign='right';ctx.fillText(t,x0-6,yy)}else{ctx.textAlign='left';ctx.fillText(t,x0+4,yy-8)}}
    else{if(!o.extR&&x1+tw+8<w){ctx.textAlign='left';ctx.fillText(t,x1+6,yy)}else{ctx.textAlign='right';ctx.fillText(t,x1-4,yy-8)}}});
   ctx.textAlign='left';ctx.strokeStyle=ctx.fillStyle=d.c;ctx.setLineDash([4,4]);ctx.lineWidth=1;seg(...a,...b);ctx.setLineDash([])}
  else if(d.k==='brush'){ctx.lineJoin=ctx.lineCap='round';ctx.beginPath();ps.forEach((q,j)=>j?ctx.lineTo(...q):ctx.moveTo(...q));if(ps.length===1)ctx.lineTo(ps[0][0]+.1,ps[0][1]);ctx.stroke()}
+ ctx.setLineDash([]);ctx.lineCap='butt';
  if(on&&d.k!=='brush'){const lk=locked(d);ps.forEach(q=>{ctx.beginPath();lk?ctx.rect(q[0]-4,q[1]-4,8,8):ctx.arc(q[0],q[1],5,0,7);ctx.fillStyle=lk?d.c:'#0f1316';ctx.fill();ctx.lineWidth=2;ctx.stroke()})}
 }
 
@@ -568,9 +620,9 @@ function ui(){
  document.querySelectorAll('#syms .chip').forEach(b=>b.setAttribute('aria-pressed',b.dataset.id===sym.id));
  document.querySelectorAll('#tfs .chip').forEach(b=>b.setAttribute('aria-pressed',b.dataset.id===tf.id));
  document.querySelectorAll('[data-tool]').forEach(b=>b.setAttribute('aria-pressed',b.dataset.tool===tool));
- document.querySelectorAll('.sw').forEach(b=>b.setAttribute('aria-pressed',b.dataset.c===color));
+ penUI();
  $('#vis').setAttribute('aria-pressed',hidden);$('#vis').innerHTML='<svg viewBox="0 0 22 22"><path d="M2 11s3.5-6 9-6 9 6 9 6-3.5 6-9 6-9-6-9-6z"/><circle cx="11" cy="11" r="2.5"/>'+(hidden?'<path d="M4 3l14 16"/>':'')+'</svg>';$('#vis').title=hidden?'Zeichnungen einblenden':'Zeichnungen ausblenden';
- if($('#fibp').classList.contains('on'))fibUI();if($('#chp').classList.contains('on'))chUI();
+ if($('#fibp').classList.contains('on'))fibUI();if($('#chp').classList.contains('on'))chUI();if($('#fnp').classList.contains('on'))fnUI();
  $('#ma').setAttribute('aria-pressed',showMA);$('#mag').setAttribute('aria-pressed',magnet>0);$('#magbd').textContent=['','•','••'][magnet];$('#mag').title=['Magnet aus','Magnet schwach','Magnet stark'][magnet];$('#zzb').setAttribute('aria-pressed',showZZ);$('#pgb').setAttribute('aria-pressed',showPG);$('#scb').setAttribute('aria-pressed',showSC);$('#znb').setAttribute('aria-pressed',showZN);$('#trb').setAttribute('aria-pressed',showTR);progUI();
  $('#undo').disabled=!undo.length;$('#del').disabled=sel<0||locked(drawings[sel]);$('#lock').disabled=sel<0||lockAll;$('#lock').setAttribute('aria-pressed',sel>=0&&!!drawings[sel]?.lk);$('#lockall').setAttribute('aria-pressed',lockAll);$('#clear').disabled=!drawings.length;
  status();
@@ -616,7 +668,17 @@ function status(){const b=$('#src'),t=b.querySelector('span');b.className='chip 
 
 $('#syms').innerHTML=SYMS.map(s=>`<button class="chip" data-id="${s.id}">${s.name}</button>`).join('');
 $('#tfs').innerHTML=TFS.map(t=>`<button class="chip" data-id="${t.id}">${t.l}</button>`).join('');
-$('#swatches').innerHTML=COLORS.map(c=>`<button class="tb sw" data-c="${c}" aria-label="Farbe ${c}" title="Farbe"><span class="dot" style="--c:${c}"></span></button>`).join('');
+$('#swatches').innerHTML='<button class="tb" id="colbtn" title="Farbe und Linie" aria-label="Farbe und Linie"><span class="dot" id="coldot"></span></button><button class="tb" id="lsbtn" title="Linienart und Stärke" aria-label="Linienart und Stärke"></button>';
+const PAL=['#ffffff','#d1d4dc','#b2b5be','#9598a1','#787b86','#5d606b','#434651','#2a2e39','#131722','#000000',
+ '#f23645','#ff9800','#ffeb3b','#4caf50','#089981','#00bcd4','#2962ff','#673ab7','#9c27b0','#e91e63',
+ '#faa1a4','#ffcc80','#fff59d','#a5d6a7','#70ccbd','#80deea','#90bff9','#b39ddb','#ce93d8','#f48fb1',
+ '#f7525f','#ffb74d','#fff176','#81c784','#42bda8','#4dd0e1','#5b9cf6','#9575cd','#ba68c8','#f06292',
+ '#b22833','#e65100','#f57f17','#1b5e20','#056656','#006064','#0c3299','#311b92','#4a148c','#880e4f'];
+const LSI={solid:'<svg viewBox="0 0 30 12"><path d="M2 6h26" stroke="currentColor" stroke-width="2.2"/></svg>',dash:'<svg viewBox="0 0 30 12"><path d="M2 6h26" stroke="currentColor" stroke-width="2.2" stroke-dasharray="6 4"/></svg>',dot:'<svg viewBox="0 0 30 12"><path d="M3 6h25" stroke="currentColor" stroke-width="2.6" stroke-dasharray="0.1 4.5" stroke-linecap="round"/></svg>'};
+const LWS=[1,1.6,2.4,3.4];
+$('#pal').innerHTML=PAL.map(c=>`<button data-c="${c}" style="--c:${c}" aria-label="Farbe ${c}"></button>`).join('');
+$('#lss').innerHTML=['solid','dash','dot'].map(k=>`<button data-ls="${k}" aria-label="${{solid:'Durchgezogen',dash:'Gestrichelt',dot:'Gepunktet'}[k]}" title="${{solid:'Durchgezogen',dash:'Gestrichelt',dot:'Gepunktet'}[k]}">${LSI[k]}</button>`).join('');
+$('#lws').innerHTML=LWS.map((w,i)=>`<button data-lw="${w}" aria-label="Stärke ${i+1}" title="Stärke ${i+1}"><svg viewBox="0 0 30 12"><path d="M2 6h26" stroke="currentColor" stroke-width="${w*1.2}"/></svg></button>`).join('');
 $('#syms').onclick=e=>{const b=e.target.closest('.chip');if(!b)return;sym=SYMS.find(s=>s.id===b.dataset.id);load();sel=-1;undo=[];chanP=-1;loadData(true)};
 $('#tfs').onclick=e=>{const b=e.target.closest('.chip');if(!b)return;tf=TFS.find(t=>t.id===b.dataset.id);loadData(true)};
 $('#ma').onclick=()=>{showMA=!showMA;ui();draw()};
@@ -640,7 +702,7 @@ $('#lock').onclick=()=>{if(sel<0)return;const d=drawings[sel];undo.push(snap());
 $('#lockall').onclick=()=>{lockAll=!lockAll;try{lsSet('chartwerk:lockall',lockAll?'1':'0')}catch(e){}ui();draw();toast(lockAll?'Alle Zeichnungen gesperrt. Neue Zeichnungen sind weiter möglich.':'Sperre für alle aufgehoben. Einzeln gesperrte bleiben gesperrt.')};
 $('#mag').onclick=()=>{magnet=(magnet+1)%3;try{lsSet('chartwerk:mag',magnet)}catch(e){}ui();draw();
  toast(['Magnet aus','Magnet schwach: fängt in der Nähe von Open, High, Low, Close','Magnet stark: fängt immer den nächsten Kerzenwert'][magnet])};
-const ftarget=()=>sel>=0&&!hidden&&(drawings[sel].k==='fib'||drawings[sel].k==='fan')?drawings[sel]:null;
+const ftarget=()=>sel>=0&&!hidden&&drawings[sel].k==='fib'?drawings[sel]:null;
 function fibUI(){const d=ftarget(),o=fo(d);
  $('#fph').textContent=d?'Fibonacci · ausgewählte Zeichnung':'Fibonacci · Standard für neue';
  $('#flv').innerHTML=FIBL.map(l=>`<label class="ck"><input type="checkbox" data-v="${l.v}" ${o.on.includes(l.v)?'checked':''}><span class="dot" style="--c:${l.c}"></span>${l.v.toLocaleString('de-DE',{maximumFractionDigits:3})}</label>`).join('');
@@ -649,8 +711,23 @@ function setOpt(mut){const d=ftarget();
  if(d){if(locked(d)){toast('Gesperrt: erst entsperren');fibUI();return}undo.push(snap());d.o=d.o||JSON.parse(JSON.stringify(fib));mut(d.o);save()}
  else{mut(fib);try{lsSet('chartwerk:fib',JSON.stringify(fib))}catch(e){}}
  ui();draw()}
-function openPanel(id){['#fibp','#panel','#bkp','#zzp','#chp'].forEach(p=>{if(p!==id)$(p).classList.remove('on')});return $(id).classList.toggle('on')}
-$('#fibset').onclick=()=>{if(ctarget()||tool==='chan'){chUI();openPanel('#chp');return}fibUI();openPanel('#fibp')};
+function openPanel(id){['#fibp','#panel','#bkp','#zzp','#chp','#colp','#fnp'].forEach(p=>{if(p!==id)$(p).classList.remove('on')});return $(id).classList.toggle('on')}
+$('#fibset').onclick=()=>{if(ctarget()||tool==='chan'){chUI();openPanel('#chp');return}if(fntarget()||tool==='fan'){fnUI(true);openPanel('#fnp');return}fibUI();openPanel('#fibp')};
+const fntarget=()=>sel>=0&&!hidden&&drawings[sel]&&drawings[sel].k==='fan'?drawings[sel]:null;let fnT;
+function fnUI(force){const d=fntarget();if(!force&&d===fnT)return;fnT=d;const o=d?fanOpt(d):fand;
+ $('#fnh').textContent=d?'Fib-Fächer · ausgewählt':'Fib-Fächer · Standard für neue';
+ const row=g=>o[g].map((l,i)=>`<label class="ck"><input type="checkbox" data-g="${g}" data-i="${i}" ${l.on?'checked':''}><input type="color" data-g="${g}" data-i="${i}" value="${l.c}" aria-label="Farbe ${l.v}">${l.v.toLocaleString('de-DE',{maximumFractionDigits:3})}</label>`).join('');
+ $('#fnlp').innerHTML=row('fp');$('#fnlt').innerHTML=row('ft');
+ ['lblL','lblR','lblT','lblB','mono','fill','grid','rev'].forEach(k=>$('#fn-'+k).checked=!!o[k]);$('#fn-fa').value=o.fa}
+function fnSet(mut){const d=fntarget();
+ if(d){if(locked(d)){toast('Gesperrt: erst entsperren');fnUI(true);return}undo.push(snap());d.o=JSON.parse(JSON.stringify(fanOpt(d)));mut(d.o);save()}
+ else{mut(fand);try{lsSet('chartwerk:fan',JSON.stringify(fand))}catch(e){}}ui();draw()}
+$('#fnp').addEventListener('change',e=>{const t=e.target;
+ if(t.dataset.g){const g=t.dataset.g,i=+t.dataset.i;if(t.type==='checkbox'){const v=t.checked?1:0;fnSet(o=>{o[g][i].on=v})}else{const v=t.value;fnSet(o=>{o[g][i].c=v})}}
+ else if(t.id==='fn-fa'){const v=+t.value;fnSet(o=>{o.fa=v})}
+ else if(t.id&&t.id.startsWith('fn-')){const k=t.id.slice(3),v=t.checked;fnSet(o=>{o[k]=v})}});
+$('#fnok').onclick=()=>$('#fnp').classList.remove('on');
+$('#fnreset').onclick=()=>{const d=fntarget();fnSet(o=>{Object.keys(o).forEach(k=>delete o[k]);Object.assign(o,JSON.parse(JSON.stringify(d?fand:FANDEF)))});fnUI(true)};
 const ctarget=()=>sel>=0&&!hidden&&drawings[sel]&&drawings[sel].k==='chan'?drawings[sel]:null;
 function chUI(){const d=ctarget(),o=d?(d.o||chd):chd;$('#chh').textContent=d?'Parallelkanal · ausgewählt':'Parallelkanal · Standard für neue';
  $('#chl').innerHTML=CHL.map(v=>{const fx=v===0||v===1;return`<label class="ck"><input type="checkbox" data-v="${v}" ${fx||o.on.includes(v)?'checked':''} ${fx?'disabled':''}><span></span>${v.toLocaleString('de-DE')}</label>`}).join('');
@@ -684,7 +761,7 @@ function validD(d){return d&&KINDS.includes(d.k)&&Array.isArray(d.pts)&&d.pts.le
 function doImport(replace){let b;try{b=JSON.parse($('#bktxt').value.trim())}catch(e){bkmsg('Das ist kein gültiges Backup.');return}
  if(!b||b.app!=='chartwerk'||typeof b.drawings!=='object'){bkmsg('Das ist kein Chartwerk-Backup.');return}
  const cur=allDrawings();let n=0;undo.push(snap());
- SYMS.forEach(s=>{const inc=(Array.isArray(b.drawings[s.id])?b.drawings[s.id]:[]).filter(validD).map(d=>({k:d.k,c:typeof d.c==='string'&&/^#[0-9a-f]{3,8}$/i.test(d.c)?d.c:COLORS[0],pts:d.pts.map(q=>({t:+q.t,p:+q.p})),...(d.lk?{lk:true}:{}),...(d.o&&Array.isArray(d.o.on)?{o:Object.assign(JSON.parse(JSON.stringify(d.k==='chan'?CHDEF:FIBDEF)),d.o)}:{})}));
+ SYMS.forEach(s=>{const inc=(Array.isArray(b.drawings[s.id])?b.drawings[s.id]:[]).filter(validD).map(d=>({k:d.k,c:typeof d.c==='string'&&/^#[0-9a-f]{3,8}$/i.test(d.c)?d.c:COLORS[0],pts:d.pts.map(q=>({t:+q.t,p:+q.p})),...(d.lk?{lk:true}:{}),...(d.o&&typeof d.o==='object'&&(Array.isArray(d.o.on)||Array.isArray(d.o.fp))?{o:Object.assign(JSON.parse(JSON.stringify(d.k==='chan'?CHDEF:d.k==='fan'&&Array.isArray(d.o.fp)?FANDEF:FIBDEF)),d.o)}:{}),...(['dash','dot'].includes(d.ls)?{ls:d.ls}:{}),...(d.lw>0&&d.lw<6?{lw:+d.lw}:{})}));
   n+=inc.length;const out=replace?inc:[...(cur[s.id]||[]),...inc];try{localStorage.setItem('chartwerk:'+s.id,JSON.stringify(out));localStorage.setItem('chartwerk:u:'+s.id,Date.now())}catch(e){}});
  queueSync();
  if(b.fib&&Array.isArray(b.fib.on)){fib=Object.assign(JSON.parse(JSON.stringify(FIBDEF)),b.fib);try{lsSet('chartwerk:fib',JSON.stringify(fib))}catch(e){}}
@@ -698,9 +775,24 @@ $('#pclose').onclick=()=>$('#panel').classList.remove('on');
 $('#psave').onclick=()=>{tdKey=$('#tdk').value.trim();try{localStorage.setItem('chartwerk:td',tdKey)}catch(e){}$('#panel').classList.remove('on');toast(tdKey?'Schlüssel gespeichert':'Schlüssel entfernt');if(sym.td)loadData(true);else ui()};
 $('#fit').onclick=()=>{resetView();draw()};
 document.querySelectorAll('[data-tool]').forEach(b=>b.onclick=()=>setTool(b.dataset.tool));
-$('#swatches').onclick=e=>{const b=e.target.closest('.sw');if(!b)return;color=b.dataset.c;
- if(sel>=0&&locked(drawings[sel]))toast('Gesperrte Zeichnung behält ihre Farbe');
- else if(sel>=0&&drawings[sel].c!==color){undo.push(snap());drawings[sel].c=color;save()}ui();draw()};
+$('#swatches').onclick=e=>{if(e.target.closest('#colbtn,#lsbtn')){if(openPanel('#colp'))penUI()}};
+function penUI(){const d=sel>=0&&!hidden?drawings[sel]:null,c=d?d.c:color,ls=d?(d.ls||'solid'):lstyle,lw=d?(d.lw||1.6):lwidth;
+ const cd=$('#coldot');if(cd)cd.style.setProperty('--c',c);const lb=$('#lsbtn');if(lb&&lb.dataset.ls!==ls){lb.dataset.ls=ls;lb.innerHTML=LSI[ls]}
+ if(!$('#colp').classList.contains('on'))return;
+ $('#colh').textContent=d?'Farbe und Linie · ausgewählt':'Farbe und Linie · für neue Zeichnungen';
+ document.querySelectorAll('#pal button').forEach(b=>b.setAttribute('aria-pressed',b.dataset.c.toLowerCase()===String(c).toLowerCase()));
+ const hx=/^#[0-9a-f]{6}$/i.test(c)?c:'#4c8dff';if($('#colc').value!==hx)$('#colc').value=hx;
+ document.querySelectorAll('#lss button').forEach(b=>b.setAttribute('aria-pressed',b.dataset.ls===ls));
+ document.querySelectorAll('#lws button').forEach(b=>b.setAttribute('aria-pressed',+b.dataset.lw===lw))}
+function penSet(k,v){const d=sel>=0&&!hidden?drawings[sel]:null;
+ if(d){if(locked(d)){toast('Gesperrte Zeichnung behält ihren Stil')}else{undo.push(snap());if(k==='c')d.c=v;else if(k==='ls'){if(v==='solid')delete d.ls;else d.ls=v}else{if(v===1.6)delete d.lw;else d.lw=v}save()}}
+ if(k==='c')color=v;else if(k==='ls')lstyle=v;else lwidth=v;
+ try{localStorage.setItem('chartwerk:pen',JSON.stringify({color,lstyle,lwidth}))}catch(e){}ui();draw()}
+$('#pal').onclick=e=>{const b=e.target.closest('button');if(b)penSet('c',b.dataset.c)};
+$('#colc').onchange=e=>penSet('c',e.target.value);
+$('#lss').onclick=e=>{const b=e.target.closest('button');if(b)penSet('ls',b.dataset.ls)};
+$('#lws').onclick=e=>{const b=e.target.closest('button');if(b)penSet('lw',+b.dataset.lw)};
+$('#colok').onclick=()=>$('#colp').classList.remove('on');
 function doUndo(){if(!undo.length)return;drawings=JSON.parse(undo.pop());sel=-1;save();ui();draw()}
 function doDel(){if(sel<0)return;if(locked(drawings[sel])){toast('Gesperrt: erst entsperren, dann löschen');return}undo.push(snap());drawings.splice(sel,1);sel=-1;save();ui();draw()}
 $('#undo').onclick=doUndo;$('#del').onclick=doDel;
@@ -737,7 +829,7 @@ cv.addEventListener('pointerdown',e=>{
   draw();return}
  if(hidden){hidden=false;try{localStorage.setItem('chartwerk:hide','0')}catch(e){}toast('Zeichnungen wieder eingeblendet')}
  const s=snap(),q=tool==='brush'?toPt(px,py):snapPt(px,py),nd={k:tool,c:color,pts:tool==='hline'||tool==='goal'||tool==='brush'?[q]:[q,{...q}]};
- if(tool==='fib'||tool==='fan')nd.o=JSON.parse(JSON.stringify(fib));if(tool==='chan')nd.o=JSON.parse(JSON.stringify(chd));
+ if(tool==='fib')nd.o=JSON.parse(JSON.stringify(fib));if(tool==='fan')nd.o=JSON.parse(JSON.stringify(fand));if(lstyle!=='solid')nd.ls=lstyle;if(lwidth!==1.6)nd.lw=lwidth;if(tool==='chan')nd.o=JSON.parse(JSON.stringify(chd));
  drawings.push(nd);sel=drawings.length-1;act={k:'new',s};draw();
 });
 cv.addEventListener('pointermove',e=>{
