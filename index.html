@@ -695,20 +695,22 @@ async function tdFetch(n){const j=await getJSON(`https://api.twelvedata.com/time
  return j.values.map(v=>{const d=v.datetime;return{t:Date.parse(d.length>10?d.replace(' ','T')+'Z':d+'T00:00:00Z'),o:+v.open,h:+v.high,l:+v.low,c:+v.close,v:+(v.volume||0)}}).reverse()}
 async function loadBn(id){const a=await getJSON(`${bnHost}/api/v3/klines?symbol=${sym.bn}&interval=${BNI[tf.id]}&limit=1000`);if(id!==loadId)return false;
  data=a.map(k=>({t:k[0],o:+k[1],h:+k[2],l:+k[3],c:+k[4],v:+k[5]}));src='binance';openWS(id);return true}
+const tdC={};let retryT=0,retryP=false;
+function retryLater(){clearTimeout(retryT);retryP=true;const s0=sym.id,t0=tf.id;retryT=setTimeout(()=>{retryP=false;if(sym.id===s0&&tf.id===t0&&src!=='twelve')loadData(false);else ui()},65000)}
 async function loadData(reset){
- const id=++loadId;stopLive();err='';
+ const id=++loadId;stopLive();err='';clearTimeout(retryT);retryP=false;
  const useTd=!!(sym.td&&tdKey),liveOk=net&&(useTd||sym.bn);
  if(!liveOk){agg();src='sim';if(net&&sym.td)err='Schlüssel fehlt'}
  else{data=[];src='wait';ui();draw();
   try{
-   if(useTd){try{const a=await tdFetch(1000);if(id!==loadId)return;data=a;src='twelve';
+   if(useTd){try{const ck=sym.id+tf.id,c=tdC[ck];let a;if(c&&Date.now()-c.t<tdMin()*60000)a=c.d.map(o=>({...o}));else{a=await tdFetch(1000);tdC[ck]={t:Date.now(),d:a.map(o=>({...o}))}}if(id!==loadId)return;data=a;src='twelve';
      let lastP=Date.now();poll=setInterval(async()=>{if(document.visibilityState!=='visible'||!mktOpen()||Date.now()-lastP<tdMin()*60000)return;lastP=Date.now();try{const b=await tdFetch(3);if(id!==loadId)return;b.forEach(merge);schedule()}catch(e){}},20000)}
-    catch(e){if(id!==loadId)return;if(!sym.bn)throw e;err='Twelve Data: '+String(e.message||e).slice(0,60);if(!await loadBn(id))return}}
+    catch(e){if(id!==loadId)return;if(!sym.bn)throw e;err='Twelve Data: '+String(e.message||e).slice(0,60);retryLater();if(!await loadBn(id))return}}
    else if(!await loadBn(id))return}
-  catch(e){if(id!==loadId)return;agg();src='sim';err=String(e.message||e).slice(0,80)}}
+  catch(e){if(id!==loadId)return;agg();src='sim';err=String(e.message||e).slice(0,80);if(useTd)retryLater()}}
  recalc();if(reset)resetView();clampView();ui();draw()}
 function status(){const b=$('#src'),t=b.querySelector('span');b.className='chip src'+(src==='binance'||src==='twelve'?' live':src==='wait'||net===null?' wait':'');
- t.textContent=net===null?'Prüfe Verbindung…':src==='wait'?'Lade…':src==='binance'?'Live · Binance':src==='twelve'?'Live · '+tdMin()+' Min.':err==='Schlüssel fehlt'?'Simuliert · Schlüssel fehlt':'Simuliert';
+ t.textContent=net===null?'Prüfe Verbindung…':src==='wait'?'Lade…':src==='binance'?'Live · Binance'+(retryP?' · Twelve gleich':''):src==='twelve'?'Live · '+tdMin()+' Min.':err==='Schlüssel fehlt'?'Simuliert · Schlüssel fehlt':retryP?(src==='binance'?'Binance · neuer Versuch gleich':'Simuliert · neuer Versuch gleich'):'Simuliert';
  $('#ntxt').textContent=src==='binance'?'Echtzeitkurse von Binance in USDT'+(sym.id==='XAU'?', Gold über den Token PAXG.':'.'):src==='twelve'?sym.name+'kurs (Spot '+sym.pair+') von Twelve Data, Aktualisierung alle '+tdMin()+' Minuten'+(mktOpen()?'':' (Markt geschlossen)')+'.':'Simulierte Kurse zur Demonstration, keine echten Marktdaten.';
  $('#pinfo').textContent=net?'Verbindung zu den Kursanbietern steht.':net===null?'Verbindung wird geprüft …':'Hier sind keine Verbindungen zu Kursanbietern möglich, deshalb laufen simulierte Kurse. Öffne Chartwerk als Datei auf deinem Computer oder auf einer eigenen Webadresse, dann laden Echtzeitkurse automatisch.';
  $('#plist').innerHTML=SYMS.map(s=>`<li><span>${s.name}</span><span>${!net?'simuliert':s.td&&tdKey?'Twelve Data, alle '+tdMin()+' Min.':s.bn?'Binance live'+(s.id==='XAU'?' (PAXG)':''):'simuliert, Schlüssel fehlt'}</span></li>`).join('')+(err&&err!=='Schlüssel fehlt'?`<li><span>Letzter Fehler</span><span>${err.replace(/</g,'&lt;')}</span></li>`:'')}
