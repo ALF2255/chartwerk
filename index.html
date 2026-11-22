@@ -643,7 +643,19 @@ function setLays(sid,a){try{localStorage.setItem('chartwerk:lays:'+sid,JSON.stri
 const allEntries=()=>SYMS.flatMap(s=>lays(s.id).map(l=>ek(s.id,l.id)));
 const curLay=()=>lays(sym.id).find(l=>l.id===lay)||lays(sym.id)[0];
 const key=()=>'chartwerk:'+ek(sym.id,lay);
-function save(){try{localStorage.setItem(key(),snap());localStorage.setItem('chartwerk:u:'+ek(sym.id,lay),Date.now())}catch(e){}queueSync()}
+// Abgleich pro Zeichnung: jede Zeichnung hat eine Kennung (id) und eine Änderungszeit (m);
+// gelöschte Zeichnungen werden als Grabstein (id, Zeit) gemerkt, damit sie nicht wieder auftauchen.
+function dHash(d){const s=JSON.stringify(Object.assign({},d,{id:undefined,m:undefined}));let x=2166136261;for(let i=0;i<s.length;i++){x^=s.charCodeAt(i);x=Math.imul(x,16777619)}return 'h'+(x>>>0).toString(36)}
+const withIds=a=>(Array.isArray(a)?a:[]).map(d=>d&&!d.id?Object.assign({},d,{id:dHash(d)}):d);
+const dStrip=d=>JSON.stringify(Object.assign({},d,{m:undefined}));
+function tombs(e){try{const a=JSON.parse(localStorage.getItem('chartwerk:x:'+e)||'[]');return Array.isArray(a)?a.filter(t=>t&&typeof t.id==='string'&&isFinite(t.t)):[]}catch(x){return[]}}
+function mergeTombs(a,b){const m=new Map();[...a,...b].forEach(t=>{if(t&&typeof t.id==='string'&&isFinite(t.t)&&(!m.has(t.id)||t.t>m.get(t.id)))m.set(t.id,t.t)});
+ const lim=Date.now()-90*864e5;return[...m].filter(([,t])=>t>lim).sort((x,y)=>y[1]-x[1]).slice(0,400).map(([id,t])=>({id,t}))}
+function save(){try{const e=ek(sym.id,lay),now=Date.now();let prev=[];try{prev=withIds(JSON.parse(localStorage.getItem(key())||'[]'))}catch(x){}
+  const pm=new Map(prev.map(d=>[d.id,d]));
+  drawings.forEach(d=>{if(!d.id)d.id=dHash(d);const q=pm.get(d.id);if(!q||dStrip(q)!==dStrip(d))d.m=now;pm.delete(d.id)});
+  if(pm.size){const x=mergeTombs(tombs(e),[...pm.keys()].map(id=>({id,t:now})));localStorage.setItem('chartwerk:x:'+e,JSON.stringify(x))}
+  localStorage.setItem(key(),snap());localStorage.setItem('chartwerk:u:'+e,now)}catch(e){}queueSync()}
 function load(){try{drawings=JSON.parse(localStorage.getItem(key())||'[]')}catch(e){drawings=[]}}
 function toast(s){const t=$('#toast');t.textContent=s;t.classList.add('on');clearTimeout(toastT);toastT=setTimeout(()=>t.classList.remove('on'),2600)}
 function clampView(){const n=data.length,w=pw();view.bw=Math.max(1.2,Math.min(48,view.bw));view.end=Math.max(Math.min(10,n),Math.min(n+.7*w/view.bw,view.end))}
@@ -967,7 +979,7 @@ function lsSet(k,v){try{localStorage.setItem(k,v);localStorage.setItem('chartwer
 async function gh(path,opt={}){const r=await fetch(GH+path,{cache:'no-store',...opt,headers:{Authorization:'Bearer '+ghTok,Accept:'application/vnd.github+json',...(opt.body?{'Content-Type':'application/json'}:{})}});
  if(r.status===401)throw new Error('Schlüssel ungültig oder abgelaufen');if(r.status===403)throw new Error('Schlüssel hat keine Gist-Berechtigung');if(r.status===404)throw new Error('nicht gefunden (404)');
  if(!r.ok)throw new Error('GitHub-Fehler '+r.status);return r.json()}
-function localState(){const m={};SYMS.forEach(s=>{lays(s.id).forEach(l=>{const e=ek(s.id,l.id);let d=[];try{d=JSON.parse(lsGet('chartwerk:'+e)||'[]')}catch(x){}m[e]={u:+lsGet('chartwerk:u:'+e)||0,d}});m['L:'+s.id]={u:+lsGet('chartwerk:u:L:'+s.id)||0,d:lays(s.id)}});
+function localState(){const m={};SYMS.forEach(s=>{lays(s.id).forEach(l=>{const e=ek(s.id,l.id);let d=[];try{d=JSON.parse(lsGet('chartwerk:'+e)||'[]')}catch(x){}m[e]={u:+lsGet('chartwerk:u:'+e)||0,d,x:tombs(e)}});m['L:'+s.id]={u:+lsGet('chartwerk:u:L:'+s.id)||0,d:lays(s.id)}});
  return{app:'chartwerk',v:2,markets:m,settings:{u:+lsGet('chartwerk:us')||0,fib,magnet,lockAll,zz:zzo}}}
 // Alle Gists mit der Abgleich-Datei, älteste zuerst. Alle Geräte nehmen so immer dasselbe (das älteste) Gist,
 // auch wenn früher versehentlich mehrere angelegt wurden.
@@ -995,7 +1007,17 @@ async function sync(){
   const L=localState(),M={};let push=!R||gistDup.length>0,changed=false;
   const ER=new RegExp('^(L:('+SYMS.map(s=>s.id).join('|')+')|('+SYMS.map(s=>s.id).join('|')+')(@[a-z0-9]{1,12})?)$');
   const ks=[...new Set([...Object.keys(L.markets),...Object.keys(R&&R.markets||{})])].filter(k=>ER.test(k)).sort((a,b)=>(b.startsWith('L:')?1:0)-(a.startsWith('L:')?1:0));
-  ks.forEach(k=>{const r=R&&R.markets&&R.markets[k],l=L.markets[k]||{u:0,d:[]},isL=k.startsWith('L:');
+  ks.forEach(k=>{const r=R&&R.markets&&R.markets[k],l=L.markets[k]||{u:0,d:[],x:[]},isL=k.startsWith('L:');
+   if(!isL){ // Zeichnungen: pro Zeichnung zusammenführen statt ganze Liste überschreiben
+    const ld=withIds(l.d),rd=r&&Array.isArray(r.d)?withIds(r.d.filter(validD)):[],lx=l.x||tombs(k),rx=r&&Array.isArray(r.x)?r.x:[],X=mergeTombs(lx,rx),dead=new Map(X.map(t=>[t.id,t.t]));
+    const best=new Map();[...rd,...ld].forEach(d=>{const o=best.get(d.id);if(!o||(d.m||0)>(o.m||0))best.set(d.id,d)});
+    const order=[...ld.map(d=>d.id),...rd.map(d=>d.id).filter(id=>!ld.some(d=>d.id===id))];
+    const out=[...new Set(order)].map(id=>best.get(id)).filter(d=>d&&!(dead.has(d.id)&&dead.get(d.id)>=(d.m||0)));
+    const u=Math.max(l.u||0,(r&&r.u)||0),js=JSON.stringify(out);
+    if(js!==JSON.stringify(l.d)||JSON.stringify(X)!==JSON.stringify(lx)){try{localStorage.setItem('chartwerk:'+k,js);localStorage.setItem('chartwerk:x:'+k,JSON.stringify(X));localStorage.setItem('chartwerk:u:'+k,u)}catch(e){}
+     if(js!==JSON.stringify(l.d)&&k===ek(sym.id,lay))changed=true}
+    if(!r||js!==JSON.stringify(rd)||JSON.stringify(X)!==JSON.stringify(rx))push=true;
+    M[k]={u,d:out,x:X};return}
    if(r&&Array.isArray(r.d)&&(r.u||0)>l.u){const d=isL?cleanLays(r.d):r.d.filter(validD);M[k]={u:r.u,d};
     try{localStorage.setItem(isL?'chartwerk:lays:'+k.slice(2):'chartwerk:'+k,JSON.stringify(d));localStorage.setItem('chartwerk:u:'+k,r.u)}catch(e){}
     if(isL?k.slice(2)===sym.id:k===ek(sym.id,lay))changed=true}
