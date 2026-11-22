@@ -331,10 +331,11 @@ function buildLQ(kl,oi){const om=new Map();oi.forEach(o=>om.set(Math.floor(o.tim
  const c2=document.createElement('canvas');c2.width=N;c2.height=R;const g=c2.getContext('2d'),im=g.createImageData(N,R);
  for(let i=0;i<N;i++)for(let r=0;r<R;r++){const c=hm(Math.min(1,grid[i*R+r]/mx)),o=((R-1-r)*N+i)*4;im.data[o]=c[0];im.data[o+1]=c[1];im.data[o+2]=c[2];im.data[o+3]=c[3]}
  g.putImageData(im,0,0);let tot=0;for(const q of lv)if(q.a)tot+=q.v*G;return{img:c2,t0:T[0],t1:T[N-1]+36e5,pLo,pHi,N,R,tot}}
-async function loadLQ(force){if(!showLQ||sym.id!=='BTC'||lqBusy)return;const c=LQ.BTC;if(!force&&c&&Date.now()-c.at<15*60e3)return;lqBusy=true;
- try{const[kl,oi]=await Promise.all([getJSON('https://fapi.binance.com/fapi/v1/klines?symbol=BTCUSDT&interval=1h&limit=500'),getJSON('https://fapi.binance.com/futures/data/openInterestHist?symbol=BTCUSDT&period=1h&limit=500')]);
-  if(!Array.isArray(kl)||!Array.isArray(oi)||kl.length<50)throw new Error('keine Daten');LQ.BTC=buildLQ(kl,oi);LQ.BTC.at=Date.now()}
- catch(e){LQ.BTC={at:Date.now(),err:String(e&&e.message||e).slice(0,60)}}finally{lqBusy=false}ui();draw()}
+const LQS={BTC:'BTCUSDT',XAU:'XAUUSDT',XAG:'XAGUSDT'};
+async function loadLQ(force){const sid=sym.id,fs=LQS[sid];if(!showLQ||!fs||lqBusy)return;const c=LQ[sid];if(!force&&c&&Date.now()-c.at<15*60e3)return;lqBusy=true;
+ try{const[kl,oi]=await Promise.all([getJSON('https://fapi.binance.com/fapi/v1/klines?symbol='+fs+'&interval=1h&limit=500'),getJSON('https://fapi.binance.com/futures/data/openInterestHist?symbol='+fs+'&period=1h&limit=500')]);
+  if(!Array.isArray(kl)||!Array.isArray(oi)||kl.length<50)throw new Error('keine Daten');LQ[sid]=buildLQ(kl,oi);LQ[sid].at=Date.now()}
+ catch(e){LQ[sid]={at:Date.now(),err:String(e&&e.message||e).slice(0,60)}}finally{lqBusy=false}ui();draw()}
 setInterval(()=>{if(document.visibilityState==='visible')loadLQ()},60000);
 let showCY=true;try{showCY=localStorage.getItem('chartwerk:cy')!=='0'}catch(e){}
 const DAY=864e5,HALV=[[Date.UTC(2012,10,28),'2012'],[Date.UTC(2016,6,9),'2016'],[Date.UTC(2020,4,11),'2020'],[Date.UTC(2024,3,20),'2024'],[Date.UTC(2028,3,15),'~2028 (geschätzt)']];
@@ -591,7 +592,7 @@ function draw(){
    ctx.fillStyle=top?DN:UP;ctx.beginPath();if(top){ctx.moveTo(xx,yy);ctx.lineTo(xx-5,yy-8);ctx.lineTo(xx+5,yy-8)}else{ctx.moveTo(xx,yy);ctx.lineTo(xx-5,yy+8);ctx.lineTo(xx+5,yy+8)}ctx.fill();
    ctx.textAlign='center';ctx.textBaseline=top?'bottom':'top';const hv=HALV.filter(q=>q[0]<=t).pop(),dh=hv?Math.round((t-hv[0])/DAY):null,pt=!top?CYX.filter(q=>q[1]&&q[0]<t).pop():null;ctx.fillText(lb+(dh!=null?' · Tag '+dh:'')+(pt?' · '+Math.round((t-pt[0])/DAY)+' T. nach Hoch':''),xx,top?yy-10:yy+10);ctx.textBaseline='top'});
   ctx.textAlign='left';ctx.textBaseline='middle'}
- const LQc=showLQ&&sym.id==='BTC'?LQ.BTC:null;
+ const LQc=showLQ&&LQS[sym.id]?LQ[sym.id]:null;
  if(LQc&&LQc.img){const xa=x(idxOfT(LQc.t0)),xb=x(idxOfT(LQc.t1)),ya=y(LQc.pHi),yb=y(LQc.pLo);ctx.save();ctx.imageSmoothingEnabled=true;
   if(xb>0&&xa<w){ctx.globalAlpha=.75;ctx.drawImage(LQc.img,0,0,LQc.N,LQc.R,xa,ya,Math.max(1,xb-xa),yb-ya)}
   if(xb<w){ctx.globalAlpha=.6;ctx.drawImage(LQc.img,LQc.N-1,0,1,LQc.R,Math.max(0,xb),ya,w-Math.max(0,xb),yb-ya)}ctx.restore()}
@@ -663,7 +664,7 @@ function legend(){
  const n=data.length;let i=n-1;const hp=hover||cross;if(hp&&hp[0]<pw()){const j=Math.round(idx(hp[0]));if(j>=0&&j<n)i=j}
  const b=data[i],c=b.c>=b.o?'up':'dn';
  $('#legend').innerHTML=`<span><b class="pk${pkOpen==='sym'?' on':''}" data-pk="sym">${src==='binance'&&sym.lp?sym.lp:sym.pair}<i>▾</i></b> · <b class="pk${pkOpen==='tf'?' on':''}" data-pk="tf">${tf.l}<i>▾</i></b></span><span>O <b class="${c}">${fmt(b.o)}</b> H <b class="${c}">${fmt(b.h)}</b> L <b class="${c}">${fmt(b.l)}</b> C <b class="${c}">${fmt(b.c)}</b></span>`+
-  (showMA?`<span class="m"><b style="color:#f2c94c">MA20</b> ${ma20[i]!=null?fmt(ma20[i]):'–'} <b style="color:#b78cff">MA50</b> ${ma50[i]!=null?fmt(ma50[i]):'–'}</span>`:'')+(showLQ&&sym.id==='BTC'&&LQ.BTC?`<span class="m"><b style="color:#5ec962">Liquidationen</b> ${LQ.BTC.err?'nicht erreichbar':'geschätzt, letzte 20 Tage, Binance Futures'}</span>`:'')+(showCY&&sym.id==='BTC'&&cyState()?(()=>{const c=cyState();return`<span><b style="color:#ff9800">Zyklus</b> Tag ${c.d.toLocaleString('de-DE')} nach Halving ${c.y} · ${c.ph}</span>`})():'')+(showZZ?`<span class="m"><b style="color:${zzo.c}">Zickzack</b> ${zzo.dev.toLocaleString('de-DE')} ${zzo.depth}</span>`:'');
+  (showMA?`<span class="m"><b style="color:#f2c94c">MA20</b> ${ma20[i]!=null?fmt(ma20[i]):'–'} <b style="color:#b78cff">MA50</b> ${ma50[i]!=null?fmt(ma50[i]):'–'}</span>`:'')+(showLQ&&LQS[sym.id]&&LQ[sym.id]?`<span class="m"><b style="color:#5ec962">Liquidationen</b> ${LQ[sym.id].err?'nicht erreichbar':'geschätzt, '+(sym.m?'nur Binance-Trader, ':'')+'letzte 20 Tage, Binance Futures'}</span>`:'')+(showCY&&sym.id==='BTC'&&cyState()?(()=>{const c=cyState();return`<span><b style="color:#ff9800">Zyklus</b> Tag ${c.d.toLocaleString('de-DE')} nach Halving ${c.y} · ${c.ph}</span>`})():'')+(showZZ?`<span class="m"><b style="color:${zzo.c}">Zickzack</b> ${zzo.dev.toLocaleString('de-DE')} ${zzo.depth}</span>`:'');
 }
 
 function distSeg(px,py,ax,ay,bx,by){const dx=bx-ax,dy=by-ay,l=dx*dx+dy*dy;let t=l?((px-ax)*dx+(py-ay)*dy)/l:0;t=Math.max(0,Math.min(1,t));return Math.hypot(px-ax-t*dx,py-ay-t*dy)}
@@ -720,7 +721,7 @@ function ui(){
  penUI();
  $('#vis').setAttribute('aria-pressed',hidden);$('#vis').innerHTML='<svg viewBox="0 0 22 22"><path d="M2 11s3.5-6 9-6 9 6 9 6-3.5 6-9 6-9-6-9-6z"/><circle cx="11" cy="11" r="2.5"/>'+(hidden?'<path d="M4 3l14 16"/>':'')+'</svg>';$('#vis').title=hidden?'Zeichnungen einblenden':'Zeichnungen ausblenden';
  if($('#fibp').classList.contains('on'))fibUI();if($('#chp').classList.contains('on'))chUI();obUI();layUI();if($('#fnp').classList.contains('on'))fnUI();
- $('#ma').setAttribute('aria-pressed',showMA);$('#mag').setAttribute('aria-pressed',magnet>0);$('#magbd').textContent=['','•','••'][magnet];$('#mag').title=['Magnet aus','Magnet schwach','Magnet stark'][magnet];$('#zzb').setAttribute('aria-pressed',showZZ);$('#pgb').setAttribute('aria-pressed',showPG);$('#scb').setAttribute('aria-pressed',showSC);$('#znb').setAttribute('aria-pressed',showZN);$('#trb').setAttribute('aria-pressed',showTR);$('#cyb').setAttribute('aria-pressed',showCY);$('#lqb').setAttribute('aria-pressed',showLQ);$('#lqb').style.display=sym.id==='BTC'?'':'none';$('#cyb').style.display=sym.id==='BTC'?'':'none';progUI();
+ $('#ma').setAttribute('aria-pressed',showMA);$('#mag').setAttribute('aria-pressed',magnet>0);$('#magbd').textContent=['','•','••'][magnet];$('#mag').title=['Magnet aus','Magnet schwach','Magnet stark'][magnet];$('#zzb').setAttribute('aria-pressed',showZZ);$('#pgb').setAttribute('aria-pressed',showPG);$('#scb').setAttribute('aria-pressed',showSC);$('#znb').setAttribute('aria-pressed',showZN);$('#trb').setAttribute('aria-pressed',showTR);$('#cyb').setAttribute('aria-pressed',showCY);$('#lqb').setAttribute('aria-pressed',showLQ);$('#lqb').style.display=LQS[sym.id]?'':'none';$('#cyb').style.display=sym.id==='BTC'?'':'none';progUI();
  $('#undo').disabled=!undo.length;$('#del').disabled=sel<0||locked(drawings[sel]);$('#lock').disabled=sel<0||lockAll;$('#lock').setAttribute('aria-pressed',sel>=0&&!!drawings[sel]?.lk);$('#lockall').setAttribute('aria-pressed',lockAll);$('#clear').disabled=!drawings.length;
  status();
  $('#pair').textContent=src==='binance'&&sym.lp?sym.lp:sym.pair;
@@ -829,7 +830,7 @@ $('#layl').addEventListener('click',e=>{const g=e.target.closest('[data-go]'),r=
 $('#tfs').onclick=e=>{const b=e.target.closest('.chip');if(!b)return;tf=TFS.find(t=>t.id===b.dataset.id);loadData(true)};
 $('#ma').onclick=()=>{showMA=!showMA;ui();draw()};
 $('#zzb').onclick=()=>{showZZ=!showZZ;ui();draw()};
-$('#lqb').onclick=()=>{showLQ=!showLQ;try{localStorage.setItem('chartwerk:lq',showLQ?'1':'0')}catch(e){}if(showLQ)loadLQ(LQ.BTC&&LQ.BTC.err);ui();draw()};
+$('#lqb').onclick=()=>{showLQ=!showLQ;try{localStorage.setItem('chartwerk:lq',showLQ?'1':'0')}catch(e){}if(showLQ)loadLQ(LQ[sym.id]&&LQ[sym.id].err);ui();draw()};
 $('#cyb').onclick=()=>{showCY=!showCY;try{localStorage.setItem('chartwerk:cy',showCY?'1':'0')}catch(e){}ui();draw()};
 $('#trb').onclick=()=>{showTR=!showTR;try{localStorage.setItem('chartwerk:tr',showTR?'1':'0')}catch(e){}ui();draw()};
 $('#znb').onclick=()=>{showZN=!showZN;try{localStorage.setItem('chartwerk:zn',showZN?'1':'0')}catch(e){}ui();draw()};
@@ -944,7 +945,7 @@ $('#lss').onclick=e=>{const b=e.target.closest('button');if(b)penSet('ls',b.data
 $('#lws').onclick=e=>{const b=e.target.closest('button');if(b)penSet('lw',+b.dataset.lw)};
 $('#colok').onclick=()=>$('#colp').classList.remove('on');
 const KN={trend:'Trendlinie',ray:'Strahl',ext:'Erweiterte Linie',chan:'Parallelkanal',info:'Info-Linie',hline:'Horizontale Linie',goal:'Ziel',rect:'Rechteck',fib:'Fibonacci-Retracement',fan:'Fib-Fächer',brush:'Freihand'};
-const IND=[['ma','MA 20/50'],['zzb','Zickzack'],['cyb','Halving-Zyklus (Bitcoin)'],['lqb','Liquidations-Heatmap (Bitcoin)'],['trb','Trendlinien (automatisch)'],['znb','Kauf- und Verkaufszonen'],['pgb','Prognose'],['scb','Szenarien']];
+const IND=[['ma','MA 20/50'],['zzb','Zickzack'],['cyb','Halving-Zyklus (Bitcoin)'],['lqb','Liquidations-Heatmap (BTC, Gold, Silber)'],['trb','Trendlinien (automatisch)'],['znb','Kauf- und Verkaufszonen'],['pgb','Prognose'],['scb','Szenarien']];
 const EYE=(on)=>'<svg viewBox="0 0 22 22"><path d="M2 11s3.5-6 9-6 9 6 9 6-3.5 6-9 6-9-6-9-6z"/><circle cx="11" cy="11" r="2.5"/>'+(on?'':'<path d="M4 3l14 16"/>')+'</svg>';
 const LCK='<svg viewBox="0 0 22 22"><rect x="5" y="10" width="12" height="9" rx="1.5"/><path d="M8 10V7a3 3 0 016 0v3"/></svg>',BIN='<svg viewBox="0 0 22 22"><path d="M4 6h14M8.5 6V4h5v2M6 6l1 13h8l1-13"/></svg>';
 let obSig='';
