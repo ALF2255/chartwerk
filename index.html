@@ -102,6 +102,11 @@ canvas{position:absolute;inset:0;width:100%;height:100%;touch-action:none;cursor
 #fsb{padding:0 11px;color:var(--ink)}#fsb svg,#fsx svg{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
 #fsx{position:absolute;right:80px;top:8px;z-index:4;width:44px;height:44px;border-radius:10px;border:1px solid #2f3a43;background:rgba(20,26,30,.85);color:var(--ink);display:none;place-items:center;cursor:pointer;padding:0}
 .app.fs #fsx{display:grid}
+.legend .pk{pointer-events:auto;cursor:pointer;color:var(--ink);padding:6px 5px;margin:-6px -1px;border-radius:7px;white-space:nowrap}
+.legend .pk i{font-style:normal;color:var(--mute);font-size:11px;margin-left:3px}.legend .pk:hover,.legend .pk.on{background:#1f2830}
+#pkm{position:absolute;z-index:6;background:#182027;border:1px solid #2f3a43;border-radius:12px;padding:6px;display:none;flex-direction:column;gap:3px;box-shadow:0 14px 40px #000a;min-width:170px;max-height:calc(100% - 20px);overflow:auto}
+#pkm.on{display:flex}#pkm button{appearance:none;text-align:left;min-height:44px;padding:0 14px;border:0;border-radius:8px;background:transparent;color:var(--ink);font:inherit;font-size:15px;cursor:pointer}
+#pkm button:hover{background:#232c33}#pkm button[aria-pressed=true]{background:var(--acc);color:#fff}#pkm small{color:var(--mute);font-size:12px;margin-left:8px}#pkm button[aria-pressed=true] small{color:#dfe8ff}
 :focus-visible{outline:2px solid var(--acc);outline-offset:2px}
 @media(max-width:700px){
  .app{grid-template-columns:minmax(0,1fr);grid-template-areas:"h" "b" "s" "t" "n"}
@@ -160,7 +165,7 @@ canvas{position:absolute;inset:0;width:100%;height:100%;touch-action:none;cursor
   <button class="tb" id="del" title="Auswahl löschen (Entf)" aria-label="Auswahl löschen"><svg viewBox="0 0 22 22"><path d="M4 6h14M8.5 6V4h5v2M6 6l1 13h8l1-13"/></svg></button>
   <button class="tb" id="clear" title="Alle Zeichnungen löschen" aria-label="Alle Zeichnungen löschen"><svg viewBox="0 0 22 22"><rect x="3" y="3" width="16" height="16" rx="2.5"/><path d="M8 8l6 6M14 8l-6 6"/></svg></button>
  </nav>
- <main class="stage" id="stage"><canvas id="cv"></canvas><button id="fsx" title="Vollbild beenden" aria-label="Vollbild beenden"><svg viewBox="0 0 22 22"><path d="M8 3v5H3M19 8h-5V3M14 19v-5h5M3 14h5v5"/></svg></button><div class="legend" id="legend"></div><div class="toast" id="toast"></div>
+ <main class="stage" id="stage"><canvas id="cv"></canvas><button id="fsx" title="Vollbild beenden" aria-label="Vollbild beenden"><svg viewBox="0 0 22 22"><path d="M8 3v5H3M19 8h-5V3M14 19v-5h5M3 14h5v5"/></svg></button><div class="legend" id="legend"></div><div id="pkm" role="menu"></div><div class="toast" id="toast"></div>
  <div class="pg" id="pg" hidden>
   <div class="pgh"><b>Prognose</b><span id="pgt"></span></div>
   <div class="pgr"><div><span>Höher</span><b class="up" id="pgu">–</b></div><div><span>Tiefer</span><b class="dn" id="pgd">–</b></div></div>
@@ -657,7 +662,7 @@ function draw(){
 function legend(){
  const n=data.length;let i=n-1;const hp=hover||cross;if(hp&&hp[0]<pw()){const j=Math.round(idx(hp[0]));if(j>=0&&j<n)i=j}
  const b=data[i],c=b.c>=b.o?'up':'dn';
- $('#legend').innerHTML=`<span><b>${sym.pair}</b> · ${tf.l}</span><span>O <b class="${c}">${fmt(b.o)}</b> H <b class="${c}">${fmt(b.h)}</b> L <b class="${c}">${fmt(b.l)}</b> C <b class="${c}">${fmt(b.c)}</b></span>`+
+ $('#legend').innerHTML=`<span><b class="pk${pkOpen==='sym'?' on':''}" data-pk="sym">${src==='binance'&&sym.lp?sym.lp:sym.pair}<i>▾</i></b> · <b class="pk${pkOpen==='tf'?' on':''}" data-pk="tf">${tf.l}<i>▾</i></b></span><span>O <b class="${c}">${fmt(b.o)}</b> H <b class="${c}">${fmt(b.h)}</b> L <b class="${c}">${fmt(b.l)}</b> C <b class="${c}">${fmt(b.c)}</b></span>`+
   (showMA?`<span class="m"><b style="color:#f2c94c">MA20</b> ${ma20[i]!=null?fmt(ma20[i]):'–'} <b style="color:#b78cff">MA50</b> ${ma50[i]!=null?fmt(ma50[i]):'–'}</span>`:'')+(showLQ&&sym.id==='BTC'&&LQ.BTC?`<span class="m"><b style="color:#5ec962">Liquidationen</b> ${LQ.BTC.err?'nicht erreichbar':'geschätzt, letzte 20 Tage, Binance Futures'}</span>`:'')+(showCY&&sym.id==='BTC'&&cyState()?(()=>{const c=cyState();return`<span><b style="color:#ff9800">Zyklus</b> Tag ${c.d.toLocaleString('de-DE')} nach Halving ${c.y} · ${c.ph}</span>`})():'')+(showZZ?`<span class="m"><b style="color:${zzo.c}">Zickzack</b> ${zzo.dev.toLocaleString('de-DE')} ${zzo.depth}</span>`:'');
 }
 
@@ -798,6 +803,15 @@ function setFS(on){const a=document.querySelector('.app');a.classList.toggle('fs
   else if(!on&&document.fullscreenElement)document.exitFullscreen().catch(()=>{})}catch(e){}}
 $('#fsb').onclick=()=>setFS(true);$('#fsx').onclick=()=>setFS(false);
 document.addEventListener('fullscreenchange',()=>{if(!document.fullscreenElement)document.querySelector('.app').classList.remove('fs')});
+let pkOpen='';
+function pkClose(){pkOpen='';$('#pkm').classList.remove('on');legend()}
+$('#legend').addEventListener('pointerdown',e=>{const b=e.target.closest('.pk');if(!b)return;e.preventDefault();e.stopPropagation();
+ const k=b.dataset.pk;if(pkOpen===k){pkClose();return}pkOpen=k;const m=$('#pkm');
+ m.innerHTML=k==='sym'?SYMS.map(s=>`<button data-s="${s.id}" aria-pressed="${s.id===sym.id}">${s.name}<small>${s.pair}</small></button>`).join(''):TFS.map(t=>`<button data-t="${t.id}" aria-pressed="${t.id===tf.id}">${t.l}</button>`).join('');
+ const sr=stage.getBoundingClientRect(),r=b.getBoundingClientRect();m.style.left=Math.max(6,r.left-sr.left-6)+'px';m.style.top=(r.bottom-sr.top+8)+'px';m.classList.add('on');legend()});
+$('#pkm').addEventListener('click',e=>{const b=e.target.closest('button');if(!b)return;const s=b.dataset.s,t=b.dataset.t;pkClose();
+ if(s&&s!==sym.id)$('#syms .chip[data-id="'+s+'"]').click();if(t&&t!==tf.id)$('#tfs .chip[data-id="'+t+'"]').click()});
+document.addEventListener('pointerdown',e=>{if(pkOpen&&!e.target.closest('#pkm,.pk'))pkClose()},true);
 $('#layb').onclick=()=>{if(openPanel('#layp')){laySig='';layUI()}};
 $('#layok').onclick=()=>$('#layp').classList.remove('on');
 function newLay(copy){const n=($('#layn').value.trim()||'Layout '+lays(sym.id).length).slice(0,30),id=Math.random().toString(36).slice(2,10),a=lays(sym.id);
