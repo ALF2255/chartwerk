@@ -95,6 +95,9 @@ canvas{position:absolute;inset:0;width:100%;height:100%;touch-action:none;cursor
 .ib{appearance:none;width:40px;height:40px;flex:none;display:grid;place-items:center;border:0;border-radius:8px;background:transparent;color:var(--mute);cursor:pointer;padding:0}
 .ib:hover{color:var(--ink);background:#232c33}.ib svg{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
 .ib.on{color:var(--ink)}
+.panel .obr .lin{flex:1;width:auto;height:38px;border-radius:8px;border:1px solid transparent;background:transparent;color:var(--ink);font:15px "IBM Plex Sans",system-ui;padding:0 8px}
+.panel .obr .lin:focus{border-color:#34404b;background:var(--bg)}
+#layb{margin-left:auto;color:var(--ink)}#layb svg{width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:1.7;vertical-align:-3px;margin-right:6px}
 :focus-visible{outline:2px solid var(--acc);outline-offset:2px}
 @media(max-width:700px){
  .app{grid-template-columns:minmax(0,1fr);grid-template-areas:"h" "b" "s" "t" "n"}
@@ -109,7 +112,7 @@ canvas{position:absolute;inset:0;width:100%;height:100%;touch-action:none;cursor
 @media(prefers-reduced-motion:reduce){.toast{transition:none}}
 </style></head><body>
 <div class="app">
- <header><div class="brand">Chart<i>werk</i></div><div class="row" id="syms"></div></header>
+ <header><div class="brand">Chart<i>werk</i></div><div class="row" id="syms"></div><button class="chip" id="layb" title="Strategie-Layouts"><svg viewBox="0 0 22 22"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="12" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="12" width="7" height="7" rx="1.5"/><rect x="12" y="12" width="7" height="7" rx="1.5"/></svg><span id="laybt">Standard</span></button></header>
  <div class="bar">
   <div class="quote"><span id="pair">BTC/USD</span><b id="last">–</b><em id="chg"></em></div>
   <div class="row"><button class="chip src" id="src"><i></i><span>Prüfe Verbindung…</span></button><div class="row" id="tfs"></div>
@@ -194,6 +197,15 @@ canvas{position:absolute;inset:0;width:100%;height:100%;touch-action:none;cursor
    <label class="ck"><input type="checkbox" id="f-mono">Nur gewählte Zeichenfarbe</label>
   </div>
   <div class="prow"><button class="chip" id="freset">Standard</button><button class="chip pri" id="fclose">Fertig</button></div>
+ </div>
+ <div class="panel" id="layp" role="dialog" aria-label="Strategie-Layouts">
+  <h2 id="layh">Strategie-Layouts</h2>
+  <p>Jedes Layout hat eigene Zeichnungen, eine eigene Zeiteinheit und eigene Indikatoren. Namen lassen sich direkt antippen und ändern.</p>
+  <div class="obl" id="layl"></div>
+  <label for="layn">Neues Layout</label>
+  <input id="layn" maxlength="30" autocomplete="off" placeholder="z. B. Swing, Langfrist, Elliott">
+  <div class="prow"><button class="chip" id="laynew">Leer anlegen</button><button class="chip" id="laycp">Aktuelles kopieren</button></div>
+  <div class="prow"><button class="chip pri" id="layok">Fertig</button></div>
  </div>
  <div class="panel" id="obp" role="dialog" aria-label="Objektbaum">
   <h2 id="obh">Objektbaum</h2>
@@ -622,8 +634,16 @@ function hit(px,py,tol){
 function handleHit(px,py,tol){if(sel<0||drawings[sel].k==='brush'||locked(drawings[sel]))return -1;const ps=drawings[sel].pts.map(P);return ps.findIndex(q=>Math.hypot(q[0]-px,q[1]-py)<=tol+3)}
 
 const snap=()=>JSON.stringify(drawings);
-const key=()=>'chartwerk:'+sym.id;
-function save(){try{localStorage.setItem(key(),snap());localStorage.setItem('chartwerk:u:'+sym.id,Date.now())}catch(e){}queueSync()}
+let lay='';
+const ek=(sid,lid)=>sid+(lid?'@'+lid:'');
+function cleanLays(a){const o=(Array.isArray(a)?a:[]).filter(l=>l&&typeof l.id==='string'&&/^[a-z0-9]{0,12}$/.test(l.id)).map(l=>({id:l.id,n:String(l.n||'Layout').slice(0,30),...(typeof l.tf==='string'?{tf:l.tf}:{}),...(l.ind&&typeof l.ind==='object'?{ind:l.ind}:{})}));
+ const s=o.findIndex(l=>l.id==='');const d=s>=0?o.splice(s,1)[0]:{id:'',n:'Standard'};o.unshift(d);return o.filter((l,i)=>o.findIndex(q=>q.id===l.id)===i)}
+function lays(sid){try{return cleanLays(JSON.parse(localStorage.getItem('chartwerk:lays:'+sid)||'null'))}catch(e){return cleanLays(null)}}
+function setLays(sid,a){try{localStorage.setItem('chartwerk:lays:'+sid,JSON.stringify(cleanLays(a)));localStorage.setItem('chartwerk:u:L:'+sid,Date.now())}catch(e){}queueSync()}
+const allEntries=()=>SYMS.flatMap(s=>lays(s.id).map(l=>ek(s.id,l.id)));
+const curLay=()=>lays(sym.id).find(l=>l.id===lay)||lays(sym.id)[0];
+const key=()=>'chartwerk:'+ek(sym.id,lay);
+function save(){try{localStorage.setItem(key(),snap());localStorage.setItem('chartwerk:u:'+ek(sym.id,lay),Date.now())}catch(e){}queueSync()}
 function load(){try{drawings=JSON.parse(localStorage.getItem(key())||'[]')}catch(e){drawings=[]}}
 function toast(s){const t=$('#toast');t.textContent=s;t.classList.add('on');clearTimeout(toastT);toastT=setTimeout(()=>t.classList.remove('on'),2600)}
 function clampView(){const n=data.length,w=pw();view.bw=Math.max(1.2,Math.min(48,view.bw));view.end=Math.max(Math.min(10,n),Math.min(n+.7*w/view.bw,view.end))}
@@ -635,7 +655,7 @@ function ui(){
  document.querySelectorAll('[data-tool]').forEach(b=>b.setAttribute('aria-pressed',b.dataset.tool===tool));
  penUI();
  $('#vis').setAttribute('aria-pressed',hidden);$('#vis').innerHTML='<svg viewBox="0 0 22 22"><path d="M2 11s3.5-6 9-6 9 6 9 6-3.5 6-9 6-9-6-9-6z"/><circle cx="11" cy="11" r="2.5"/>'+(hidden?'<path d="M4 3l14 16"/>':'')+'</svg>';$('#vis').title=hidden?'Zeichnungen einblenden':'Zeichnungen ausblenden';
- if($('#fibp').classList.contains('on'))fibUI();if($('#chp').classList.contains('on'))chUI();obUI();if($('#fnp').classList.contains('on'))fnUI();
+ if($('#fibp').classList.contains('on'))fibUI();if($('#chp').classList.contains('on'))chUI();obUI();layUI();if($('#fnp').classList.contains('on'))fnUI();
  $('#ma').setAttribute('aria-pressed',showMA);$('#mag').setAttribute('aria-pressed',magnet>0);$('#magbd').textContent=['','•','••'][magnet];$('#mag').title=['Magnet aus','Magnet schwach','Magnet stark'][magnet];$('#zzb').setAttribute('aria-pressed',showZZ);$('#pgb').setAttribute('aria-pressed',showPG);$('#scb').setAttribute('aria-pressed',showSC);$('#znb').setAttribute('aria-pressed',showZN);$('#trb').setAttribute('aria-pressed',showTR);progUI();
  $('#undo').disabled=!undo.length;$('#del').disabled=sel<0||locked(drawings[sel]);$('#lock').disabled=sel<0||lockAll;$('#lock').setAttribute('aria-pressed',sel>=0&&!!drawings[sel]?.lk);$('#lockall').setAttribute('aria-pressed',lockAll);$('#clear').disabled=!drawings.length;
  status();
@@ -692,7 +712,38 @@ const LWS=[1,1.6,2.4,3.4];
 $('#pal').innerHTML=PAL.map(c=>`<button data-c="${c}" style="--c:${c}" aria-label="Farbe ${c}"></button>`).join('');
 $('#lss').innerHTML=['solid','dash','dot'].map(k=>`<button data-ls="${k}" aria-label="${{solid:'Durchgezogen',dash:'Gestrichelt',dot:'Gepunktet'}[k]}" title="${{solid:'Durchgezogen',dash:'Gestrichelt',dot:'Gepunktet'}[k]}">${LSI[k]}</button>`).join('');
 $('#lws').innerHTML=LWS.map((w,i)=>`<button data-lw="${w}" aria-label="Stärke ${i+1}" title="Stärke ${i+1}"><svg viewBox="0 0 30 12"><path d="M2 6h26" stroke="currentColor" stroke-width="${w*1.2}"/></svg></button>`).join('');
-$('#syms').onclick=e=>{const b=e.target.closest('.chip');if(!b)return;sym=SYMS.find(s=>s.id===b.dataset.id);load();sel=-1;undo=[];chanP=-1;loadData(true)};
+function layCapture(){const a=lays(sym.id),L=a.find(l=>l.id===lay);if(!L)return;const nw={tf:tf.id,ind:{ma:showMA,zzb:showZZ,trb:showTR,znb:showZN,pgb:showPG,scb:showSC}};
+ if(L.tf===nw.tf&&JSON.stringify(L.ind)===JSON.stringify(nw.ind))return;Object.assign(L,nw);setLays(sym.id,a)}
+function applyLay(L){const i=L&&L.ind;if(i){if('ma'in i)showMA=!!i.ma;if('zzb'in i)showZZ=!!i.zzb;if('trb'in i)showTR=!!i.trb;if('znb'in i)showZN=!!i.znb;if('pgb'in i)showPG=!!i.pgb;if('scb'in i)showSC=!!i.scb;
+  try{localStorage.setItem('chartwerk:tr',showTR?'1':'0');localStorage.setItem('chartwerk:zn',showZN?'1':'0');localStorage.setItem('chartwerk:pg',showPG?'1':'0');localStorage.setItem('chartwerk:sc',showSC?'1':'0')}catch(e){}}
+ const t=L&&L.tf&&TFS.find(x=>x.id===L.tf);if(t&&t!==tf){tf=t;return true}return false}
+function layInit(){let l='';try{l=localStorage.getItem('chartwerk:lay:'+sym.id)||''}catch(e){}return lays(sym.id).some(q=>q.id===l)?l:''}
+function setLay(lid){layCapture();lay=lid;try{localStorage.setItem('chartwerk:lay:'+sym.id,lid)}catch(e){}const tch=applyLay(curLay());load();sel=-1;undo=[];chanP=-1;if(tch)loadData(true);else{ui();draw()}}
+$('#syms').onclick=e=>{const b=e.target.closest('.chip');if(!b)return;layCapture();sym=SYMS.find(s=>s.id===b.dataset.id);lay=layInit();applyLay(curLay());load();sel=-1;undo=[];chanP=-1;loadData(true)};
+document.querySelector('.bar').addEventListener('click',()=>setTimeout(layCapture,0));
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+let laySig='',rmArm='',rmT=0;
+function layUI(){$('#laybt').textContent=curLay().n;if(!$('#layp').classList.contains('on')){laySig='';return}
+ const a=lays(sym.id),s=sym.id+'|'+lay+'|'+JSON.stringify(a.map(l=>[l.id,l.n]))+'|'+rmArm;if(s===laySig)return;laySig=s;
+ $('#layh').textContent='Strategie-Layouts · '+sym.name;
+ $('#layl').innerHTML=a.map(l=>{const on=l.id===lay,cnt=(()=>{try{return JSON.parse(localStorage.getItem('chartwerk:'+ek(sym.id,l.id))||'[]').length}catch(e){return 0}})();
+  return`<div class="obr${on?' sel':''}"><button class="ib${on?' on':''}" data-go="${l.id}" aria-label="Layout öffnen" title="Öffnen"><svg viewBox="0 0 22 22">${on?'<circle cx="11" cy="11" r="7"/><path d="M7.5 11l2.5 2.5 4.5-5"/>':'<circle cx="11" cy="11" r="7"/>'}</svg></button>`+
+  `<input class="lin" data-rn="${l.id}" value="${esc(l.n)}" maxlength="30" aria-label="Name des Layouts"><span style="color:var(--mute);font-size:12px;white-space:nowrap">${cnt} Zeichn.</span>`+
+  (l.id?`<button class="ib" data-rm="${l.id}" aria-label="Layout löschen" title="${rmArm===l.id?'Nochmal tippen zum Löschen':'Löschen'}" style="${rmArm===l.id?'color:#fff;background:var(--dn)':''}">${BIN}</button>`:'<span style="width:40px"></span>')+'</div>'}).join('')}
+$('#layb').onclick=()=>{if(openPanel('#layp')){laySig='';layUI()}};
+$('#layok').onclick=()=>$('#layp').classList.remove('on');
+function newLay(copy){const n=($('#layn').value.trim()||'Layout '+lays(sym.id).length).slice(0,30),id=Math.random().toString(36).slice(2,10),a=lays(sym.id);
+ layCapture();a.push({id,n,tf:tf.id,ind:{ma:showMA,zzb:showZZ,trb:showTR,znb:showZN,pgb:showPG,scb:showSC}});setLays(sym.id,a);
+ try{localStorage.setItem('chartwerk:'+ek(sym.id,id),copy?snap():'[]');localStorage.setItem('chartwerk:u:'+ek(sym.id,id),Date.now())}catch(e){}
+ $('#layn').value='';setLay(id);toast('Layout „'+n+'“ angelegt'+(copy?' (Kopie)':''))}
+$('#laynew').onclick=()=>newLay(false);$('#laycp').onclick=()=>newLay(true);
+$('#layn').addEventListener('keydown',e=>{if(e.key==='Enter')newLay(false)});
+$('#layl').addEventListener('change',e=>{const t=e.target;if(t.dataset.rn===undefined)return;const a=lays(sym.id),L=a.find(l=>l.id===t.dataset.rn);if(!L)return;const n=t.value.trim().slice(0,30);if(!n){t.value=L.n;return}L.n=n;setLays(sym.id,a);laySig='';ui()});
+$('#layl').addEventListener('click',e=>{const g=e.target.closest('[data-go]'),r=e.target.closest('[data-rm]');
+ if(g){if(g.dataset.go!==lay)setLay(g.dataset.go);return}
+ if(r){const id=r.dataset.rm;if(rmArm!==id||Date.now()-rmT>3000){rmArm=id;rmT=Date.now();laySig='';layUI();toast('Nochmal tippen, um das Layout mit seinen Zeichnungen zu löschen');setTimeout(()=>{if(rmArm===id){rmArm='';laySig='';layUI()}},3000);return}
+  rmArm='';const a=lays(sym.id).filter(l=>l.id!==id);setLays(sym.id,a);try{localStorage.removeItem('chartwerk:'+ek(sym.id,id));localStorage.removeItem('chartwerk:u:'+ek(sym.id,id))}catch(x){}
+  if(lay===id){lay='';setLay('')}else{laySig='';ui()}toast('Layout gelöscht')}});
 $('#tfs').onclick=e=>{const b=e.target.closest('.chip');if(!b)return;tf=TFS.find(t=>t.id===b.dataset.id);loadData(true)};
 $('#ma').onclick=()=>{showMA=!showMA;ui();draw()};
 $('#zzb').onclick=()=>{showZZ=!showZZ;ui();draw()};
@@ -724,7 +775,7 @@ function setOpt(mut){const d=ftarget();
  if(d){if(locked(d)){toast('Gesperrt: erst entsperren');fibUI();return}undo.push(snap());d.o=d.o||JSON.parse(JSON.stringify(fib));mut(d.o);save()}
  else{mut(fib);try{lsSet('chartwerk:fib',JSON.stringify(fib))}catch(e){}}
  ui();draw()}
-function openPanel(id){['#fibp','#panel','#bkp','#zzp','#chp','#colp','#fnp','#obp'].forEach(p=>{if(p!==id)$(p).classList.remove('on')});return $(id).classList.toggle('on')}
+function openPanel(id){['#fibp','#panel','#bkp','#zzp','#chp','#colp','#fnp','#obp','#layp'].forEach(p=>{if(p!==id)$(p).classList.remove('on')});return $(id).classList.toggle('on')}
 $('#fibset').onclick=()=>{if(ctarget()||tool==='chan'){chUI();openPanel('#chp');return}if(fntarget()||tool==='fan'){fnUI(true);openPanel('#fnp');return}fibUI();openPanel('#fibp')};
 const fntarget=()=>sel>=0&&!hidden&&drawings[sel]&&drawings[sel].k==='fan'?drawings[sel]:null;let fnT;
 function fnUI(force){const d=fntarget();if(!force&&d===fnT)return;fnT=d;const o=d?fanOpt(d):fand;
@@ -758,8 +809,8 @@ $('#freset').onclick=()=>setOpt(o=>{const src=ftarget()?fib:FIBDEF;Object.keys(o
 $('#vis').onclick=()=>{hidden=!hidden;if(hidden)sel=-1;try{localStorage.setItem('chartwerk:hide',hidden?'1':'0')}catch(e){}ui();draw();toast(hidden?'Zeichnungen ausgeblendet':'Zeichnungen eingeblendet')};
 /* Backup */
 const KINDS=['trend','ray','ext','chan','info','hline','goal','rect','fib','fan','brush'];
-function allDrawings(){const o={};SYMS.forEach(s=>{try{o[s.id]=JSON.parse(localStorage.getItem('chartwerk:'+s.id)||'[]')}catch(e){o[s.id]=[]}});if(!Object.keys(o).length||!o[sym.id])o[sym.id]=drawings;return o}
-function backupText(){return JSON.stringify({app:'chartwerk',v:1,date:new Date().toISOString(),drawings:allDrawings(),fib,magnet,lockAll})}
+function allDrawings(){const o={};allEntries().forEach(e=>{try{o[e]=JSON.parse(localStorage.getItem('chartwerk:'+e)||'[]')}catch(x){o[e]=[]}});o[ek(sym.id,lay)]=drawings;return o}
+function backupText(){return JSON.stringify({app:'chartwerk',v:1,date:new Date().toISOString(),drawings:allDrawings(),lays:Object.fromEntries(SYMS.map(s=>[s.id,lays(s.id)])),fib,magnet,lockAll})}
 const bkmsg=t=>{$('#bkmsg').textContent=t};
 function bkInfo(){const a=allDrawings(),n=Object.values(a).reduce((s,x)=>s+x.length,0),m=Object.values(a).filter(x=>x.length).length;$('#bkinfo').textContent=`${n} Zeichnung${n===1?'':'en'} in ${m} ${m===1?'Markt':'Märkten'}`}
 $('#bk').onclick=()=>{bkInfo();bkmsg('');openPanel('#bkp')};
@@ -773,9 +824,11 @@ $('#bkfile').onchange=async e=>{const f=e.target.files[0];if(!f)return;try{$('#b
 function validD(d){return d&&KINDS.includes(d.k)&&Array.isArray(d.pts)&&d.pts.length&&d.pts.every(q=>q&&isFinite(q.t)&&isFinite(q.p))}
 function doImport(replace){let b;try{b=JSON.parse($('#bktxt').value.trim())}catch(e){bkmsg('Das ist kein gültiges Backup.');return}
  if(!b||b.app!=='chartwerk'||typeof b.drawings!=='object'){bkmsg('Das ist kein Chartwerk-Backup.');return}
+ if(b.lays&&typeof b.lays==='object')SYMS.forEach(s=>{if(!Array.isArray(b.lays[s.id]))return;const inc=cleanLays(b.lays[s.id]);
+  if(replace)setLays(s.id,inc);else{const a=lays(s.id);inc.forEach(l=>{if(!a.some(q=>q.id===l.id))a.push(l)});setLays(s.id,a)}});
  const cur=allDrawings();let n=0;undo.push(snap());
- SYMS.forEach(s=>{const inc=(Array.isArray(b.drawings[s.id])?b.drawings[s.id]:[]).filter(validD).map(d=>({k:d.k,c:typeof d.c==='string'&&/^#[0-9a-f]{3,8}$/i.test(d.c)?d.c:COLORS[0],pts:d.pts.map(q=>({t:+q.t,p:+q.p})),...(d.lk?{lk:true}:{}),...(d.hd?{hd:true}:{}),...(d.o&&typeof d.o==='object'&&(Array.isArray(d.o.on)||Array.isArray(d.o.fp))?{o:Object.assign(JSON.parse(JSON.stringify(d.k==='chan'?CHDEF:d.k==='fan'&&Array.isArray(d.o.fp)?FANDEF:FIBDEF)),d.o)}:{}),...(['dash','dot'].includes(d.ls)?{ls:d.ls}:{}),...(d.lw>0&&d.lw<6?{lw:+d.lw}:{})}));
-  n+=inc.length;const out=replace?inc:[...(cur[s.id]||[]),...inc];try{localStorage.setItem('chartwerk:'+s.id,JSON.stringify(out));localStorage.setItem('chartwerk:u:'+s.id,Date.now())}catch(e){}});
+ allEntries().forEach(eid=>{const inc=(Array.isArray(b.drawings[eid])?b.drawings[eid]:[]).filter(validD).map(d=>({k:d.k,c:typeof d.c==='string'&&/^#[0-9a-f]{3,8}$/i.test(d.c)?d.c:COLORS[0],pts:d.pts.map(q=>({t:+q.t,p:+q.p})),...(d.lk?{lk:true}:{}),...(d.hd?{hd:true}:{}),...(d.o&&typeof d.o==='object'&&(Array.isArray(d.o.on)||Array.isArray(d.o.fp))?{o:Object.assign(JSON.parse(JSON.stringify(d.k==='chan'?CHDEF:d.k==='fan'&&Array.isArray(d.o.fp)?FANDEF:FIBDEF)),d.o)}:{}),...(['dash','dot'].includes(d.ls)?{ls:d.ls}:{}),...(d.lw>0&&d.lw<6?{lw:+d.lw}:{})}));
+  n+=inc.length;const out=replace?inc:[...(cur[eid]||[]),...inc];try{localStorage.setItem('chartwerk:'+eid,JSON.stringify(out));localStorage.setItem('chartwerk:u:'+eid,Date.now())}catch(e){}});
  queueSync();
  if(b.fib&&Array.isArray(b.fib.on)){fib=Object.assign(JSON.parse(JSON.stringify(FIBDEF)),b.fib);try{lsSet('chartwerk:fib',JSON.stringify(fib))}catch(e){}}
  if(replace){magnet=[0,1,2].includes(b.magnet)?b.magnet:magnet;lockAll=!!b.lockAll;try{lsSet('chartwerk:mag',magnet);lsSet('chartwerk:lockall',lockAll?'1':'0')}catch(e){}}
@@ -914,7 +967,7 @@ function lsSet(k,v){try{localStorage.setItem(k,v);localStorage.setItem('chartwer
 async function gh(path,opt={}){const r=await fetch(GH+path,{...opt,headers:{Authorization:'Bearer '+ghTok,Accept:'application/vnd.github+json',...(opt.body?{'Content-Type':'application/json'}:{})}});
  if(r.status===401)throw new Error('Schlüssel ungültig oder abgelaufen');if(r.status===403)throw new Error('Schlüssel hat keine Gist-Berechtigung');if(r.status===404)throw new Error('nicht gefunden (404)');
  if(!r.ok)throw new Error('GitHub-Fehler '+r.status);return r.json()}
-function localState(){const m={};SYMS.forEach(s=>{let d=[];try{d=JSON.parse(lsGet('chartwerk:'+s.id)||'[]')}catch(e){}m[s.id]={u:+lsGet('chartwerk:u:'+s.id)||0,d}});
+function localState(){const m={};SYMS.forEach(s=>{lays(s.id).forEach(l=>{const e=ek(s.id,l.id);let d=[];try{d=JSON.parse(lsGet('chartwerk:'+e)||'[]')}catch(x){}m[e]={u:+lsGet('chartwerk:u:'+e)||0,d}});m['L:'+s.id]={u:+lsGet('chartwerk:u:L:'+s.id)||0,d:lays(s.id)}});
  return{app:'chartwerk',v:2,markets:m,settings:{u:+lsGet('chartwerk:us')||0,fib,magnet,lockAll,zz:zzo}}}
 async function findGist(){for(let p=1;p<=5;p++){const a=await gh(`/gists?per_page=100&page=${p}`);const g=a.find(x=>x.files&&x.files[GF]);if(g)return g.id;if(a.length<100)break}return ''}
 async function readGist(){const g=await gh('/gists/'+gistId);const f=g.files&&g.files[GF];if(!f)return null;let t=f.content;
@@ -930,13 +983,17 @@ async function sync(){
    if(!gistId){const g=await gh('/gists',{method:'POST',body:JSON.stringify({description:'Chartwerk Abgleich',public:false,files:{[GF]:{content:JSON.stringify(localState())}}})});gistId=g.id}
    try{localStorage.setItem('chartwerk:gist',gistId)}catch(e){}}
   const R=await readGist(),L=localState(),M={};let push=!R,changed=false;
-  SYMS.forEach(s=>{const r=R&&R.markets&&R.markets[s.id],l=L.markets[s.id];
-   if(r&&Array.isArray(r.d)&&(r.u||0)>l.u){const d=r.d.filter(validD);M[s.id]={u:r.u,d};
-    try{localStorage.setItem('chartwerk:'+s.id,JSON.stringify(d));localStorage.setItem('chartwerk:u:'+s.id,r.u)}catch(e){}if(s.id===sym.id)changed=true}
-   else{M[s.id]=l;if(!r||l.u>(r.u||0))push=true}});
+  const ER=new RegExp('^(L:('+SYMS.map(s=>s.id).join('|')+')|('+SYMS.map(s=>s.id).join('|')+')(@[a-z0-9]{1,12})?)$');
+  const ks=[...new Set([...Object.keys(L.markets),...Object.keys(R&&R.markets||{})])].filter(k=>ER.test(k)).sort((a,b)=>(b.startsWith('L:')?1:0)-(a.startsWith('L:')?1:0));
+  ks.forEach(k=>{const r=R&&R.markets&&R.markets[k],l=L.markets[k]||{u:0,d:[]},isL=k.startsWith('L:');
+   if(r&&Array.isArray(r.d)&&(r.u||0)>l.u){const d=isL?cleanLays(r.d):r.d.filter(validD);M[k]={u:r.u,d};
+    try{localStorage.setItem(isL?'chartwerk:lays:'+k.slice(2):'chartwerk:'+k,JSON.stringify(d));localStorage.setItem('chartwerk:u:'+k,r.u)}catch(e){}
+    if(isL?k.slice(2)===sym.id:k===ek(sym.id,lay))changed=true}
+   else{M[k]=l;if(!r||l.u>(r.u||0))push=true}});
   let S=L.settings;const rs=R&&R.settings;
   if(rs&&(rs.u||0)>S.u){applySettings(rs);S=rs}else if(!rs||S.u>(rs.u||0))push=true;
   if(push)await gh('/gists/'+gistId,{method:'PATCH',body:JSON.stringify({files:{[GF]:{content:JSON.stringify({app:'chartwerk',v:2,markets:M,settings:S})}}})});
+  if(changed&&!lays(sym.id).some(l=>l.id===lay)){lay='';try{localStorage.setItem('chartwerk:lay:'+sym.id,'')}catch(e){}}
   if(changed&&!act){load();sel=-1;undo=[]}else if(changed)syncAgain=true;
   lastSync=Date.now();
  }catch(e){syncErr=String(e&&e.message||e).slice(0,90);if(/404/.test(syncErr)){gistId='';try{localStorage.removeItem('chartwerk:gist')}catch(_){}}}
@@ -952,7 +1009,7 @@ $('#ghoff').onclick=()=>{ghTok='';gistId='';try{localStorage.removeItem('chartwe
 document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')sync()});
 setInterval(()=>{if(document.visibilityState==='visible')sync()},45000);
 if('serviceWorker' in navigator&&location.protocol==='https:'&&!/claude/.test(location.hostname)){try{navigator.serviceWorker.register('sw.js').catch(()=>{})}catch(e){}}
-load();agg();ma20=sma(20);ma50=sma(50);zz=calcZZ();ui();ro.observe(stage);
+lay=layInit();applyLay(curLay());load();agg();ma20=sma(20);ma50=sma(50);zz=calcZZ();ui();ro.observe(stage);
 if(document.fonts)document.fonts.ready.then(draw);
 probe().then(ok=>{net=ok;if(ok)loadData(true);else ui()});
 syncUI();if(ghTok)sync();
