@@ -124,7 +124,7 @@ canvas{position:absolute;inset:0;width:100%;height:100%;touch-action:none;cursor
  <header><div class="brand">Chart<i>werk</i></div><div class="row" id="syms"></div><button class="chip" id="layb" title="Strategie-Layouts"><svg viewBox="0 0 22 22"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="12" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="12" width="7" height="7" rx="1.5"/><rect x="12" y="12" width="7" height="7" rx="1.5"/></svg><span id="laybt">Standard</span></button><button class="chip" id="fsb" title="Vollbild" aria-label="Vollbild"><svg viewBox="0 0 22 22"><path d="M3 8V3h5M14 3h5v5M19 14v5h-5M8 19H3v-5"/></svg></button></header>
  <div class="bar">
   <div class="quote"><span id="pair">BTC/USD</span><b id="last">–</b><em id="chg"></em></div>
-  <div class="row"><button class="chip src" id="src"><i></i><span>Prüfe Verbindung…</span></button><div class="row" id="tfs"></div>
+  <div class="row"><button class="chip src" id="src"><i></i><span>Prüfe Verbindung…</span></button><button class="chip" id="curb" title="Währung umschalten: Dollar / Euro">$ Dollar</button><div class="row" id="tfs"></div>
   <button class="chip" id="ma" aria-pressed="true">MA 20/50</button>
   <button class="chip" id="zzb" aria-pressed="true">Zickzack</button>
   <button class="chip" id="zzs" title="Zickzack-Einstellungen" aria-label="Zickzack-Einstellungen" style="padding:0 10px"><svg viewBox="0 0 22 22" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M3 5h9M3 11h13M3 17h9"/><circle cx="15.5" cy="5" r="2"/><circle cx="15.5" cy="17" r="2"/></svg></button>
@@ -593,7 +593,7 @@ function draw(){
    ctx.textAlign='center';ctx.textBaseline=top?'bottom':'top';const hv=HALV.filter(q=>q[0]<=t).pop(),dh=hv?Math.round((t-hv[0])/DAY):null,pt=!top?CYX.filter(q=>q[1]&&q[0]<t).pop():null;ctx.fillText(lb+(dh!=null?' · Tag '+dh:'')+(pt?' · '+Math.round((t-pt[0])/DAY)+' T. nach Hoch':''),xx,top?yy-10:yy+10);ctx.textBaseline='top'});
   ctx.textAlign='left';ctx.textBaseline='middle'}
  const LQc=showLQ&&LQS[sym.id]?LQ[sym.id]:null;
- if(LQc&&LQc.img){const xa=x(idxOfT(LQc.t0)),xb=x(idxOfT(LQc.t1)),ya=y(LQc.pHi),yb=y(LQc.pLo);ctx.save();ctx.imageSmoothingEnabled=true;
+ if(LQc&&LQc.img){const xa=x(idxOfT(LQc.t0)),xb=x(idxOfT(LQc.t1)),ya=y(LQc.pHi/fxNow()),yb=y(LQc.pLo/fxNow());ctx.save();ctx.imageSmoothingEnabled=true;
   if(xb>0&&xa<w){ctx.globalAlpha=.75;ctx.drawImage(LQc.img,0,0,LQc.N,LQc.R,xa,ya,Math.max(1,xb-xa),yb-ya)}
   if(xb<w){ctx.globalAlpha=.6;ctx.drawImage(LQc.img,LQc.N-1,0,1,LQc.R,Math.max(0,xb),ya,w-Math.max(0,xb),yb-ya)}ctx.restore()}
  if(showZN){ctx.font='11px "IBM Plex Sans",system-ui';ctx.textAlign='right';
@@ -663,7 +663,7 @@ function draw(){
 function legend(){
  const n=data.length;let i=n-1;const hp=hover||cross;if(hp&&hp[0]<pw()){const j=Math.round(idx(hp[0]));if(j>=0&&j<n)i=j}
  const b=data[i],c=b.c>=b.o?'up':'dn';
- $('#legend').innerHTML=`<span><b class="pk${pkOpen==='sym'?' on':''}" data-pk="sym">${src==='binance'&&sym.lp?sym.lp:sym.pair}<i>▾</i></b> · <b class="pk${pkOpen==='tf'?' on':''}" data-pk="tf">${tf.l}<i>▾</i></b></span><span>O <b class="${c}">${fmt(b.o)}</b> H <b class="${c}">${fmt(b.h)}</b> L <b class="${c}">${fmt(b.l)}</b> C <b class="${c}">${fmt(b.c)}</b></span>`+
+ $('#legend').innerHTML=`<span><b class="pk${pkOpen==='sym'?' on':''}" data-pk="sym">${pairName()}<i>▾</i></b> · <b class="pk${pkOpen==='tf'?' on':''}" data-pk="tf">${tf.l}<i>▾</i></b></span><span>O <b class="${c}">${fmt(b.o)}</b> H <b class="${c}">${fmt(b.h)}</b> L <b class="${c}">${fmt(b.l)}</b> C <b class="${c}">${fmt(b.c)}</b></span>`+
   (showMA?`<span class="m"><b style="color:#f2c94c">MA20</b> ${ma20[i]!=null?fmt(ma20[i]):'–'} <b style="color:#b78cff">MA50</b> ${ma50[i]!=null?fmt(ma50[i]):'–'}</span>`:'')+(showLQ&&LQS[sym.id]&&LQ[sym.id]?`<span class="m"><b style="color:#5ec962">Liquidationen</b> ${LQ[sym.id].err?'nicht erreichbar':'geschätzt, '+(sym.m?'nur Binance-Trader, ':'')+'letzte 20 Tage, Binance Futures'}</span>`:'')+(showCY&&sym.id==='BTC'&&cyState()?(()=>{const c=cyState();return`<span><b style="color:#ff9800">Zyklus</b> Tag ${c.d.toLocaleString('de-DE')} nach Halving ${c.y} · ${c.ph}</span>`})():'')+(showZZ?`<span class="m"><b style="color:${zzo.c}">Zickzack</b> ${zzo.dev.toLocaleString('de-DE')} ${zzo.depth}</span>`:'');
 }
 
@@ -689,13 +689,15 @@ function handleHit(px,py,tol){if(sel<0||drawings[sel].k==='brush'||locked(drawin
 const snap=()=>JSON.stringify(drawings);
 let lay='';
 const ek=(sid,lid)=>sid+(lid?'@'+lid:'');
+let cur='USD';try{cur=localStorage.getItem('chartwerk:cur')==='EUR'?'EUR':'USD'}catch(e){}
+const cl=lid=>lid+(cur==='EUR'?'eur':'');
 function cleanLays(a){const o=(Array.isArray(a)?a:[]).filter(l=>l&&typeof l.id==='string'&&/^[a-z0-9]{0,12}$/.test(l.id)).map(l=>({id:l.id,n:String(l.n||'Layout').slice(0,30),...(typeof l.tf==='string'?{tf:l.tf}:{}),...(l.ind&&typeof l.ind==='object'?{ind:l.ind}:{})}));
  const s=o.findIndex(l=>l.id==='');const d=s>=0?o.splice(s,1)[0]:{id:'',n:'Standard'};o.unshift(d);return o.filter((l,i)=>o.findIndex(q=>q.id===l.id)===i)}
 function lays(sid){try{return cleanLays(JSON.parse(localStorage.getItem('chartwerk:lays:'+sid)||'null'))}catch(e){return cleanLays(null)}}
 function setLays(sid,a){try{localStorage.setItem('chartwerk:lays:'+sid,JSON.stringify(cleanLays(a)));localStorage.setItem('chartwerk:u:L:'+sid,Date.now())}catch(e){}queueSync()}
-const allEntries=()=>SYMS.flatMap(s=>lays(s.id).map(l=>ek(s.id,l.id)));
+const allEntries=()=>SYMS.flatMap(s=>lays(s.id).flatMap(l=>[ek(s.id,l.id),ek(s.id,l.id+'eur')]));
 const curLay=()=>lays(sym.id).find(l=>l.id===lay)||lays(sym.id)[0];
-const key=()=>'chartwerk:'+ek(sym.id,lay);
+const key=()=>'chartwerk:'+ek(sym.id,cl(lay));
 // Abgleich pro Zeichnung: jede Zeichnung hat eine Kennung (id) und eine Änderungszeit (m);
 // gelöschte Zeichnungen werden als Grabstein (id, Zeit) gemerkt, damit sie nicht wieder auftauchen.
 function dHash(d){const s=JSON.stringify(Object.assign({},d,{id:undefined,m:undefined}));let x=2166136261;for(let i=0;i<s.length;i++){x^=s.charCodeAt(i);x=Math.imul(x,16777619)}return 'h'+(x>>>0).toString(36)}
@@ -704,7 +706,7 @@ const dStrip=d=>JSON.stringify(Object.assign({},d,{m:undefined}));
 function tombs(e){try{const a=JSON.parse(localStorage.getItem('chartwerk:x:'+e)||'[]');return Array.isArray(a)?a.filter(t=>t&&typeof t.id==='string'&&isFinite(t.t)):[]}catch(x){return[]}}
 function mergeTombs(a,b){const m=new Map();[...a,...b].forEach(t=>{if(t&&typeof t.id==='string'&&isFinite(t.t)&&(!m.has(t.id)||t.t>m.get(t.id)))m.set(t.id,t.t)});
  const lim=Date.now()-90*864e5;return[...m].filter(([,t])=>t>lim).sort((x,y)=>y[1]-x[1]).slice(0,400).map(([id,t])=>({id,t}))}
-function save(){try{const e=ek(sym.id,lay),now=Date.now();let prev=[];try{prev=withIds(JSON.parse(localStorage.getItem(key())||'[]'))}catch(x){}
+function save(){try{const e=ek(sym.id,cl(lay)),now=Date.now();let prev=[];try{prev=withIds(JSON.parse(localStorage.getItem(key())||'[]'))}catch(x){}
   const pm=new Map(prev.map(d=>[d.id,d]));
   drawings.forEach(d=>{if(!d.id)d.id=dHash(d);const q=pm.get(d.id);if(!q||dStrip(q)!==dStrip(d))d.m=now;pm.delete(d.id)});
   if(pm.size){const x=mergeTombs(tombs(e),[...pm.keys()].map(id=>({id,t:now})));localStorage.setItem('chartwerk:x:'+e,JSON.stringify(x))}
@@ -724,7 +726,7 @@ function ui(){
  $('#ma').setAttribute('aria-pressed',showMA);$('#mag').setAttribute('aria-pressed',magnet>0);$('#magbd').textContent=['','•','••'][magnet];$('#mag').title=['Magnet aus','Magnet schwach','Magnet stark'][magnet];$('#zzb').setAttribute('aria-pressed',showZZ);$('#pgb').setAttribute('aria-pressed',showPG);$('#scb').setAttribute('aria-pressed',showSC);$('#znb').setAttribute('aria-pressed',showZN);$('#trb').setAttribute('aria-pressed',showTR);$('#cyb').setAttribute('aria-pressed',showCY);$('#lqb').setAttribute('aria-pressed',showLQ);$('#lqb').style.display=LQS[sym.id]?'':'none';$('#cyb').style.display=sym.id==='BTC'?'':'none';progUI();
  $('#undo').disabled=!undo.length;$('#del').disabled=sel<0||locked(drawings[sel]);$('#lock').disabled=sel<0||lockAll;$('#lock').setAttribute('aria-pressed',sel>=0&&!!drawings[sel]?.lk);$('#lockall').setAttribute('aria-pressed',lockAll);$('#clear').disabled=!drawings.length;
  status();
- $('#pair').textContent=src==='binance'&&sym.lp?sym.lp:sym.pair;
+ $('#pair').textContent=pairName();$('#curb').textContent=cur==='EUR'?'€ Euro':'$ Dollar';$('#curb').setAttribute('aria-pressed',cur==='EUR');if(cur==='EUR')$('#ntxt').textContent+=' In Euro umgerechnet (EUR/USDT von Binance, Kurs der jeweiligen Kerze).';
  const n=data.length;if(!n){$('#last').textContent='…';$('#chg').textContent='';return}
  const L=data[n-1],r=tf.h<24?data[Math.max(0,Math.round(idxOfT(L.t-864e5)))].c:data[Math.max(0,n-2)].c,ch=L.c/r-1;
  $('#last').textContent=fmt(L.c);
@@ -737,7 +739,16 @@ function schedule(){if(raf)return;raf=requestAnimationFrame(()=>{raf=0;recalc();
 async function getJSON(u,t=8000){const c=new AbortController(),k=setTimeout(()=>c.abort(),t);try{const r=await fetch(u,{signal:c.signal});if(!r.ok)throw new Error('HTTP '+r.status);return await r.json()}finally{clearTimeout(k)}}
 async function probe(){for(const h of['https://data-api.binance.vision','https://api.binance.com']){try{await getJSON(h+'/api/v3/ping',4000);bnHost=h;return true}catch(e){}}return false}
 function stopLive(){if(ws){ws.onclose=null;try{ws.close()}catch(e){}ws=null}clearInterval(poll);poll=0}
-function merge(b){const L=data[data.length-1];if(L&&b.t===L.t)Object.assign(L,b);else if(!L||b.t>L.t){if(view.end>data.length-3)view.end++;data.push(b)}}
+let fx={k:'',t:0,T:[],C:[]};
+async function loadFx(){const k=tf.id;if(fx.k===k&&Date.now()-fx.t<15*60e3&&fx.T.length)return true;
+ try{const host=bnHost||'https://data-api.binance.vision';const[w,f]=await Promise.all([getJSON(host+'/api/v3/klines?symbol=EURUSDT&interval=1w&limit=1000'),getJSON(host+'/api/v3/klines?symbol=EURUSDT&interval='+BNI[tf.id]+'&limit=1000')]);
+  const f0=f.length?f[0][0]:Infinity,rows=[...w.filter(q=>q[0]<f0),...f].map(q=>[q[0],+q[4]]).filter(q=>q[1]>0);if(!rows.length)return false;
+  fx={k,t:Date.now(),T:rows.map(q=>q[0]),C:rows.map(q=>q[1])};return true}catch(e){return false}}
+function rateAt(t){const T=fx.T,C=fx.C;if(!T.length)return 1;if(t<=T[0])return C[0];let a=0,b=T.length-1;if(t>=T[b])return C[b];while(b-a>1){const m=(a+b)>>1;if(T[m]<=t)a=m;else b=m}return C[a]}
+const fxB=b=>{const r=rateAt(b.t);return{...b,o:b.o/r,h:b.h/r,l:b.l/r,c:b.c/r}};
+const fxNow=()=>cur==='EUR'&&fx.C.length?fx.C[fx.C.length-1]:1;
+const pairName=()=>{const q=src==='binance'&&sym.lp?sym.lp:sym.pair;return cur==='EUR'?q.replace(/USDT|USD/,'EUR'):q};
+function merge(b){if(cur==='EUR'&&fx.T.length)b=fxB(b);const L=data[data.length-1];if(L&&b.t===L.t)Object.assign(L,b);else if(!L||b.t>L.t){if(view.end>data.length-3)view.end++;data.push(b)}}
 function openWS(id){const w=new WebSocket(`wss://stream.binance.com:9443/ws/${sym.bn.toLowerCase()}@kline_${BNI[tf.id]}`);ws=w;
  w.onmessage=ev=>{if(id!==loadId)return;try{const k=JSON.parse(ev.data).k;if(!k)return;merge({t:k.t,o:+k.o,h:+k.h,l:+k.l,c:+k.c,v:+k.v});schedule()}catch(e){}};
  w.onclose=()=>{if(id===loadId)setTimeout(()=>{if(id===loadId)openWS(id)},3000)}}
@@ -765,6 +776,7 @@ async function loadData(reset){
     catch(e){if(id!==loadId)return;err='Twelve Data: '+String(e.message||e).slice(0,60);if(transient(e.message||e))retryLater();else tdNo[sym.id]=Date.now();if(sym.fb){try{if(!await loadFut(id))return}catch(f){if(!sym.bn)throw e;if(!await loadBn(id))return}}else{if(!sym.bn)throw e;if(!await loadBn(id))return}}}
    else if(sym.fb&&!sym.bn){if(!await loadFut(id))return}else if(!await loadBn(id))return}
   catch(e){if(id!==loadId)return;agg();src='sim';err=String(e.message||e).slice(0,80);if(useTd&&transient(err))retryLater()}}
+ if(cur==='EUR'&&data.length){if(!await loadFx()){if(id!==loadId)return;cur='USD';try{localStorage.setItem('chartwerk:cur','USD')}catch(e){}load();sel=-1;toast('Euro-Kurs nicht erreichbar, Anzeige in Dollar')}else{if(id!==loadId)return;data=data.map(fxB)}}
  recalc();if(reset)resetView();clampView();ui();draw();loadLQ()}
 function status(){const b=$('#src'),t=b.querySelector('span');b.className='chip src'+(src==='binance'||src==='bfut'||src==='twelve'?' live':src==='wait'||net===null?' wait':'');
  t.textContent=net===null?'Prüfe Verbindung…':src==='wait'?'Lade…':src==='bfut'?'Live · Binance Futures'+(retryP?' · Twelve gleich':''):src==='binance'?'Live · Binance'+(retryP?' · Twelve gleich':''):src==='twelve'?'Live · '+tdMin()+' Min.':err==='Schlüssel fehlt'?'Simuliert · Schlüssel fehlt':retryP?(src==='binance'?'Binance · neuer Versuch gleich':'Simuliert · neuer Versuch gleich'):'Simuliert';
@@ -799,7 +811,7 @@ let laySig='',rmArm='',rmT=0;
 function layUI(){$('#laybt').textContent=curLay().n;if(!$('#layp').classList.contains('on')){laySig='';return}
  const a=lays(sym.id),s=sym.id+'|'+lay+'|'+JSON.stringify(a.map(l=>[l.id,l.n]))+'|'+rmArm;if(s===laySig)return;laySig=s;
  $('#layh').textContent='Strategie-Layouts · '+sym.name;
- $('#layl').innerHTML=a.map(l=>{const on=l.id===lay,cnt=(()=>{try{return JSON.parse(localStorage.getItem('chartwerk:'+ek(sym.id,l.id))||'[]').length}catch(e){return 0}})();
+ $('#layl').innerHTML=a.map(l=>{const on=l.id===lay,cnt=(()=>{try{return JSON.parse(localStorage.getItem('chartwerk:'+ek(sym.id,cl(l.id)))||'[]').length}catch(e){return 0}})();
   return`<div class="obr${on?' sel':''}"><button class="ib${on?' on':''}" data-go="${l.id}" aria-label="Layout öffnen" title="Öffnen"><svg viewBox="0 0 22 22">${on?'<circle cx="11" cy="11" r="7"/><path d="M7.5 11l2.5 2.5 4.5-5"/>':'<circle cx="11" cy="11" r="7"/>'}</svg></button>`+
   `<input class="lin" data-rn="${l.id}" value="${esc(l.n)}" maxlength="30" aria-label="Name des Layouts"><span style="color:var(--mute);font-size:12px;white-space:nowrap">${cnt} Zeichn.</span>`+
   (l.id?`<button class="ib" data-rm="${l.id}" aria-label="Layout löschen" title="${rmArm===l.id?'Nochmal tippen zum Löschen':'Löschen'}" style="${rmArm===l.id?'color:#fff;background:var(--dn)':''}">${BIN}</button>`:'<span style="width:40px"></span>')+'</div>'}).join('')}
@@ -817,11 +829,13 @@ $('#legend').addEventListener('pointerdown',e=>{const b=e.target.closest('.pk');
 $('#pkm').addEventListener('click',e=>{const b=e.target.closest('button');if(!b)return;const s=b.dataset.s,t=b.dataset.t;pkClose();
  if(s&&s!==sym.id)$('#syms .chip[data-id="'+s+'"]').click();if(t&&t!==tf.id)$('#tfs .chip[data-id="'+t+'"]').click()});
 document.addEventListener('pointerdown',e=>{if(pkOpen&&!e.target.closest('#pkm,.pk'))pkClose()},true);
+$('#curb').onclick=()=>{cur=cur==='EUR'?'USD':'EUR';try{localStorage.setItem('chartwerk:cur',cur)}catch(e){}load();sel=-1;undo=[];chanP=-1;
+ toast(cur==='EUR'?'Anzeige in Euro. Zeichnungen gelten je Währung.':'Anzeige in Dollar.');loadData(false)};
 $('#layb').onclick=()=>{if(openPanel('#layp')){laySig='';layUI()}};
 $('#layok').onclick=()=>$('#layp').classList.remove('on');
 function newLay(copy){const n=($('#layn').value.trim()||'Layout '+lays(sym.id).length).slice(0,30),id=Math.random().toString(36).slice(2,10),a=lays(sym.id);
  layCapture();a.push({id,n,tf:tf.id,ind:{ma:showMA,zzb:showZZ,trb:showTR,znb:showZN,pgb:showPG,scb:showSC,cyb:showCY,lqb:showLQ}});setLays(sym.id,a);
- try{localStorage.setItem('chartwerk:'+ek(sym.id,id),copy?snap():'[]');localStorage.setItem('chartwerk:u:'+ek(sym.id,id),Date.now())}catch(e){}
+ try{localStorage.setItem('chartwerk:'+ek(sym.id,cl(id)),copy?snap():'[]');localStorage.setItem('chartwerk:u:'+ek(sym.id,cl(id)),Date.now())}catch(e){}
  $('#layn').value='';setLay(id);toast('Layout „'+n+'“ angelegt'+(copy?' (Kopie)':''))}
 $('#laynew').onclick=()=>newLay(false);$('#laycp').onclick=()=>newLay(true);
 $('#layn').addEventListener('keydown',e=>{if(e.key==='Enter')newLay(false)});
@@ -829,7 +843,7 @@ $('#layl').addEventListener('change',e=>{const t=e.target;if(t.dataset.rn===unde
 $('#layl').addEventListener('click',e=>{const g=e.target.closest('[data-go]'),r=e.target.closest('[data-rm]');
  if(g){if(g.dataset.go!==lay)setLay(g.dataset.go);return}
  if(r){const id=r.dataset.rm;if(rmArm!==id||Date.now()-rmT>3000){rmArm=id;rmT=Date.now();laySig='';layUI();toast('Nochmal tippen, um das Layout mit seinen Zeichnungen zu löschen');setTimeout(()=>{if(rmArm===id){rmArm='';laySig='';layUI()}},3000);return}
-  rmArm='';const a=lays(sym.id).filter(l=>l.id!==id);setLays(sym.id,a);try{localStorage.removeItem('chartwerk:'+ek(sym.id,id));localStorage.removeItem('chartwerk:u:'+ek(sym.id,id))}catch(x){}
+  rmArm='';const a=lays(sym.id).filter(l=>l.id!==id);setLays(sym.id,a);try{[id,id+'eur'].forEach(q=>{localStorage.removeItem('chartwerk:'+ek(sym.id,q));localStorage.removeItem('chartwerk:u:'+ek(sym.id,q))})}catch(x){}
   if(lay===id){lay='';setLay('')}else{laySig='';ui()}toast('Layout gelöscht')}});
 $('#tfs').onclick=e=>{const b=e.target.closest('.chip');if(!b)return;tf=TFS.find(t=>t.id===b.dataset.id);loadData(true)};
 $('#ma').onclick=()=>{showMA=!showMA;ui();draw()};
@@ -898,7 +912,7 @@ $('#freset').onclick=()=>setOpt(o=>{const src=ftarget()?fib:FIBDEF;Object.keys(o
 $('#vis').onclick=()=>{hidden=!hidden;if(hidden)sel=-1;try{localStorage.setItem('chartwerk:hide',hidden?'1':'0')}catch(e){}ui();draw();toast(hidden?'Zeichnungen ausgeblendet':'Zeichnungen eingeblendet')};
 /* Backup */
 const KINDS=['trend','ray','ext','chan','info','hline','goal','rect','fib','fan','brush'];
-function allDrawings(){const o={};allEntries().forEach(e=>{try{o[e]=JSON.parse(localStorage.getItem('chartwerk:'+e)||'[]')}catch(x){o[e]=[]}});o[ek(sym.id,lay)]=drawings;return o}
+function allDrawings(){const o={};allEntries().forEach(e=>{try{o[e]=JSON.parse(localStorage.getItem('chartwerk:'+e)||'[]')}catch(x){o[e]=[]}});o[ek(sym.id,cl(lay))]=drawings;return o}
 function backupText(){return JSON.stringify({app:'chartwerk',v:1,date:new Date().toISOString(),drawings:allDrawings(),lays:Object.fromEntries(SYMS.map(s=>[s.id,lays(s.id)])),fib,magnet,lockAll})}
 const bkmsg=t=>{$('#bkmsg').textContent=t};
 function bkInfo(){const a=allDrawings(),n=Object.values(a).reduce((s,x)=>s+x.length,0),m=Object.values(a).filter(x=>x.length).length;$('#bkinfo').textContent=`${n} Zeichnung${n===1?'':'en'} in ${m} ${m===1?'Markt':'Märkten'}`}
@@ -1060,7 +1074,7 @@ async function gh(path,opt={}){const r=await fetch(GH+path,{cache:'no-store',...
   if(r.status===429||rem==='0'||ra||/rate limit|abuse/i.test(msg)){const s=ra||(rs?Math.max(60,rs-Date.now()/1000):300);ghPause=Date.now()+s*1000;throw new Error('GitHub-Limit erreicht, neuer Versuch in '+Math.ceil(s/60)+' Min.')}
   throw new Error('Kein Zugriff auf Gists'+(msg?' („'+msg.slice(0,60)+'“)':'')+'. Prüfe die Berechtigung „gist“.')}if(r.status===404)throw new Error('nicht gefunden (404)');
  if(!r.ok)throw new Error('GitHub-Fehler '+r.status);return r.json()}
-function localState(){const m={};SYMS.forEach(s=>{lays(s.id).forEach(l=>{const e=ek(s.id,l.id);let d=[];try{d=JSON.parse(lsGet('chartwerk:'+e)||'[]')}catch(x){}m[e]={u:+lsGet('chartwerk:u:'+e)||0,d,x:tombs(e)}});m['L:'+s.id]={u:+lsGet('chartwerk:u:L:'+s.id)||0,d:lays(s.id)}});
+function localState(){const m={};SYMS.forEach(s=>{lays(s.id).flatMap(l=>[l.id,l.id+'eur']).forEach(lid=>{const e=ek(s.id,lid);let d=[];try{d=JSON.parse(lsGet('chartwerk:'+e)||'[]')}catch(x){}m[e]={u:+lsGet('chartwerk:u:'+e)||0,d,x:tombs(e)}});m['L:'+s.id]={u:+lsGet('chartwerk:u:L:'+s.id)||0,d:lays(s.id)}});
  return{app:'chartwerk',v:2,markets:m,settings:{u:+lsGet('chartwerk:us')||0,fib,magnet,lockAll,zz:zzo}}}
 // Alle Gists mit der Abgleich-Datei, älteste zuerst. Alle Geräte nehmen so immer dasselbe (das älteste) Gist,
 // auch wenn früher versehentlich mehrere angelegt wurden.
@@ -1097,12 +1111,12 @@ async function sync(){
     const out=[...new Set(order)].map(id=>best.get(id)).filter(d=>d&&!(dead.has(d.id)&&dead.get(d.id)>=(d.m||0)));
     const u=Math.max(l.u||0,(r&&r.u)||0),js=JSON.stringify(out);
     if(js!==JSON.stringify(l.d)||JSON.stringify(X)!==JSON.stringify(lx)){try{localStorage.setItem('chartwerk:'+k,js);localStorage.setItem('chartwerk:x:'+k,JSON.stringify(X));localStorage.setItem('chartwerk:u:'+k,u)}catch(e){}
-     if(js!==JSON.stringify(l.d)&&k===ek(sym.id,lay))changed=true}
+     if(js!==JSON.stringify(l.d)&&k===ek(sym.id,cl(lay)))changed=true}
     if(!r||js!==JSON.stringify(rd)||JSON.stringify(X)!==JSON.stringify(rx))push=true;
     M[k]={u,d:out,x:X};return}
    if(r&&Array.isArray(r.d)&&(r.u||0)>l.u){const d=isL?cleanLays(r.d):r.d.filter(validD);M[k]={u:r.u,d};
     try{localStorage.setItem(isL?'chartwerk:lays:'+k.slice(2):'chartwerk:'+k,JSON.stringify(d));localStorage.setItem('chartwerk:u:'+k,r.u)}catch(e){}
-    if(isL?k.slice(2)===sym.id:k===ek(sym.id,lay))changed=true}
+    if(isL?k.slice(2)===sym.id:k===ek(sym.id,cl(lay)))changed=true}
    else{M[k]=l;if(!r||l.u>(r.u||0))push=true}});
   let S=L.settings;const rs=R&&R.settings;
   if(rs&&(rs.u||0)>S.u){applySettings(rs);S=rs}else if(!rs||S.u>(rs.u||0))push=true;
