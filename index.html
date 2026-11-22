@@ -1049,8 +1049,12 @@ let ghTok='',gistId='',syncT=0,syncing=false,syncAgain=false,lastSync=0,syncErr=
 try{ghTok=localStorage.getItem('chartwerk:gh')||'';gistId=localStorage.getItem('chartwerk:gist')||''}catch(e){}
 const lsGet=k=>{try{return localStorage.getItem(k)}catch(e){return null}};
 function lsSet(k,v){try{localStorage.setItem(k,v);localStorage.setItem('chartwerk:us',Date.now())}catch(e){}queueSync()}
+let ghPause=0;
 async function gh(path,opt={}){const r=await fetch(GH+path,{cache:'no-store',...opt,headers:{Authorization:'Bearer '+ghTok,Accept:'application/vnd.github+json',...(opt.body?{'Content-Type':'application/json'}:{})}});
- if(r.status===401)throw new Error('Schlüssel ungültig oder abgelaufen');if(r.status===403)throw new Error('Schlüssel hat keine Gist-Berechtigung');if(r.status===404)throw new Error('nicht gefunden (404)');
+ if(r.status===401)throw new Error('Schlüssel ungültig oder abgelaufen');
+ if(r.status===403||r.status===429){let j={};try{j=await r.json()}catch(e){}const msg=String(j.message||''),rem=r.headers.get('x-ratelimit-remaining'),rs=+r.headers.get('x-ratelimit-reset')||0,ra=+r.headers.get('retry-after')||0;
+  if(r.status===429||rem==='0'||ra||/rate limit|abuse/i.test(msg)){const s=ra||(rs?Math.max(60,rs-Date.now()/1000):300);ghPause=Date.now()+s*1000;throw new Error('GitHub-Limit erreicht, neuer Versuch in '+Math.ceil(s/60)+' Min.')}
+  throw new Error('Kein Zugriff auf Gists'+(msg?' („'+msg.slice(0,60)+'“)':'')+'. Prüfe die Berechtigung „gist“.')}if(r.status===404)throw new Error('nicht gefunden (404)');
  if(!r.ok)throw new Error('GitHub-Fehler '+r.status);return r.json()}
 function localState(){const m={};SYMS.forEach(s=>{lays(s.id).forEach(l=>{const e=ek(s.id,l.id);let d=[];try{d=JSON.parse(lsGet('chartwerk:'+e)||'[]')}catch(x){}m[e]={u:+lsGet('chartwerk:u:'+e)||0,d,x:tombs(e)}});m['L:'+s.id]={u:+lsGet('chartwerk:u:L:'+s.id)||0,d:lays(s.id)}});
  return{app:'chartwerk',v:2,markets:m,settings:{u:+lsGet('chartwerk:us')||0,fib,magnet,lockAll,zz:zzo}}}
@@ -1070,7 +1074,8 @@ function applySettings(rs){try{if(rs.fib&&Array.isArray(rs.fib.on)){fib=Object.a
  lockAll=!!rs.lockAll;localStorage.setItem('chartwerk:lockall',lockAll?'1':'0');
  if(rs.zz&&isFinite(rs.zz.dev)){zzo=Object.assign(JSON.parse(JSON.stringify(ZZDEF)),rs.zz);localStorage.setItem('chartwerk:zz',JSON.stringify(zzo));zz=calcZZ()}localStorage.setItem('chartwerk:us',rs.u||0)}catch(e){}}
 async function sync(){
- if(!ghTok)return;if(syncing){syncAgain=true;return}syncing=true;syncErr='';syncUI();
+ if(!ghTok)return;if(Date.now()<ghPause){syncErr='GitHub-Limit erreicht, neuer Versuch in '+Math.ceil((ghPause-Date.now())/60000)+' Min.';syncUI();return}
+ if(syncing){syncAgain=true;return}syncing=true;syncErr='';syncUI();
  try{
   const ids=await findGists();
   if(ids.length){if(gistId!==ids[0]){gistId=ids[0];try{localStorage.setItem('chartwerk:gist',gistId)}catch(e){}}}
@@ -1103,7 +1108,7 @@ async function sync(){
   if(changed&&!lays(sym.id).some(l=>l.id===lay)){lay='';try{localStorage.setItem('chartwerk:lay:'+sym.id,'')}catch(e){}}
   if(changed&&!act){load();sel=-1;undo=[]}else if(changed)syncAgain=true;
   lastSync=Date.now();
- }catch(e){syncErr=String(e&&e.message||e).slice(0,90);if(/404/.test(syncErr)){gistId='';try{localStorage.removeItem('chartwerk:gist')}catch(_){}}}
+ }catch(e){syncErr=String(e&&e.message||e).slice(0,140);if(/404/.test(syncErr)){gistId='';try{localStorage.removeItem('chartwerk:gist')}catch(_){}}}
  syncing=false;ui();draw();syncUI();if(syncAgain){syncAgain=false;queueSync()}}
 function queueSync(){if(!ghTok)return;clearTimeout(syncT);syncT=setTimeout(sync,1500)}
 function syncUI(){const t=lastSync?new Date(lastSync).toLocaleTimeString('de-DE',{hour:'2-digit',minute:'2-digit'}):'';
