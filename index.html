@@ -688,7 +688,7 @@ function merge(b){const L=data[data.length-1];if(L&&b.t===L.t)Object.assign(L,b)
 function openWS(id){const w=new WebSocket(`wss://stream.binance.com:9443/ws/${sym.bn.toLowerCase()}@kline_${BNI[tf.id]}`);ws=w;
  w.onmessage=ev=>{if(id!==loadId)return;try{const k=JSON.parse(ev.data).k;if(!k)return;merge({t:k.t,o:+k.o,h:+k.h,l:+k.l,c:+k.c,v:+k.v});schedule()}catch(e){}};
  w.onclose=()=>{if(id===loadId)setTimeout(()=>{if(id===loadId)openWS(id)},3000)}}
-const tdMin=()=>({'1h':3,'4h':5,'1D':10}[tf.id]||15);
+const tdMin=()=>15;
 function mktOpen(){const d=new Date(),w=d.getUTCDay(),hh=d.getUTCHours();return!(w===6||(w===5&&hh>=22)||(w===0&&hh<22))}
 async function tdFetch(n){const j=await getJSON(`https://api.twelvedata.com/time_series?symbol=${encodeURIComponent(sym.td)}&interval=${TDI[tf.id]}&outputsize=${n}&timezone=UTC&apikey=${encodeURIComponent(tdKey)}`);
  if(j.status!=='ok'||!j.values)throw new Error(j.message||'Twelve Data Fehler');
