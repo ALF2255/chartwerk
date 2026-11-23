@@ -107,6 +107,9 @@ canvas{position:absolute;inset:0;width:100%;height:100%;touch-action:none;cursor
 #pkm{position:absolute;z-index:6;background:#182027;border:1px solid #2f3a43;border-radius:12px;padding:6px;display:none;flex-direction:column;gap:3px;box-shadow:0 14px 40px #000a;min-width:170px;max-height:calc(100% - 20px);overflow:auto}
 #pkm.on{display:flex}#pkm button{appearance:none;text-align:left;min-height:44px;padding:0 14px;border:0;border-radius:8px;background:transparent;color:var(--ink);font:inherit;font-size:15px;cursor:pointer}
 #pkm button:hover{background:#232c33}#pkm button[aria-pressed=true]{background:var(--acc);color:#fff}#pkm small{color:var(--mute);font-size:12px;margin-left:8px}#pkm button[aria-pressed=true] small{color:#dfe8ff}
+.emb{position:absolute;left:12px;bottom:34px;width:236px;background:rgba(20,26,30,.92);border:1px solid #2a343c;border-radius:10px;padding:9px 12px;font-size:12px;pointer-events:none;z-index:3}
+.emb[hidden]{display:none}.emb b.up,.legend b.up{color:var(--up)}.emb b.dn,.legend b.dn{color:var(--dn)}.emb .pgk{padding:2px 0}.emb h3{margin:0 0 6px;font-size:13px;font-weight:600;display:flex;justify-content:space-between;gap:8px}.emb h3 span{font-weight:500}
+@media(max-width:700px){.emb{bottom:30px;left:8px;width:200px;padding:7px 9px}}
 :focus-visible{outline:2px solid var(--acc);outline-offset:2px}
 @media(max-width:700px){
  .app{grid-template-columns:minmax(0,1fr);grid-template-areas:"h" "b" "s" "t" "n"}
@@ -126,6 +129,7 @@ canvas{position:absolute;inset:0;width:100%;height:100%;touch-action:none;cursor
   <div class="quote"><span id="pair">BTC/USD</span><b id="last">–</b><em id="chg"></em></div>
   <div class="row"><button class="chip src" id="src"><i></i><span>Prüfe Verbindung…</span></button><button class="chip" id="curb" title="Währung umschalten: Dollar / Euro">$ Dollar</button><div class="row" id="tfs"></div>
   <button class="chip" id="ma" aria-pressed="true">MA 20/50</button>
+  <button class="chip" id="emb" aria-pressed="true" title="EMA 12 mit Long-/Short-Signal und Check">EMA 12</button>
   <button class="chip" id="zzb" aria-pressed="true">Zickzack</button>
   <button class="chip" id="zzs" title="Zickzack-Einstellungen" aria-label="Zickzack-Einstellungen" style="padding:0 10px"><svg viewBox="0 0 22 22" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M3 5h9M3 11h13M3 17h9"/><circle cx="15.5" cy="5" r="2"/><circle cx="15.5" cy="17" r="2"/></svg></button>
   <button class="chip" id="lqb" aria-pressed="true" title="Geschätzte Liquidations-Heatmap (Binance Futures)">Liquidationen</button>
@@ -166,6 +170,7 @@ canvas{position:absolute;inset:0;width:100%;height:100%;touch-action:none;cursor
   <button class="tb" id="clear" title="Alle Zeichnungen löschen" aria-label="Alle Zeichnungen löschen"><svg viewBox="0 0 22 22"><rect x="3" y="3" width="16" height="16" rx="2.5"/><path d="M8 8l6 6M14 8l-6 6"/></svg></button>
  </nav>
  <main class="stage" id="stage"><canvas id="cv"></canvas><button id="fsx" title="Vollbild beenden" aria-label="Vollbild beenden"><svg viewBox="0 0 22 22"><path d="M8 3v5H3M19 8h-5V3M14 19v-5h5M3 14h5v5"/></svg></button><div class="legend" id="legend"></div><div id="pkm" role="menu"></div><div class="toast" id="toast"></div>
+ <div class="emb" id="embx" hidden></div>
  <div class="pg" id="pg" hidden>
   <div class="pgh"><b>Prognose</b><span id="pgt"></span></div>
   <div class="pgr"><div><span>Höher</span><b class="up" id="pgu">–</b></div><div><span>Tiefer</span><b class="dn" id="pgd">–</b></div></div>
@@ -617,6 +622,11 @@ function draw(){
  for(let i=i0;i<=i1;i++){const b=data[i],u=b.c>=b.o,xx=Math.round(x(i))+.5,col=u?UP:DN;
   ctx.strokeStyle=ctx.fillStyle=col;seg(xx,y(b.h),xx,y(b.l));
   const yo=y(b.o),yc=y(b.c);ctx.fillRect(xx-cw/2,Math.min(yo,yc),cw,Math.max(1,Math.abs(yc-yo)))}
+ if(showEMA&&ema12.length===n){ctx.strokeStyle='#00e5ff';ctx.lineWidth=1.6;ctx.beginPath();let s=0;
+  for(let i=Math.max(0,i0-1);i<=Math.min(n-1,i1+1);i++){if(ema12[i]==null)continue;s++?ctx.lineTo(x(i),y(ema12[i])):ctx.moveTo(x(i),y(ema12[i]))}ctx.stroke();
+  for(let i=Math.max(13,i0);i<=Math.min(n-1,i1);i++){const up=data[i].c>ema12[i],pu=data[i-1].c>ema12[i-1];if(up===pu)continue;const xx=x(i),b=data[i],yy=up?y(b.l)+7:y(b.h)-7,sz=Math.max(4,Math.min(7,view.bw*.6));
+   ctx.fillStyle=up?UP:DN;ctx.beginPath();if(up){ctx.moveTo(xx,yy);ctx.lineTo(xx-sz,yy+sz*1.5);ctx.lineTo(xx+sz,yy+sz*1.5)}else{ctx.moveTo(xx,yy);ctx.lineTo(xx-sz,yy-sz*1.5);ctx.lineTo(xx+sz,yy-sz*1.5)}ctx.fill();
+   if(view.bw>=5){ctx.font='10px "IBM Plex Sans",system-ui';ctx.textAlign='center';ctx.textBaseline=up?'top':'bottom';ctx.fillText(up?'L':'S',xx,up?yy+sz*1.5+2:yy-sz*1.5-2);ctx.textAlign='left'}}}
  if(showMA)[[ma20,'#f2c94c'],[ma50,'#b78cff']].forEach(([a,c])=>{ctx.strokeStyle=c;ctx.lineWidth=1.4;ctx.beginPath();let s=0;
   for(let i=Math.max(0,i0-1);i<=Math.min(n-1,i1+1);i++){if(a[i]==null)continue;s++?ctx.lineTo(x(i),y(a[i])):ctx.moveTo(x(i),y(a[i]))}ctx.stroke()});
  const L=data[n-1],ly=Math.round(y(L.c))+.5,lc=L.c>=L.o?UP:DN;ctx.setLineDash([2,3]);ctx.strokeStyle=lc;ctx.lineWidth=1;seg(0,ly,w,ly);ctx.setLineDash([]);
@@ -666,7 +676,7 @@ function legend(){
  const n=data.length;let i=n-1;const hp=hover||cross;if(hp&&hp[0]<pw()){const j=Math.round(idx(hp[0]));if(j>=0&&j<n)i=j}
  const b=data[i],c=b.c>=b.o?'up':'dn';
  $('#legend').innerHTML=`<span><b class="pk${pkOpen==='sym'?' on':''}" data-pk="sym">${pairName()}<i>▾</i></b> · <b class="pk${pkOpen==='tf'?' on':''}" data-pk="tf">${tf.l}<i>▾</i></b></span><span>O <b class="${c}">${fmt(b.o)}</b> H <b class="${c}">${fmt(b.h)}</b> L <b class="${c}">${fmt(b.l)}</b> C <b class="${c}">${fmt(b.c)}</b></span>`+
-  (showMA?`<span class="m"><b style="color:#f2c94c">MA20</b> ${ma20[i]!=null?fmt(ma20[i]):'–'} <b style="color:#b78cff">MA50</b> ${ma50[i]!=null?fmt(ma50[i]):'–'}</span>`:'')+(showLQ&&LQS[sym.id]&&LQ[sym.id]?`<span class="m"><b style="color:#5ec962">Liquidationen</b> ${LQ[sym.id].err?'nicht erreichbar':'geschätzt, '+(sym.m?'nur Binance-Trader, ':'')+'letzte 20 Tage, Binance Futures'}</span>`:'')+(showCY&&sym.id==='BTC'&&cyState()?(()=>{const c=cyState();return`<span><b style="color:#ff9800">Zyklus</b> Tag ${c.d.toLocaleString('de-DE')} nach Halving ${c.y} · ${c.ph}</span>`})():'')+(showZZ?`<span class="m"><b style="color:${zzo.c}">Zickzack</b> ${zzo.dev.toLocaleString('de-DE')} ${zzo.depth}</span>`:'');
+  (showEMA&&ema12[i]!=null?`<span><b style="color:#00e5ff">EMA12</b> ${fmt(ema12[i])} <b class="${b.c>ema12[i]?'up':'dn'}">${b.c>ema12[i]?'Long':'Short'}</b></span>`:'')+(showMA?`<span class="m"><b style="color:#f2c94c">MA20</b> ${ma20[i]!=null?fmt(ma20[i]):'–'} <b style="color:#b78cff">MA50</b> ${ma50[i]!=null?fmt(ma50[i]):'–'}</span>`:'')+(showLQ&&LQS[sym.id]&&LQ[sym.id]?`<span class="m"><b style="color:#5ec962">Liquidationen</b> ${LQ[sym.id].err?'nicht erreichbar':'geschätzt, '+(sym.m?'nur Binance-Trader, ':'')+'letzte 20 Tage, Binance Futures'}</span>`:'')+(showCY&&sym.id==='BTC'&&cyState()?(()=>{const c=cyState();return`<span><b style="color:#ff9800">Zyklus</b> Tag ${c.d.toLocaleString('de-DE')} nach Halving ${c.y} · ${c.ph}</span>`})():'')+(showZZ?`<span class="m"><b style="color:${zzo.c}">Zickzack</b> ${zzo.dev.toLocaleString('de-DE')} ${zzo.depth}</span>`:'');
 }
 
 function distSeg(px,py,ax,ay,bx,by){const dx=bx-ax,dy=by-ay,l=dx*dx+dy*dy;let t=l?((px-ax)*dx+(py-ay)*dy)/l:0;t=Math.max(0,Math.min(1,t));return Math.hypot(px-ax-t*dx,py-ay-t*dy)}
@@ -726,7 +736,7 @@ function ui(){
  penUI();
  $('#vis').setAttribute('aria-pressed',hidden);$('#vis').innerHTML='<svg viewBox="0 0 22 22"><path d="M2 11s3.5-6 9-6 9 6 9 6-3.5 6-9 6-9-6-9-6z"/><circle cx="11" cy="11" r="2.5"/>'+(hidden?'<path d="M4 3l14 16"/>':'')+'</svg>';$('#vis').title=hidden?'Zeichnungen einblenden':'Zeichnungen ausblenden';
  if($('#fibp').classList.contains('on'))fibUI();if($('#chp').classList.contains('on'))chUI();obUI();layUI();if($('#fnp').classList.contains('on'))fnUI();
- $('#ma').setAttribute('aria-pressed',showMA);$('#mag').setAttribute('aria-pressed',magnet>0);$('#magbd').textContent=['','•','••'][magnet];$('#mag').title=['Magnet aus','Magnet schwach','Magnet stark'][magnet];$('#zzb').setAttribute('aria-pressed',showZZ);$('#pgb').setAttribute('aria-pressed',showPG);$('#scb').setAttribute('aria-pressed',showSC);$('#znb').setAttribute('aria-pressed',showZN);$('#trb').setAttribute('aria-pressed',showTR);$('#cyb').setAttribute('aria-pressed',showCY);$('#lqb').setAttribute('aria-pressed',showLQ);$('#lqb').style.display=LQS[sym.id]?'':'none';$('#cyb').style.display=sym.id==='BTC'?'':'none';progUI();
+ $('#ma').setAttribute('aria-pressed',showMA);$('#emb').setAttribute('aria-pressed',showEMA);emaUI();$('#mag').setAttribute('aria-pressed',magnet>0);$('#magbd').textContent=['','•','••'][magnet];$('#mag').title=['Magnet aus','Magnet schwach','Magnet stark'][magnet];$('#zzb').setAttribute('aria-pressed',showZZ);$('#pgb').setAttribute('aria-pressed',showPG);$('#scb').setAttribute('aria-pressed',showSC);$('#znb').setAttribute('aria-pressed',showZN);$('#trb').setAttribute('aria-pressed',showTR);$('#cyb').setAttribute('aria-pressed',showCY);$('#lqb').setAttribute('aria-pressed',showLQ);$('#lqb').style.display=LQS[sym.id]?'':'none';$('#cyb').style.display=sym.id==='BTC'?'':'none';progUI();
  $('#undo').disabled=!undo.length;$('#del').disabled=sel<0||locked(drawings[sel]);$('#lock').disabled=sel<0||lockAll;$('#lock').setAttribute('aria-pressed',sel>=0&&!!drawings[sel]?.lk);$('#lockall').setAttribute('aria-pressed',lockAll);$('#clear').disabled=!drawings.length;
  status();
  $('#pair').textContent=pairName();$('#curb').textContent=cur==='EUR'?'€ Euro':'$ Dollar';$('#curb').setAttribute('aria-pressed',cur==='EUR');$('#curb').style.display=sym.id==='EUR'?'none':'';if(curE()==='EUR')$('#ntxt').textContent+=' In Euro umgerechnet (EUR/USDT von Binance, Kurs der jeweiligen Kerze).';
@@ -737,7 +747,15 @@ function ui(){
  cv.style.cursor=tool==='cursor'?'default':'crosshair';
 }
 function setTool(t,quiet){tool=t;if(t!=='cross')cross=null;if(t!=='cursor')sel=-1;ui();draw();if(!quiet)toast(HINTS[t])}
-function recalc(){ma20=sma(20);ma50=sma(50);zz=calcZZ()}
+let showEMA=true,ema12=[],EB=null;try{showEMA=localStorage.getItem('chartwerk:ema')!=='0'}catch(e){}
+function ema(n){const o=[],k=2/(n+1);let e=null,s=0;data.forEach((b,i)=>{if(i<n-1){s+=b.c;o.push(null);return}if(e==null){s+=b.c;e=s/n}else e=b.c*k+e*(1-k);o.push(e)});return o}
+function emaBT(){const n=data.length,E=ema12,fee=.001;if(n<40)return null;const st=12,last=n-2;
+ let eq=1,eqL=1,peak=1,dd=0,pos=0,trades=0,wins=0,tEq=1,flips=[],lastFlip=-1;
+ for(let i=st;i<=last;i++){const p=data[i].c>E[i]?1:-1;
+  if(p!==pos){if(pos!==0){trades++;if(eq/tEq>1)wins++}eq*=1-fee*(pos===0?1:2);if(p===1)eqL*=1-fee;else if(pos===1)eqL*=1-fee;tEq=eq;pos=p;flips.push(i);lastFlip=i}
+  if(i<last){const r=data[i+1].c/data[i].c-1;eq*=1+pos*r;if(pos===1)eqL*=1+r;peak=Math.max(peak,eq);dd=Math.min(dd,eq/peak-1)}}
+ const hold=data[last].c/data[st].c-1;return{n:last-st,trades,wins,res:eq-1,resL:eqL-1,hold,dd,pos,since:last-lastFlip,flips}}
+function recalc(){ma20=sma(20);ma50=sma(50);zz=calcZZ();ema12=ema(12);EB=emaBT()}
 function schedule(){if(raf)return;raf=requestAnimationFrame(()=>{raf=0;recalc();ui();draw()})}
 async function getJSON(u,t=8000){const c=new AbortController(),k=setTimeout(()=>c.abort(),t);try{const r=await fetch(u,{signal:c.signal});if(!r.ok)throw new Error('HTTP '+r.status);return await r.json()}finally{clearTimeout(k)}}
 async function probe(){for(const h of['https://data-api.binance.vision','https://api.binance.com']){try{await getJSON(h+'/api/v3/ping',4000);bnHost=h;return true}catch(e){}}return false}
@@ -800,10 +818,10 @@ const LWS=[1,1.6,2.4,3.4];
 $('#pal').innerHTML=PAL.map(c=>`<button data-c="${c}" style="--c:${c}" aria-label="Farbe ${c}"></button>`).join('');
 $('#lss').innerHTML=['solid','dash','dot'].map(k=>`<button data-ls="${k}" aria-label="${{solid:'Durchgezogen',dash:'Gestrichelt',dot:'Gepunktet'}[k]}" title="${{solid:'Durchgezogen',dash:'Gestrichelt',dot:'Gepunktet'}[k]}">${LSI[k]}</button>`).join('');
 $('#lws').innerHTML=LWS.map((w,i)=>`<button data-lw="${w}" aria-label="Stärke ${i+1}" title="Stärke ${i+1}"><svg viewBox="0 0 30 12"><path d="M2 6h26" stroke="currentColor" stroke-width="${w*1.2}"/></svg></button>`).join('');
-function layCapture(){const a=lays(sym.id),L=a.find(l=>l.id===lay);if(!L)return;const nw={tf:tf.id,ind:{ma:showMA,zzb:showZZ,trb:showTR,znb:showZN,pgb:showPG,scb:showSC,cyb:showCY,lqb:showLQ}};
+function layCapture(){const a=lays(sym.id),L=a.find(l=>l.id===lay);if(!L)return;const nw={tf:tf.id,ind:{ma:showMA,zzb:showZZ,trb:showTR,znb:showZN,pgb:showPG,scb:showSC,cyb:showCY,lqb:showLQ,emb:showEMA}};
  if(L.tf===nw.tf&&JSON.stringify(L.ind)===JSON.stringify(nw.ind))return;Object.assign(L,nw);setLays(sym.id,a)}
-function applyLay(L){const i=L&&L.ind;if(i){if('ma'in i)showMA=!!i.ma;if('zzb'in i)showZZ=!!i.zzb;if('trb'in i)showTR=!!i.trb;if('znb'in i)showZN=!!i.znb;if('pgb'in i)showPG=!!i.pgb;if('scb'in i)showSC=!!i.scb;if('cyb'in i)showCY=!!i.cyb;if('lqb'in i)showLQ=!!i.lqb;
-  try{localStorage.setItem('chartwerk:tr',showTR?'1':'0');localStorage.setItem('chartwerk:zn',showZN?'1':'0');localStorage.setItem('chartwerk:pg',showPG?'1':'0');localStorage.setItem('chartwerk:sc',showSC?'1':'0');localStorage.setItem('chartwerk:cy',showCY?'1':'0');localStorage.setItem('chartwerk:lq',showLQ?'1':'0')}catch(e){}}
+function applyLay(L){const i=L&&L.ind;if(i){if('ma'in i)showMA=!!i.ma;if('zzb'in i)showZZ=!!i.zzb;if('trb'in i)showTR=!!i.trb;if('znb'in i)showZN=!!i.znb;if('pgb'in i)showPG=!!i.pgb;if('scb'in i)showSC=!!i.scb;if('cyb'in i)showCY=!!i.cyb;if('lqb'in i)showLQ=!!i.lqb;if('emb'in i)showEMA=!!i.emb;
+  try{localStorage.setItem('chartwerk:tr',showTR?'1':'0');localStorage.setItem('chartwerk:zn',showZN?'1':'0');localStorage.setItem('chartwerk:pg',showPG?'1':'0');localStorage.setItem('chartwerk:sc',showSC?'1':'0');localStorage.setItem('chartwerk:cy',showCY?'1':'0');localStorage.setItem('chartwerk:lq',showLQ?'1':'0');localStorage.setItem('chartwerk:ema',showEMA?'1':'0')}catch(e){}}
  const t=L&&L.tf&&TFS.find(x=>x.id===L.tf);if(t&&t!==tf){tf=t;return true}return false}
 function layInit(){let l='';try{l=localStorage.getItem('chartwerk:lay:'+sym.id)||''}catch(e){}return lays(sym.id).some(q=>q.id===l)?l:''}
 function setLay(lid){layCapture();lay=lid;try{localStorage.setItem('chartwerk:lay:'+sym.id,lid)}catch(e){}const tch=applyLay(curLay());load();sel=-1;undo=[];chanP=-1;if(tch)loadData(true);else{ui();draw()}}
@@ -837,7 +855,7 @@ $('#curb').onclick=()=>{cur=cur==='EUR'?'USD':'EUR';try{localStorage.setItem('ch
 $('#layb').onclick=()=>{if(openPanel('#layp')){laySig='';layUI()}};
 $('#layok').onclick=()=>$('#layp').classList.remove('on');
 function newLay(copy){const n=($('#layn').value.trim()||'Layout '+lays(sym.id).length).slice(0,30),id=Math.random().toString(36).slice(2,10),a=lays(sym.id);
- layCapture();a.push({id,n,tf:tf.id,ind:{ma:showMA,zzb:showZZ,trb:showTR,znb:showZN,pgb:showPG,scb:showSC,cyb:showCY,lqb:showLQ}});setLays(sym.id,a);
+ layCapture();a.push({id,n,tf:tf.id,ind:{ma:showMA,zzb:showZZ,trb:showTR,znb:showZN,pgb:showPG,scb:showSC,cyb:showCY,lqb:showLQ,emb:showEMA}});setLays(sym.id,a);
  try{localStorage.setItem('chartwerk:'+ek(sym.id,cl(id)),copy?snap():'[]');localStorage.setItem('chartwerk:u:'+ek(sym.id,cl(id)),Date.now())}catch(e){}
  $('#layn').value='';setLay(id);toast('Layout „'+n+'“ angelegt'+(copy?' (Kopie)':''))}
 $('#laynew').onclick=()=>newLay(false);$('#laycp').onclick=()=>newLay(true);
@@ -851,6 +869,17 @@ $('#layl').addEventListener('click',e=>{const g=e.target.closest('[data-go]'),r=
 $('#tfs').onclick=e=>{const b=e.target.closest('.chip');if(!b)return;tf=TFS.find(t=>t.id===b.dataset.id);loadData(true)};
 $('#ma').onclick=()=>{showMA=!showMA;ui();draw()};
 $('#zzb').onclick=()=>{showZZ=!showZZ;ui();draw()};
+function emaUI(){const el=$('#embx');if(!showEMA||!EB){el.hidden=true;return}el.hidden=false;const B=EB,pc=v=>(v>=0?'+':'−')+Math.abs(v*100).toLocaleString('de-DE',{maximumFractionDigits:Math.abs(v)<.1?1:0})+' %',cl=v=>v>=0?'up':'dn';
+ const L=data[data.length-1],now=ema12[data.length-1]!=null?(L.c>ema12[data.length-1]?1:-1):B.pos;
+ el.innerHTML=`<h3>EMA 12 · Check<span class="${now>0?'up':'dn'}">${now>0?'▲ Long':'▼ Short'}</span></h3>`+
+ `<div class="pgk"><span>Signal seit</span><b>${B.since} ${B.since===1?'Kerze':'Kerzen'}${now!==B.pos?' (kippt gerade)':''}</b></div>`+
+ `<div class="pgk"><span>Trades · Treffer</span><b>${B.trades} · ${B.trades?Math.round(B.wins/B.trades*100):0} %</b></div>`+
+ `<div class="pgk"><span>Long + Short</span><b class="${cl(B.res)}">${pc(B.res)}</b></div>`+
+ `<div class="pgk"><span>Nur Long</span><b class="${cl(B.resL)}">${pc(B.resL)}</b></div>`+
+ `<div class="pgk"><span>Einfach halten</span><b class="${cl(B.hold)}">${pc(B.hold)}</b></div>`+
+ `<div class="pgk"><span>Größter Rückgang</span><b class="dn">${pc(B.dd)}</b></div>`+
+ `<div class="pgk"><span>Zeitraum</span><b>${B.n} Kerzen · 0,1 % Gebühr</b></div>`}
+$('#emb').onclick=()=>{showEMA=!showEMA;try{localStorage.setItem('chartwerk:ema',showEMA?'1':'0')}catch(e){}ui();draw()};
 $('#lqb').onclick=()=>{showLQ=!showLQ;try{localStorage.setItem('chartwerk:lq',showLQ?'1':'0')}catch(e){}if(showLQ)loadLQ(LQ[sym.id]&&LQ[sym.id].err);ui();draw()};
 $('#cyb').onclick=()=>{showCY=!showCY;try{localStorage.setItem('chartwerk:cy',showCY?'1':'0')}catch(e){}ui();draw()};
 $('#trb').onclick=()=>{showTR=!showTR;try{localStorage.setItem('chartwerk:tr',showTR?'1':'0')}catch(e){}ui();draw()};
@@ -966,7 +995,7 @@ $('#lss').onclick=e=>{const b=e.target.closest('button');if(b)penSet('ls',b.data
 $('#lws').onclick=e=>{const b=e.target.closest('button');if(b)penSet('lw',+b.dataset.lw)};
 $('#colok').onclick=()=>$('#colp').classList.remove('on');
 const KN={trend:'Trendlinie',ray:'Strahl',ext:'Erweiterte Linie',chan:'Parallelkanal',info:'Info-Linie',hline:'Horizontale Linie',goal:'Ziel',rect:'Rechteck',fib:'Fibonacci-Retracement',fan:'Fib-Fächer',brush:'Freihand'};
-const IND=[['ma','MA 20/50'],['zzb','Zickzack'],['cyb','Halving-Zyklus (Bitcoin)'],['lqb','Liquidations-Heatmap (BTC, Gold, Silber)'],['trb','Trendlinien (automatisch)'],['znb','Kauf- und Verkaufszonen'],['pgb','Prognose'],['scb','Szenarien']];
+const IND=[['ma','MA 20/50'],['zzb','Zickzack'],['cyb','Halving-Zyklus (Bitcoin)'],['lqb','Liquidations-Heatmap (BTC, Gold, Silber)'],['emb','EMA 12 Long/Short mit Check'],['trb','Trendlinien (automatisch)'],['znb','Kauf- und Verkaufszonen'],['pgb','Prognose'],['scb','Szenarien']];
 const EYE=(on)=>'<svg viewBox="0 0 22 22"><path d="M2 11s3.5-6 9-6 9 6 9 6-3.5 6-9 6-9-6-9-6z"/><circle cx="11" cy="11" r="2.5"/>'+(on?'':'<path d="M4 3l14 16"/>')+'</svg>';
 const LCK='<svg viewBox="0 0 22 22"><rect x="5" y="10" width="12" height="9" rx="1.5"/><path d="M8 10V7a3 3 0 016 0v3"/></svg>',BIN='<svg viewBox="0 0 22 22"><path d="M4 6h14M8.5 6V4h5v2M6 6l1 13h8l1-13"/></svg>';
 let obSig='';
@@ -1142,7 +1171,7 @@ $('#ghoff').onclick=()=>{ghTok='';gistId='';try{localStorage.removeItem('chartwe
 document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')sync()});
 setInterval(()=>{if(document.visibilityState==='visible')sync()},45000);
 if('serviceWorker' in navigator&&location.protocol==='https:'&&!/claude/.test(location.hostname)){try{navigator.serviceWorker.register('sw.js').catch(()=>{})}catch(e){}}
-lay=layInit();applyLay(curLay());load();agg();ma20=sma(20);ma50=sma(50);zz=calcZZ();ui();ro.observe(stage);
+lay=layInit();applyLay(curLay());load();agg();ma20=sma(20);ma50=sma(50);zz=calcZZ();ema12=ema(12);EB=emaBT();ui();ro.observe(stage);
 if(document.fonts)document.fonts.ready.then(draw);
 probe().then(ok=>{net=ok;if(ok)loadData(true);else ui()});
 syncUI();if(ghTok)sync();
