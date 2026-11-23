@@ -108,7 +108,7 @@ canvas{position:absolute;inset:0;width:100%;height:100%;touch-action:none;cursor
 #pkm.on{display:flex}#pkm button{appearance:none;text-align:left;min-height:44px;padding:0 14px;border:0;border-radius:8px;background:transparent;color:var(--ink);font:inherit;font-size:15px;cursor:pointer}
 #pkm button:hover{background:#232c33}#pkm button[aria-pressed=true]{background:var(--acc);color:#fff}#pkm small{color:var(--mute);font-size:12px;margin-left:8px}#pkm button[aria-pressed=true] small{color:#dfe8ff}
 .emb{position:absolute;left:12px;bottom:34px;width:236px;background:rgba(20,26,30,.92);border:1px solid #2a343c;border-radius:10px;padding:9px 12px;font-size:12px;pointer-events:none;z-index:3}
-.emb[hidden]{display:none}.emb b.up,.legend b.up{color:var(--up)}.emb b.dn,.legend b.dn{color:var(--dn)}.emb .pgk{padding:2px 0}.emb h3{margin:0 0 6px;font-size:13px;font-weight:600;display:flex;justify-content:space-between;gap:8px}.emb h3 span{font-weight:500}
+#emp .frow select{width:150px}.emb[hidden]{display:none}.emb b.up,.legend b.up{color:var(--up)}.emb b.dn,.legend b.dn{color:var(--dn)}.emb .pgk{padding:2px 0}.emb h3{margin:0 0 6px;font-size:13px;font-weight:600;display:flex;justify-content:space-between;gap:8px}.emb h3 span{font-weight:500}
 @media(max-width:700px){.emb{bottom:30px;left:8px;width:200px;padding:7px 9px}}
 :focus-visible{outline:2px solid var(--acc);outline-offset:2px}
 @media(max-width:700px){
@@ -129,7 +129,8 @@ canvas{position:absolute;inset:0;width:100%;height:100%;touch-action:none;cursor
   <div class="quote"><span id="pair">BTC/USD</span><b id="last">–</b><em id="chg"></em></div>
   <div class="row"><button class="chip src" id="src"><i></i><span>Prüfe Verbindung…</span></button><button class="chip" id="curb" title="Währung umschalten: Dollar / Euro">$ Dollar</button><div class="row" id="tfs"></div>
   <button class="chip" id="ma" aria-pressed="true">MA 20/50</button>
-  <button class="chip" id="emb" aria-pressed="true" title="EMA 12 mit Long-/Short-Signal und Check">EMA 12</button>
+  <button class="chip" id="emb" aria-pressed="true" title="EMA mit Long-/Short-Signal und Check">EMA 12</button>
+  <button class="chip" id="ems" title="EMA-Strategie einstellen und optimieren" aria-label="EMA-Einstellungen" style="padding:0 10px"><svg viewBox="0 0 22 22" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M3 5h9M3 11h13M3 17h9"/><circle cx="15.5" cy="5" r="2"/><circle cx="15.5" cy="17" r="2"/></svg></button>
   <button class="chip" id="zzb" aria-pressed="true">Zickzack</button>
   <button class="chip" id="zzs" title="Zickzack-Einstellungen" aria-label="Zickzack-Einstellungen" style="padding:0 10px"><svg viewBox="0 0 22 22" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M3 5h9M3 11h13M3 17h9"/><circle cx="15.5" cy="5" r="2"/><circle cx="15.5" cy="17" r="2"/></svg></button>
   <button class="chip" id="lqb" aria-pressed="true" title="Geschätzte Liquidations-Heatmap (Binance Futures)">Liquidationen</button>
@@ -228,6 +229,17 @@ canvas{position:absolute;inset:0;width:100%;height:100%;touch-action:none;cursor
   <div class="sub">Indikatoren</div><div class="obl" id="obi"></div>
   <div class="sub">Zeichnungen</div><div class="obl" id="obd"></div>
   <div class="prow"><button class="chip" id="obshow">Alle einblenden</button><button class="chip pri" id="obok">Fertig</button></div>
+ </div>
+ <div class="panel" id="emp" role="dialog" aria-label="EMA-Strategie">
+  <h2 id="emh">EMA-Strategie</h2>
+  <div class="frow"><label for="ep-len">EMA-Länge (Kerzen)</label><input id="ep-len" type="number" min="2" max="200" step="1" inputmode="numeric"></div>
+  <div class="frow"><label for="ep-buf">Puffer gegen Fehlsignale</label><select id="ep-buf"><option value="0">kein</option><option value="0.25">0,25 × ATR</option><option value="0.5">0,5 × ATR</option><option value="1">1 × ATR</option><option value="1.5">1,5 × ATR</option></select></div>
+  <div class="frow"><label for="ep-trend">Trendfilter</label><select id="ep-trend"><option value="none">keiner</option><option value="ma50">nur mit MA 50</option></select></div>
+  <div class="frow"><label for="ep-mode">Richtung</label><select id="ep-mode"><option value="ls">Long + Short</option><option value="l">nur Long</option></select></div>
+  <div class="prow"><button class="chip pri" id="epopt">Automatisch optimieren</button></div>
+  <div id="epres"></div>
+  <div class="prow"><button class="chip pri" id="epapply" hidden>Übernehmen</button></div>
+  <div class="prow"><button class="chip" id="epreset">Standard</button><button class="chip" id="epok">Fertig</button></div>
  </div>
  <div class="panel" id="colp" role="dialog" aria-label="Farbe und Linie">
   <h2 id="colh">Farbe und Linie</h2>
@@ -622,11 +634,12 @@ function draw(){
  for(let i=i0;i<=i1;i++){const b=data[i],u=b.c>=b.o,xx=Math.round(x(i))+.5,col=u?UP:DN;
   ctx.strokeStyle=ctx.fillStyle=col;seg(xx,y(b.h),xx,y(b.l));
   const yo=y(b.o),yc=y(b.c);ctx.fillRect(xx-cw/2,Math.min(yo,yc),cw,Math.max(1,Math.abs(yc-yo)))}
- if(showEMA&&ema12.length===n){ctx.strokeStyle='#00e5ff';ctx.lineWidth=1.6;ctx.beginPath();let s=0;
+ if(showEMA&&ema12.length===n&&emPos&&emPos.length===n){ctx.strokeStyle='#00e5ff';ctx.lineWidth=1.6;ctx.beginPath();let s=0;
   for(let i=Math.max(0,i0-1);i<=Math.min(n-1,i1+1);i++){if(ema12[i]==null)continue;s++?ctx.lineTo(x(i),y(ema12[i])):ctx.moveTo(x(i),y(ema12[i]))}ctx.stroke();
-  for(let i=Math.max(13,i0);i<=Math.min(n-1,i1);i++){const up=data[i].c>ema12[i],pu=data[i-1].c>ema12[i-1];if(up===pu)continue;const xx=x(i),b=data[i],yy=up?y(b.l)+7:y(b.h)-7,sz=Math.max(4,Math.min(7,view.bw*.6));
-   ctx.fillStyle=up?UP:DN;ctx.beginPath();if(up){ctx.moveTo(xx,yy);ctx.lineTo(xx-sz,yy+sz*1.5);ctx.lineTo(xx+sz,yy+sz*1.5)}else{ctx.moveTo(xx,yy);ctx.lineTo(xx-sz,yy-sz*1.5);ctx.lineTo(xx+sz,yy-sz*1.5)}ctx.fill();
-   if(view.bw>=5){ctx.font='10px "IBM Plex Sans",system-ui';ctx.textAlign='center';ctx.textBaseline=up?'top':'bottom';ctx.fillText(up?'L':'S',xx,up?yy+sz*1.5+2:yy-sz*1.5-2);ctx.textAlign='left'}}}
+  for(let i=Math.max(1,i0);i<=Math.min(n-1,i1);i++){const p=emPos[i];if(p===emPos[i-1])continue;const xx=x(i),b=data[i],sz=Math.max(4,Math.min(7,view.bw*.6));ctx.font='10px "IBM Plex Sans",system-ui';ctx.textAlign='center';
+   if(p===0){ctx.strokeStyle=MUTE;ctx.lineWidth=1.5;ctx.beginPath();ctx.arc(xx,y(b.c),sz*.8,0,7);ctx.stroke();continue}
+   const up=p===1,yy=up?y(b.l)+7:y(b.h)-7;ctx.fillStyle=up?UP:DN;ctx.beginPath();if(up){ctx.moveTo(xx,yy);ctx.lineTo(xx-sz,yy+sz*1.5);ctx.lineTo(xx+sz,yy+sz*1.5)}else{ctx.moveTo(xx,yy);ctx.lineTo(xx-sz,yy-sz*1.5);ctx.lineTo(xx+sz,yy-sz*1.5)}ctx.fill();
+   if(view.bw>=5){ctx.textBaseline=up?'top':'bottom';ctx.fillText(up?'L':'S',xx,up?yy+sz*1.5+2:yy-sz*1.5-2)}}ctx.textAlign='left'}
  if(showMA)[[ma20,'#f2c94c'],[ma50,'#b78cff']].forEach(([a,c])=>{ctx.strokeStyle=c;ctx.lineWidth=1.4;ctx.beginPath();let s=0;
   for(let i=Math.max(0,i0-1);i<=Math.min(n-1,i1+1);i++){if(a[i]==null)continue;s++?ctx.lineTo(x(i),y(a[i])):ctx.moveTo(x(i),y(a[i]))}ctx.stroke()});
  const L=data[n-1],ly=Math.round(y(L.c))+.5,lc=L.c>=L.o?UP:DN;ctx.setLineDash([2,3]);ctx.strokeStyle=lc;ctx.lineWidth=1;seg(0,ly,w,ly);ctx.setLineDash([]);
@@ -676,7 +689,7 @@ function legend(){
  const n=data.length;let i=n-1;const hp=hover||cross;if(hp&&hp[0]<pw()){const j=Math.round(idx(hp[0]));if(j>=0&&j<n)i=j}
  const b=data[i],c=b.c>=b.o?'up':'dn';
  $('#legend').innerHTML=`<span><b class="pk${pkOpen==='sym'?' on':''}" data-pk="sym">${pairName()}<i>▾</i></b> · <b class="pk${pkOpen==='tf'?' on':''}" data-pk="tf">${tf.l}<i>▾</i></b></span><span>O <b class="${c}">${fmt(b.o)}</b> H <b class="${c}">${fmt(b.h)}</b> L <b class="${c}">${fmt(b.l)}</b> C <b class="${c}">${fmt(b.c)}</b></span>`+
-  (showEMA&&ema12[i]!=null?`<span><b style="color:#00e5ff">EMA12</b> ${fmt(ema12[i])} <b class="${b.c>ema12[i]?'up':'dn'}">${b.c>ema12[i]?'Long':'Short'}</b></span>`:'')+(showMA?`<span class="m"><b style="color:#f2c94c">MA20</b> ${ma20[i]!=null?fmt(ma20[i]):'–'} <b style="color:#b78cff">MA50</b> ${ma50[i]!=null?fmt(ma50[i]):'–'}</span>`:'')+(showLQ&&LQS[sym.id]&&LQ[sym.id]?`<span class="m"><b style="color:#5ec962">Liquidationen</b> ${LQ[sym.id].err?'nicht erreichbar':'geschätzt, '+(sym.m?'nur Binance-Trader, ':'')+'letzte 20 Tage, Binance Futures'}</span>`:'')+(showCY&&sym.id==='BTC'&&cyState()?(()=>{const c=cyState();return`<span><b style="color:#ff9800">Zyklus</b> Tag ${c.d.toLocaleString('de-DE')} nach Halving ${c.y} · ${c.ph}</span>`})():'')+(showZZ?`<span class="m"><b style="color:${zzo.c}">Zickzack</b> ${zzo.dev.toLocaleString('de-DE')} ${zzo.depth}</span>`:'');
+  (showEMA&&ema12[i]!=null&&emPos?`<span><b style="color:#00e5ff">EMA${EP.len}</b> ${fmt(ema12[i])} <b class="${emPos[i]>0?'up':emPos[i]<0?'dn':''}">${emPos[i]>0?'Long':emPos[i]<0?'Short':'Flat'}</b></span>`:'')+(showMA?`<span class="m"><b style="color:#f2c94c">MA20</b> ${ma20[i]!=null?fmt(ma20[i]):'–'} <b style="color:#b78cff">MA50</b> ${ma50[i]!=null?fmt(ma50[i]):'–'}</span>`:'')+(showLQ&&LQS[sym.id]&&LQ[sym.id]?`<span class="m"><b style="color:#5ec962">Liquidationen</b> ${LQ[sym.id].err?'nicht erreichbar':'geschätzt, '+(sym.m?'nur Binance-Trader, ':'')+'letzte 20 Tage, Binance Futures'}</span>`:'')+(showCY&&sym.id==='BTC'&&cyState()?(()=>{const c=cyState();return`<span><b style="color:#ff9800">Zyklus</b> Tag ${c.d.toLocaleString('de-DE')} nach Halving ${c.y} · ${c.ph}</span>`})():'')+(showZZ?`<span class="m"><b style="color:${zzo.c}">Zickzack</b> ${zzo.dev.toLocaleString('de-DE')} ${zzo.depth}</span>`:'');
 }
 
 function distSeg(px,py,ax,ay,bx,by){const dx=bx-ax,dy=by-ay,l=dx*dx+dy*dy;let t=l?((px-ax)*dx+(py-ay)*dy)/l:0;t=Math.max(0,Math.min(1,t));return Math.hypot(px-ax-t*dx,py-ay-t*dy)}
@@ -736,7 +749,7 @@ function ui(){
  penUI();
  $('#vis').setAttribute('aria-pressed',hidden);$('#vis').innerHTML='<svg viewBox="0 0 22 22"><path d="M2 11s3.5-6 9-6 9 6 9 6-3.5 6-9 6-9-6-9-6z"/><circle cx="11" cy="11" r="2.5"/>'+(hidden?'<path d="M4 3l14 16"/>':'')+'</svg>';$('#vis').title=hidden?'Zeichnungen einblenden':'Zeichnungen ausblenden';
  if($('#fibp').classList.contains('on'))fibUI();if($('#chp').classList.contains('on'))chUI();obUI();layUI();if($('#fnp').classList.contains('on'))fnUI();
- $('#ma').setAttribute('aria-pressed',showMA);$('#emb').setAttribute('aria-pressed',showEMA);emaUI();$('#mag').setAttribute('aria-pressed',magnet>0);$('#magbd').textContent=['','•','••'][magnet];$('#mag').title=['Magnet aus','Magnet schwach','Magnet stark'][magnet];$('#zzb').setAttribute('aria-pressed',showZZ);$('#pgb').setAttribute('aria-pressed',showPG);$('#scb').setAttribute('aria-pressed',showSC);$('#znb').setAttribute('aria-pressed',showZN);$('#trb').setAttribute('aria-pressed',showTR);$('#cyb').setAttribute('aria-pressed',showCY);$('#lqb').setAttribute('aria-pressed',showLQ);$('#lqb').style.display=LQS[sym.id]?'':'none';$('#cyb').style.display=sym.id==='BTC'?'':'none';progUI();
+ $('#ma').setAttribute('aria-pressed',showMA);$('#emb').setAttribute('aria-pressed',showEMA);if($('#emp').classList.contains('on'))$('#emh').textContent='EMA-Strategie · '+sym.name;emaUI();$('#mag').setAttribute('aria-pressed',magnet>0);$('#magbd').textContent=['','•','••'][magnet];$('#mag').title=['Magnet aus','Magnet schwach','Magnet stark'][magnet];$('#zzb').setAttribute('aria-pressed',showZZ);$('#pgb').setAttribute('aria-pressed',showPG);$('#scb').setAttribute('aria-pressed',showSC);$('#znb').setAttribute('aria-pressed',showZN);$('#trb').setAttribute('aria-pressed',showTR);$('#cyb').setAttribute('aria-pressed',showCY);$('#lqb').setAttribute('aria-pressed',showLQ);$('#lqb').style.display=LQS[sym.id]?'':'none';$('#cyb').style.display=sym.id==='BTC'?'':'none';progUI();
  $('#undo').disabled=!undo.length;$('#del').disabled=sel<0||locked(drawings[sel]);$('#lock').disabled=sel<0||lockAll;$('#lock').setAttribute('aria-pressed',sel>=0&&!!drawings[sel]?.lk);$('#lockall').setAttribute('aria-pressed',lockAll);$('#clear').disabled=!drawings.length;
  status();
  $('#pair').textContent=pairName();$('#curb').textContent=cur==='EUR'?'€ Euro':'$ Dollar';$('#curb').setAttribute('aria-pressed',cur==='EUR');$('#curb').style.display=sym.id==='EUR'?'none':'';if(curE()==='EUR')$('#ntxt').textContent+=' In Euro umgerechnet (EUR/USDT von Binance, Kurs der jeweiligen Kerze).';
@@ -747,15 +760,27 @@ function ui(){
  cv.style.cursor=tool==='cursor'?'default':'crosshair';
 }
 function setTool(t,quiet){tool=t;if(t!=='cross')cross=null;if(t!=='cursor')sel=-1;ui();draw();if(!quiet)toast(HINTS[t])}
-let showEMA=true,ema12=[],EB=null;try{showEMA=localStorage.getItem('chartwerk:ema')!=='0'}catch(e){}
+let showEMA=true,ema12=[],EB=null,emPos=null;try{showEMA=localStorage.getItem('chartwerk:ema')!=='0'}catch(e){}
+const EPD={len:12,buf:0,trend:'none',mode:'ls'};let EP={...EPD};
+function epLoad(){try{const q=JSON.parse(localStorage.getItem('chartwerk:emap:'+sym.id)||'null');EP=Object.assign({...EPD},q&&typeof q==='object'?q:{})}catch(e){EP={...EPD}}EP.len=Math.max(2,Math.min(200,Math.round(+EP.len)||12))}
 function ema(n){const o=[],k=2/(n+1);let e=null,s=0;data.forEach((b,i)=>{if(i<n-1){s+=b.c;o.push(null);return}if(e==null){s+=b.c;e=s/n}else e=b.c*k+e*(1-k);o.push(e)});return o}
-function emaBT(){const n=data.length,E=ema12,fee=.001;if(n<40)return null;const st=12,last=n-2;
- let eq=1,eqL=1,peak=1,dd=0,pos=0,trades=0,wins=0,tEq=1,flips=[],lastFlip=-1;
- for(let i=st;i<=last;i++){const p=data[i].c>E[i]?1:-1;
-  if(p!==pos){if(pos!==0){trades++;if(eq/tEq>1)wins++}eq*=1-fee*(pos===0?1:2);if(p===1)eqL*=1-fee;else if(pos===1)eqL*=1-fee;tEq=eq;pos=p;flips.push(i);lastFlip=i}
-  if(i<last){const r=data[i+1].c/data[i].c-1;eq*=1+pos*r;if(pos===1)eqL*=1+r;peak=Math.max(peak,eq);dd=Math.min(dd,eq/peak-1)}}
- const hold=data[last].c/data[st].c-1;return{n:last-st,trades,wins,res:eq-1,resL:eqL-1,hold,dd,pos,since:last-lastFlip,flips}}
-function recalc(){ma20=sma(20);ma50=sma(50);zz=calcZZ();ema12=ema(12);EB=emaBT()}
+function atr(n){const o=[],tr=[];data.forEach((b,i)=>{const pc=i?data[i-1].c:b.c;tr.push(Math.max(b.h-b.l,Math.abs(b.h-pc),Math.abs(b.l-pc)));if(i<n-1){o.push(null);return}let s=0;for(let j=i-n+1;j<=i;j++)s+=tr[j];o.push(s/n)});return o}
+function sigPos(P,E,A,M){const n=data.length,pos=new Int8Array(n);let d=0;
+ for(let i=0;i<n;i++){const c=data[i].c;if(E[i]==null||A[i]==null){pos[i]=0;continue}const b=(+P.buf||0)*A[i];
+  if(d===0)d=c>E[i]?1:-1;else if(c>E[i]+b)d=1;else if(c<E[i]-b)d=-1;
+  let f=d;if(P.trend==='ma50'){if(M[i]==null)f=0;else if(d===1&&c<M[i])f=0;else if(d===-1&&c>M[i])f=0}if(P.mode==='l'&&f===-1)f=0;pos[i]=f}return pos}
+function btRange(pos,a,b,fee=.001){let eq=1,peak=1,dd=0,trades=0,wins=0,tEq=1,cur=pos[a-1]||0;
+ for(let i=a;i<=b;i++){const p=pos[i];if(p!==cur){if(cur!==0){trades++;if(eq/tEq>1)wins++}eq*=1-fee*Math.abs(p-cur);tEq=eq;cur=p}
+  if(i<b){eq*=1+cur*(data[i+1].c/data[i].c-1);peak=Math.max(peak,eq);dd=Math.min(dd,eq/peak-1)}}
+ return{res:eq-1,dd,trades,wins,hold:data[b].c/data[a].c-1,n:b-a}}
+function emaBT(){const n=data.length;if(n<70)return null;const st=Math.max(EP.len,EP.trend==='ma50'?50:0,14)+1,last=n-2;if(last-st<20)return null;
+ const pos=emPos,B=btRange(pos,st,last);let lf=last;while(lf>st&&pos[lf-1]===pos[last])lf--;return Object.assign(B,{pos:pos[last],since:last-lf})}
+function emaOpt(){const n=data.length,st=61,last=n-2;if(last-st<120)return null;const sp=st+Math.floor((last-st)*.7),A=atr(14),M=ma50,Ec={};
+ const ev=P=>{const E=Ec[P.len]||(Ec[P.len]=ema(P.len)),pos=sigPos(P,E,A,M);return{tr:btRange(pos,st,sp),te:btRange(pos,sp,last)}};
+ let best=null;for(const len of[5,8,12,20,30,50])for(const buf of[0,.25,.5,1])for(const trend of['none','ma50'])for(const mode of['ls','l']){const P={len,buf,trend,mode},r=ev(P);
+  if(r.tr.trades<4)continue;const sc=r.tr.res/Math.max(.05,-r.tr.dd);if(!best||sc>best.sc)best={P,sc,...r}}
+ const d=ev(EPD),c=ev(EP);return{best,def:d,cur:c,trainN:sp-st,testN:last-sp}}
+function recalc(){ma20=sma(20);ma50=sma(50);zz=calcZZ();epLoad();ema12=ema(EP.len);emPos=sigPos(EP,ema12,atr(14),ma50);EB=emaBT()}
 function schedule(){if(raf)return;raf=requestAnimationFrame(()=>{raf=0;recalc();ui();draw()})}
 async function getJSON(u,t=8000){const c=new AbortController(),k=setTimeout(()=>c.abort(),t);try{const r=await fetch(u,{signal:c.signal});if(!r.ok)throw new Error('HTTP '+r.status);return await r.json()}finally{clearTimeout(k)}}
 async function probe(){for(const h of['https://data-api.binance.vision','https://api.binance.com']){try{await getJSON(h+'/api/v3/ping',4000);bnHost=h;return true}catch(e){}}return false}
@@ -869,16 +894,34 @@ $('#layl').addEventListener('click',e=>{const g=e.target.closest('[data-go]'),r=
 $('#tfs').onclick=e=>{const b=e.target.closest('.chip');if(!b)return;tf=TFS.find(t=>t.id===b.dataset.id);loadData(true)};
 $('#ma').onclick=()=>{showMA=!showMA;ui();draw()};
 $('#zzb').onclick=()=>{showZZ=!showZZ;ui();draw()};
-function emaUI(){const el=$('#embx');if(!showEMA||!EB){el.hidden=true;return}el.hidden=false;const B=EB,pc=v=>(v>=0?'+':'−')+Math.abs(v*100).toLocaleString('de-DE',{maximumFractionDigits:Math.abs(v)<.1?1:0})+' %',cl=v=>v>=0?'up':'dn';
- const L=data[data.length-1],now=ema12[data.length-1]!=null?(L.c>ema12[data.length-1]?1:-1):B.pos;
- el.innerHTML=`<h3>EMA 12 · Check<span class="${now>0?'up':'dn'}">${now>0?'▲ Long':'▼ Short'}</span></h3>`+
- `<div class="pgk"><span>Signal seit</span><b>${B.since} ${B.since===1?'Kerze':'Kerzen'}${now!==B.pos?' (kippt gerade)':''}</b></div>`+
+const epTxt=P=>'EMA '+P.len+(+P.buf?' · Puffer '+String(P.buf).replace('.',',')+' ATR':'')+(P.trend==='ma50'?' · Trendfilter':'')+(P.mode==='l'?' · nur Long':'');
+const pcF=v=>(v>=0?'+':'−')+Math.abs(v*100).toLocaleString('de-DE',{maximumFractionDigits:Math.abs(v)<.1?1:0})+' %',clF=v=>v>=0?'up':'dn';
+function emaUI(){$('#emb').textContent='EMA '+EP.len;const el=$('#embx');if(!showEMA||!EB){el.hidden=true;return}el.hidden=false;const B=EB,now=EB.pos;
+ el.innerHTML=`<h3>${epTxt(EP)}<span class="${now>0?'up':now<0?'dn':''}">${now>0?'▲ Long':now<0?'▼ Short':'● Flat'}</span></h3>`+
+ `<div class="pgk"><span>Signal seit</span><b>${B.since} ${B.since===1?'Kerze':'Kerzen'}</b></div>`+
  `<div class="pgk"><span>Trades · Treffer</span><b>${B.trades} · ${B.trades?Math.round(B.wins/B.trades*100):0} %</b></div>`+
- `<div class="pgk"><span>Long + Short</span><b class="${cl(B.res)}">${pc(B.res)}</b></div>`+
- `<div class="pgk"><span>Nur Long</span><b class="${cl(B.resL)}">${pc(B.resL)}</b></div>`+
- `<div class="pgk"><span>Einfach halten</span><b class="${cl(B.hold)}">${pc(B.hold)}</b></div>`+
- `<div class="pgk"><span>Größter Rückgang</span><b class="dn">${pc(B.dd)}</b></div>`+
+ `<div class="pgk"><span>Strategie</span><b class="${clF(B.res)}">${pcF(B.res)}</b></div>`+
+ `<div class="pgk"><span>Einfach halten</span><b class="${clF(B.hold)}">${pcF(B.hold)}</b></div>`+
+ `<div class="pgk"><span>Größter Rückgang</span><b class="dn">${pcF(B.dd)}</b></div>`+
  `<div class="pgk"><span>Zeitraum</span><b>${B.n} Kerzen · 0,1 % Gebühr</b></div>`}
+function epUI(){$('#emh').textContent='EMA-Strategie · '+sym.name;$('#ep-len').value=EP.len;$('#ep-buf').value=String(+EP.buf||0);$('#ep-trend').value=EP.trend;$('#ep-mode').value=EP.mode}
+function epSave(P){EP=Object.assign({...EPD},P);try{localStorage.setItem('chartwerk:emap:'+sym.id,JSON.stringify(EP))}catch(e){}showEMA=true;try{localStorage.setItem('chartwerk:ema','1')}catch(e){}recalc();ui();draw();epUI()}
+$('#ems').onclick=()=>{if(openPanel('#emp')){epUI();$('#epres').innerHTML='';$('#epapply').hidden=true}};
+$('#emp').addEventListener('change',e=>{if(!e.target.id.startsWith('ep-'))return;epSave({len:Math.max(2,Math.min(200,parseInt($('#ep-len').value,10)||12)),buf:+$('#ep-buf').value,trend:$('#ep-trend').value,mode:$('#ep-mode').value})});
+let epBest=null;
+$('#epopt').onclick=()=>{const R=emaOpt();const o=$('#epres');if(!R||!R.best){o.innerHTML='<p>Zu wenige Kerzen für eine ehrliche Prüfung. Bitte eine kleinere Zeiteinheit wählen.</p>';$('#epapply').hidden=true;return}
+ epBest=R.best.P;const row=(l,v,c)=>`<div class="pgk"><span>${l}</span><b class="${c||''}">${v}</b></div>`;
+ o.innerHTML=`<p style="margin:8px 0 4px;color:var(--ink)"><b>Bestes im Training:</b> ${epTxt(R.best.P)}</p>`+
+  row('Training ('+R.trainN+' Kerzen)',pcF(R.best.tr.res)+' · Rückg. '+pcF(R.best.tr.dd),clF(R.best.tr.res))+
+  `<p style="margin:8px 0 4px;color:var(--ink)"><b>Test auf den letzten ${R.testN} Kerzen</b> (vorher nicht gesehen):</p>`+
+  row('Optimiert',pcF(R.best.te.res)+' · '+R.best.te.trades+(R.best.te.trades===1?' Trade':' Trades'),clF(R.best.te.res))+
+  row('Standard EMA 12',pcF(R.def.te.res)+' · '+R.def.te.trades+(R.def.te.trades===1?' Trade':' Trades'),clF(R.def.te.res))+
+  row('Einfach halten',pcF(R.best.te.hold),clF(R.best.te.hold))+
+  `<p style="margin:8px 0 0">${R.best.te.res>R.def.te.res&&R.best.te.res>R.best.te.hold?'Die optimierte Einstellung war auch im Test besser – ein gutes Zeichen, aber keine Garantie.':R.best.te.res>R.def.te.res?'Im Test besser als der Standard, aber nicht besser als einfaches Halten.':'Im Test nicht besser als der Standard – die Optimierung passt vermutlich nur zufällig auf die Vergangenheit.'}</p>`;
+ $('#epapply').hidden=false};
+$('#epapply').onclick=()=>{if(epBest){epSave(epBest);toast('Übernommen: '+epTxt(epBest))}};
+$('#epreset').onclick=()=>{epSave({...EPD});$('#epres').innerHTML='';$('#epapply').hidden=true};
+$('#epok').onclick=()=>$('#emp').classList.remove('on');
 $('#emb').onclick=()=>{showEMA=!showEMA;try{localStorage.setItem('chartwerk:ema',showEMA?'1':'0')}catch(e){}ui();draw()};
 $('#lqb').onclick=()=>{showLQ=!showLQ;try{localStorage.setItem('chartwerk:lq',showLQ?'1':'0')}catch(e){}if(showLQ)loadLQ(LQ[sym.id]&&LQ[sym.id].err);ui();draw()};
 $('#cyb').onclick=()=>{showCY=!showCY;try{localStorage.setItem('chartwerk:cy',showCY?'1':'0')}catch(e){}ui();draw()};
@@ -910,7 +953,7 @@ function setOpt(mut){const d=ftarget();
  if(d){if(locked(d)){toast('Gesperrt: erst entsperren');fibUI();return}undo.push(snap());d.o=d.o||JSON.parse(JSON.stringify(fib));mut(d.o);save()}
  else{mut(fib);try{lsSet('chartwerk:fib',JSON.stringify(fib))}catch(e){}}
  ui();draw()}
-function openPanel(id){['#fibp','#panel','#bkp','#zzp','#chp','#colp','#fnp','#obp','#layp'].forEach(p=>{if(p!==id)$(p).classList.remove('on')});return $(id).classList.toggle('on')}
+function openPanel(id){['#fibp','#panel','#bkp','#zzp','#chp','#colp','#fnp','#obp','#layp','#emp'].forEach(p=>{if(p!==id)$(p).classList.remove('on')});return $(id).classList.toggle('on')}
 $('#fibset').onclick=()=>{if(ctarget()||tool==='chan'){chUI();openPanel('#chp');return}if(fntarget()||tool==='fan'){fnUI(true);openPanel('#fnp');return}fibUI();openPanel('#fibp')};
 const fntarget=()=>sel>=0&&!hidden&&drawings[sel]&&drawings[sel].k==='fan'?drawings[sel]:null;let fnT;
 function fnUI(force){const d=fntarget();if(!force&&d===fnT)return;fnT=d;const o=d?fanOpt(d):fand;
@@ -1171,7 +1214,7 @@ $('#ghoff').onclick=()=>{ghTok='';gistId='';try{localStorage.removeItem('chartwe
 document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')sync()});
 setInterval(()=>{if(document.visibilityState==='visible')sync()},45000);
 if('serviceWorker' in navigator&&location.protocol==='https:'&&!/claude/.test(location.hostname)){try{navigator.serviceWorker.register('sw.js').catch(()=>{})}catch(e){}}
-lay=layInit();applyLay(curLay());load();agg();ma20=sma(20);ma50=sma(50);zz=calcZZ();ema12=ema(12);EB=emaBT();ui();ro.observe(stage);
+lay=layInit();applyLay(curLay());load();agg();recalc();ui();ro.observe(stage);
 if(document.fonts)document.fonts.ready.then(draw);
 probe().then(ok=>{net=ok;if(ok)loadData(true);else ui()});
 syncUI();if(ghTok)sync();
