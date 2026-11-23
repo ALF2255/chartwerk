@@ -218,6 +218,7 @@ canvas{position:absolute;inset:0;width:100%;height:100%;touch-action:none;cursor
    <label class="ck"><input type="checkbox" id="f-price">Preise anzeigen</label>
    <label class="ck"><input type="checkbox" id="f-mono">Nur gewählte Zeichenfarbe</label>
    <label class="ck"><input type="checkbox" id="f-prob">Wahrscheinlichkeit je Level (wie Preisfahne)</label>
+   <div class="frow"><label for="f-ph">Zeiträume</label><select id="f-ph" style="width:170px"><option value="all">alle (4h bis 1J)</option><option value="short">kurz: 4h · 1T · 3T · 1W</option><option value="long">lang: 1W · 1M · 3M · 1J</option></select></div>
   </div>
   <div class="prow"><button class="chip" id="freset">Standard</button><button class="chip pri" id="fclose">Fertig</button></div>
  </div>
@@ -324,7 +325,7 @@ const SYMS=[
 const TFS=[{id:'1h',h:1,l:'1 Std'},{id:'4h',h:4,l:'4 Std'},{id:'1D',h:24,l:'Tag'},{id:'1W',h:168,l:'Woche'},{id:'1M',h:730.5,l:'Monat'}];
 const COLORS=['#4c8dff','#f2c94c','#e573d8','#ffffff'];
 const FIBL=[{v:-.618,c:'#2962ff'},{v:0,c:'#9aa0ab'},{v:.236,c:'#f23645'},{v:.382,c:'#ff9800'},{v:.5,c:'#4caf50'},{v:.618,c:'#089981'},{v:.65,c:'#5fd068'},{v:.786,c:'#00bcd4'},{v:1,c:'#9aa0ab'},{v:1.236,c:'#ff9800'},{v:1.618,c:'#2962ff'},{v:2.236,c:'#ff9800'},{v:2.618,c:'#f23645'},{v:3.618,c:'#9c27b0'},{v:4.236,c:'#e91e63'}];
-const FIBDEF={on:[0,.236,.382,.5,.618,.65,.786,1,1.236,1.618,2.236,2.618],extL:false,extR:false,lblR:false,price:true,fill:true,mono:false,rev:false,prob:false};
+const FIBDEF={on:[0,.236,.382,.5,.618,.65,.786,1,1.236,1.618,2.236,2.618],extL:false,extR:false,lblR:false,price:true,fill:true,mono:false,rev:false,prob:false,ph:'all'};
 const FK=['rev','fill','extL','extR','lblR','price','mono','prob'];
 let fib=JSON.parse(JSON.stringify(FIBDEF)),magnet=0,mp=null,cross=null,lockAll=false,hidden=false;
 const locked=d=>!!(d&&(d.lk||lockAll));
@@ -471,8 +472,8 @@ function scenario(){const n=data.length,V=getVS();if(!V||!(V.sig>0)||n<25)return
  return{a,b,c,up:cur*Math.exp(th),dn:cur*Math.exp(-th),bullHi:cur*Math.exp(mu+s*zq(pA+.8*(1-pA))),bearLo:cur*Math.exp(mu+s*zq(.2*pB)),hi,lo,cur}}
 const pfmt=p=>p<.001?'<0,1 %':p>.999?'>99,9 %':(p<.1?(Math.round(p*1000)/10).toLocaleString('de-DE'):Math.round(p*100))+' %';
 const HZ=[['4h',1/6],['1T',1],['3T',3],['1W',7],['1M',30],['3M',91],['1J',365]];
-function probShort(B){const r=goalProb(B);if(!r)return '';const S=data[data.length-1].c;if(Math.abs(B/S-1)<.0005)return ' · am Kurs';
- return ' · '+(W<760?[3,4,5]:[1,3,4,5,6]).map(k=>r[k][0]+' '+pfmt(r[k][1]).replace(' %','%')).join(' ')}
+function probShort(B,ph){const r=goalProb(B);if(!r)return '';const S=data[data.length-1].c;if(Math.abs(B/S-1)<.0005)return ' · am Kurs';
+ return ' · '+(ph==='short'?[0,1,2,3]:ph==='long'?[3,4,5,6]:[0,1,2,3,4,5,6]).map(k=>r[k][0]+' '+pfmt(r[k][1]).replace(' %','%')).join(' ')}
 function goalProb(B){const V=getVS(),n=data.length;if(!V||!(V.sig>0))return null;const S=data[n-1].c,key=VSK+'|'+B.toFixed(6)+'|'+Math.round(Math.log(S)*2000);
  if(GC.has(key))return GC.get(key);const L=Math.log(B/S),f=sym.m&&tf.h<168?5/7:1,per=d=>d*864e5/ms()*f,K=per(365),g=Math.max(1,Math.ceil(K/400)),St=Math.ceil(K/g);
  const R=rng(hash(key)),zs=V.zs,Z=zs.length,s0=V.sig*V.sig,lr=V.lr,lam=V.lam,nrm=()=>{let u=0,v=0;while(!u)u=R();while(!v)v=R();return Math.sqrt(-2*Math.log(u))*Math.cos(2*Math.PI*v)};
@@ -582,7 +583,7 @@ function shape(d,on){
   if(o.fill)L.forEach((l,j)=>{if(j===L.length-1)return;const y1=y(B+(A-B)*l.v),y2=y(B+(A-B)*L[j+1].v);ctx.globalAlpha=.09;ctx.fillStyle=l.c;ctx.fillRect(x0,y1,x1-x0,y2-y1)});
   ctx.globalAlpha=1;ctx.textBaseline='middle';
   L.forEach(l=>{const p=B+(A-B)*l.v,yy=y(p);ctx.strokeStyle=ctx.fillStyle=l.c;ctx.lineWidth=(d.lw||1.6)*(on?1.1:.75);ctx.setLineDash(dashOf(d));seg(x0,yy,x1,yy);ctx.setLineDash([]);
-   const t=l.v.toLocaleString('de-DE',{maximumFractionDigits:3})+(o.price?` (${fmt(p)})`:'')+(o.prob?probShort(p):''),tw=ctx.measureText(t).width;
+   const t=l.v.toLocaleString('de-DE',{maximumFractionDigits:3})+(o.price?` (${fmt(p)})`:'')+(o.prob?probShort(p,o.ph):''),tw=ctx.measureText(t).width;
    if(!o.lblR){if(!o.extL&&x0-tw-8>0){ctx.textAlign='right';ctx.fillText(t,x0-6,yy)}else{ctx.textAlign='left';ctx.fillText(t,x0+4,yy-8)}}
    else{if(!o.extR&&x1+tw+8<w){ctx.textAlign='left';ctx.fillText(t,x1+6,yy)}else{ctx.textAlign='right';ctx.fillText(t,x1-4,yy-8)}}});
   ctx.textAlign='left';ctx.strokeStyle=ctx.fillStyle=d.c;ctx.setLineDash([4,4]);ctx.lineWidth=1;seg(...a,...b);ctx.setLineDash([])}
@@ -963,7 +964,7 @@ const ftarget=()=>sel>=0&&!hidden&&drawings[sel].k==='fib'?drawings[sel]:null;
 function fibUI(){const d=ftarget(),o=fo(d);
  $('#fph').textContent=d?'Fibonacci · ausgewählte Zeichnung':'Fibonacci · Standard für neue';
  $('#flv').innerHTML=FIBL.map(l=>`<label class="ck"><input type="checkbox" data-v="${l.v}" ${o.on.includes(l.v)?'checked':''}><span class="dot" style="--c:${l.c}"></span>${l.v.toLocaleString('de-DE',{maximumFractionDigits:3})}</label>`).join('');
- FK.forEach(k=>$('#f-'+k).checked=!!o[k]);$('#freset').textContent=d?'Wie Standard':'Zurücksetzen'}
+ FK.forEach(k=>$('#f-'+k).checked=!!o[k]);$('#f-ph').value=o.ph||'all';$('#freset').textContent=d?'Wie Standard':'Zurücksetzen'}
 function setOpt(mut){const d=ftarget();
  if(d){if(locked(d)){toast('Gesperrt: erst entsperren');fibUI();return}undo.push(snap());d.o=d.o||JSON.parse(JSON.stringify(fib));mut(d.o);save()}
  else{mut(fib);try{lsSet('chartwerk:fib',JSON.stringify(fib))}catch(e){}}
@@ -997,6 +998,7 @@ $('#ch-ext').onchange=e=>{const v=e.target.value;chSet(o=>{o.ext=v})};
 $('#chok').onclick=()=>$('#chp').classList.remove('on');
 $('#chreset').onclick=()=>chSet(o=>{Object.keys(o).forEach(k=>delete o[k]);Object.assign(o,JSON.parse(JSON.stringify(CHDEF)))});
 $('#flv').onchange=e=>{const v=+e.target.dataset.v,c=e.target.checked;setOpt(o=>{o.on=c?[...o.on.filter(x=>x!==v),v]:o.on.filter(x=>x!==v)})};
+$('#f-ph').onchange=e=>{const v=e.target.value;setOpt(o=>{o.ph=v})};
 FK.forEach(k=>$('#f-'+k).onchange=e=>{const c=e.target.checked;setOpt(o=>{o[k]=c})});
 $('#freset').onclick=()=>setOpt(o=>{const src=ftarget()?fib:FIBDEF;Object.keys(o).forEach(k=>delete o[k]);Object.assign(o,JSON.parse(JSON.stringify(src)))});
 $('#vis').onclick=()=>{hidden=!hidden;if(hidden)sel=-1;try{localStorage.setItem('chartwerk:hide',hidden?'1':'0')}catch(e){}ui();draw();toast(hidden?'Zeichnungen ausgeblendet':'Zeichnungen eingeblendet')};
