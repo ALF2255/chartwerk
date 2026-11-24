@@ -208,6 +208,7 @@ canvas{position:absolute;inset:0;width:100%;height:100%;touch-action:none;cursor
  </div>
  <div class="panel" id="fibp" role="dialog" aria-label="Fibonacci-Einstellungen">
   <h2 id="fph">Fibonacci</h2>
+  <div class="prow" style="margin:0 0 8px"><button class="chip" id="fall">Alle an</button><button class="chip" id="fbase">Nur 0 bis 1</button><button class="chip" id="fext">Mit Ausdehnungen</button></div>
   <div class="fgrid" id="flv"></div>
   <div class="opts">
    <label class="ck"><input type="checkbox" id="f-rev">Umkehren (0 und 1 tauschen)</label>
@@ -325,8 +326,8 @@ const SYMS=[
  {id:'EUR',name:'EUR/USD',pair:'EUR/USD',p:1.09,v:.006,m:1,td:'EUR/USD',bn:'EURUSDT',lp:'EUR/USDT'}];
 const TFS=[{id:'1h',h:1,l:'1 Std'},{id:'4h',h:4,l:'4 Std'},{id:'1D',h:24,l:'Tag'},{id:'1W',h:168,l:'Woche'},{id:'1M',h:730.5,l:'Monat'}];
 const COLORS=['#4c8dff','#f2c94c','#e573d8','#ffffff'];
-const FIBL=[{v:-.618,c:'#2962ff'},{v:0,c:'#9aa0ab'},{v:.236,c:'#f23645'},{v:.382,c:'#ff9800'},{v:.5,c:'#4caf50'},{v:.618,c:'#089981'},{v:.65,c:'#5fd068'},{v:.786,c:'#00bcd4'},{v:1,c:'#9aa0ab'},{v:1.236,c:'#ff9800'},{v:1.618,c:'#2962ff'},{v:2.236,c:'#ff9800'},{v:2.618,c:'#f23645'},{v:3.618,c:'#9c27b0'},{v:4.236,c:'#e91e63'}];
-const FIBDEF={on:[0,.236,.382,.5,.618,.65,.786,1,1.236,1.618,2.236,2.618],extL:false,extR:false,lblR:false,price:true,fill:true,mono:false,rev:false,prob:false,ph:'all'};
+const FIBL=[{v:-.618,c:'#2962ff'},{v:0,c:'#9aa0ab'},{v:.236,c:'#f23645'},{v:.382,c:'#ff9800'},{v:.5,c:'#4caf50'},{v:.618,c:'#089981'},{v:.65,c:'#5fd068'},{v:.786,c:'#00bcd4'},{v:1,c:'#9aa0ab'},{v:1.236,c:'#ff9800'},{v:1.386,c:'#f23645'},{v:1.618,c:'#2962ff'},{v:2,c:'#089981'},{v:2.236,c:'#ff9800'},{v:2.414,c:'#4caf50'},{v:2.618,c:'#f23645'},{v:3,c:'#00bcd4'},{v:3.236,c:'#9aa0ab'},{v:3.618,c:'#9c27b0'},{v:4,c:'#f23645'},{v:4.236,c:'#e91e63'},{v:4.272,c:'#9c27b0'},{v:4.414,c:'#e91e63'},{v:4.618,c:'#ff9800'},{v:4.764,c:'#089981'}];
+const FIBDEF={on:[0,.236,.382,.5,.618,.65,.786,1,1.236,1.386,1.618,2,2.236,2.414,2.618,3,3.236,3.618,4,4.236,4.272,4.414,4.618,4.764],extL:false,extR:false,lblR:false,price:true,fill:true,mono:false,rev:false,prob:false,ph:'all'};
 const FK=['rev','fill','extL','extR','lblR','price','mono','prob'];
 let fib=JSON.parse(JSON.stringify(FIBDEF)),magnet=0,mp=null,cross=null,lockAll=false,hidden=false;
 const locked=d=>!!(d&&(d.lk||lockAll));
@@ -999,6 +1000,9 @@ $('#ch-ext').onchange=e=>{const v=e.target.value;chSet(o=>{o.ext=v})};
 $('#chok').onclick=()=>$('#chp').classList.remove('on');
 $('#chreset').onclick=()=>chSet(o=>{Object.keys(o).forEach(k=>delete o[k]);Object.assign(o,JSON.parse(JSON.stringify(CHDEF)))});
 $('#flv').onchange=e=>{const v=+e.target.dataset.v,c=e.target.checked;setOpt(o=>{o.on=c?[...o.on.filter(x=>x!==v),v]:o.on.filter(x=>x!==v)})};
+$('#fall').onclick=()=>setOpt(o=>{o.on=FIBL.filter(l=>l.v>=0).map(l=>l.v)});
+$('#fbase').onclick=()=>setOpt(o=>{o.on=[0,.236,.382,.5,.618,.786,1]});
+$('#fext').onclick=()=>setOpt(o=>{o.on=[0,.236,.382,.5,.618,.65,.786,1,1.236,1.618,2.236,2.618]});
 $('#f-ph').onchange=e=>{const v=e.target.value;setOpt(o=>{o.ph=v})};
 FK.forEach(k=>$('#f-'+k).onchange=e=>{const c=e.target.checked;setOpt(o=>{o[k]=c})});
 $('#freset').onclick=()=>setOpt(o=>{const src=ftarget()?fib:FIBDEF;Object.keys(o).forEach(k=>delete o[k]);Object.assign(o,JSON.parse(JSON.stringify(src)))});
