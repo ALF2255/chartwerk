@@ -1138,10 +1138,10 @@ cv.addEventListener('pointerdown',e=>{
  if(tool==='cross'&&e.pointerType!=='mouse'){cross=p;act={k:'cross'};draw();return}
  if(cross&&e.pointerType!=='mouse'){cross=null}
  if(tool==='cursor'||tool==='cross'){
-  const hh=handleHit(px,py,tol);if(hh>=0){act={k:'pt',h:hh,s:snap()};return}
+  const hh=handleHit(px,py,tol);if(hh>=0){act={k:'pt',h:hh,s:snap(),sx:px,sy:py,th:e.pointerType==='mouse'?4:12};return}
   const k=hit(px,py,tol);
   if(k>=0&&locked(drawings[k])){sel=k;act={k:'pan',x0:px,e0:view.end};ui();draw();return}
-  if(k>=0){sel=k;act={k:'move',x0:px,y0:py,o:JSON.parse(JSON.stringify(drawings[k].pts)),s:snap()};ui();draw();return}
+  if(k>=0){sel=k;act={k:'move',x0:px,y0:py,o:JSON.parse(JSON.stringify(drawings[k].pts)),s:snap(),th:e.pointerType==='mouse'?4:12};ui();draw();return}
   if(sel>=0){sel=-1;ui()}if(Date.now()-lastTap<320&&!lastTapA&&Math.hypot(px-lastTapX,py-lastTapY)<40){lastTap=0;resetView();draw();act=null;return}lastTap=Date.now();lastTapA=0;lastTapX=px;lastTapY=py;
   const a={k:'pan',x0:px,y0:py,e0:view.end,m0:view.man?{...view.man}:null};act=a;
   if(e.pointerType!=='mouse')a.lp=setTimeout(()=>{if(act===a&&!a.mv){act={k:'cross'};cross=mp;draw()}},450);
@@ -1163,9 +1163,10 @@ cv.addEventListener('pointermove',e=>{
  else if(act.k==='vz'){const f=Math.exp((p[1]-act.y0)*.006),m=(act.lo+act.hi)/2,r=(act.hi-act.lo)/2*f;if(Math.abs(p[1]-act.y0)>3)lastTap=0;view.man={lo:m-r,hi:m+r}}
  else if(act.k==='new'){const d=drawings[drawings.length-1],q=toPt(...p);
   if(d.k==='brush'){const l=P(d.pts[d.pts.length-1]);if(Math.hypot(l[0]-p[0],l[1]-p[1])>2.5)d.pts.push(q)}else d.pts[d.pts.length-1]=snapPt(...p)}
- else if(act.k==='move'){const di=(p[0]-act.x0)/view.bw,dp=pOf(p[1])-pOf(act.y0);if(Math.hypot(p[0]-act.x0,p[1]-act.y0)>2)act.ch=true;
+ else if(act.k==='move'&&!act.go&&Math.hypot(p[0]-act.x0,p[1]-act.y0)<act.th){}
+ else if(act.k==='move'){if(!act.go){act.go=1;act.x0=p[0];act.y0=p[1]}const di=(p[0]-act.x0)/view.bw,dp=pOf(p[1])-pOf(act.y0);if(Math.hypot(p[0]-act.x0,p[1]-act.y0)>0)act.ch=true;
   drawings[sel].pts=act.o.map(q=>({t:tOfIdx(idxOfT(q.t)+di),p:q.p+dp}))}
- else if(act.k==='pt'){drawings[sel].pts[act.h]=snapPt(...p);act.ch=true}
+ else if(act.k==='pt'){if(act.th&&!act.go&&Math.hypot(p[0]-act.sx,p[1]-act.sy)<act.th){}else{act.go=1;drawings[sel].pts[act.h]=snapPt(...p);act.ch=true}}
  draw();
 });
 function up(e){
