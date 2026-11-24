@@ -114,6 +114,7 @@ canvas{position:absolute;inset:0;width:100%;height:100%;touch-action:none;cursor
 .pg.mini>*:not(.pgh):not(.pgr){display:none}.pg.mini{padding:7px 10px}.pg.mini .pgh{margin-bottom:2px}.pg.mini .pgr b{font-size:15px}.pg.mini .pgr span{display:inline;margin-right:5px}
 .emb.mini>*:not(h3){display:none}.emb.mini h3{margin:0}
 #autob{position:absolute;right:8px;bottom:32px;z-index:4;height:30px;padding:0 10px;border-radius:8px;border:1px solid #3a4752;background:#1f2830;color:var(--ink);font:12px "IBM Plex Sans",system-ui;cursor:pointer}
+.tplrow{display:flex;gap:8px;margin:0 0 8px}.panel .tplrow select,.panel .tplrow input:not([type=checkbox]){flex:1;width:auto;height:42px;border-radius:8px;border:1px solid #34404b;background:var(--bg);color:var(--ink);font:15px "IBM Plex Sans",system-ui;padding:0 8px}.tplrow .chip{flex:none}
 :focus-visible{outline:2px solid var(--acc);outline-offset:2px}
 @media(max-width:700px){
  .app{grid-template-columns:minmax(0,1fr);grid-template-areas:"h" "b" "s" "t" "n"}
@@ -208,6 +209,8 @@ canvas{position:absolute;inset:0;width:100%;height:100%;touch-action:none;cursor
  </div>
  <div class="panel" id="fibp" role="dialog" aria-label="Fibonacci-Einstellungen">
   <h2 id="fph">Fibonacci</h2>
+  <div class="tplrow"><select id="tpl-fib" aria-label="Vorlage laden"><option value="">Vorlage laden …</option></select><button class="chip" id="tpld-fib">Löschen</button></div>
+  <div class="tplrow"><input id="tpln-fib" maxlength="30" autocomplete="off" placeholder="Name für neue Vorlage"><button class="chip" id="tpls-fib">Speichern</button></div>
   <div class="prow" style="margin:0 0 8px"><button class="chip" id="fall">Alle an</button><button class="chip" id="fbase">Nur 0 bis 1</button><button class="chip" id="fext">Mit Ausdehnungen</button></div>
   <div class="fgrid" id="flv"></div>
   <div class="opts">
@@ -259,6 +262,8 @@ canvas{position:absolute;inset:0;width:100%;height:100%;touch-action:none;cursor
  </div>
  <div class="panel" id="fnp" role="dialog" aria-label="Fib-Speed-Resistance-Fächer">
   <h2 id="fnh">Fib-Fächer</h2>
+  <div class="tplrow"><select id="tpl-fan" aria-label="Vorlage laden"><option value="">Vorlage laden …</option></select><button class="chip" id="tpld-fan">Löschen</button></div>
+  <div class="tplrow"><input id="tpln-fan" maxlength="30" autocomplete="off" placeholder="Name für neue Vorlage"><button class="chip" id="tpls-fan">Speichern</button></div>
   <div class="sub">Preisniveaus</div>
   <div class="fgrid" id="fnlp"></div>
   <div class="opts"><label class="ck"><input type="checkbox" id="fn-lblL">Beschriftungen links</label><label class="ck"><input type="checkbox" id="fn-lblR">Beschriftungen rechts</label></div>
@@ -277,6 +282,8 @@ canvas{position:absolute;inset:0;width:100%;height:100%;touch-action:none;cursor
  </div>
  <div class="panel" id="chp" role="dialog" aria-label="Parallelkanal">
   <h2 id="chh">Parallelkanal</h2>
+  <div class="tplrow"><select id="tpl-chan" aria-label="Vorlage laden"><option value="">Vorlage laden …</option></select><button class="chip" id="tpld-chan">Löschen</button></div>
+  <div class="tplrow"><input id="tpln-chan" maxlength="30" autocomplete="off" placeholder="Name für neue Vorlage"><button class="chip" id="tpls-chan">Speichern</button></div>
   <div class="fgrid" id="chl"></div>
   <div class="opts">
    <label class="ck"><input type="checkbox" id="ch-fill">Hintergrund</label>
@@ -1000,6 +1007,18 @@ $('#ch-ext').onchange=e=>{const v=e.target.value;chSet(o=>{o.ext=v})};
 $('#chok').onclick=()=>$('#chp').classList.remove('on');
 $('#chreset').onclick=()=>chSet(o=>{Object.keys(o).forEach(k=>delete o[k]);Object.assign(o,JSON.parse(JSON.stringify(CHDEF)))});
 $('#flv').onchange=e=>{const v=+e.target.dataset.v,c=e.target.checked;setOpt(o=>{o.on=c?[...o.on.filter(x=>x!==v),v]:o.on.filter(x=>x!==v)})};
+const tplGet=k=>{try{const a=JSON.parse(localStorage.getItem('chartwerk:tpl:'+k)||'[]');return Array.isArray(a)?a.filter(t=>t&&typeof t.n==='string'&&t.o&&typeof t.o==='object'):[]}catch(e){return[]}};
+const tplSet=(k,a)=>{try{lsSet('chartwerk:tpl:'+k,JSON.stringify(a))}catch(e){}};
+const TPL={fib:{cur:()=>fo(ftarget()),apply:t=>setOpt(o=>{Object.keys(o).forEach(q=>delete o[q]);Object.assign(o,JSON.parse(JSON.stringify(FIBDEF)),JSON.parse(JSON.stringify(t)))}),ui:()=>fibUI()},
+ chan:{cur:()=>{const d=ctarget();return d?(d.o||chd):chd},apply:t=>chSet(o=>{Object.keys(o).forEach(q=>delete o[q]);Object.assign(o,JSON.parse(JSON.stringify(CHDEF)),JSON.parse(JSON.stringify(t)))}),ui:()=>chUI()},
+ fan:{cur:()=>{const d=fntarget();return d?fanOpt(d):fand},apply:t=>fnSet(o=>{Object.keys(o).forEach(q=>delete o[q]);Object.assign(o,JSON.parse(JSON.stringify(FANDEF)),JSON.parse(JSON.stringify(t)))}),ui:()=>fnUI(true)}};
+function tplFill(k){const s=$('#tpl-'+k),a=tplGet(k);s.innerHTML='<option value="">'+(a.length?'Vorlage laden …':'Noch keine Vorlagen')+'</option>'+a.map((t,i)=>`<option value="${i}">${esc(t.n)}</option>`).join('')}
+Object.keys(TPL).forEach(k=>{const T=TPL[k];
+ $('#tpls-'+k).onclick=()=>{const n=$('#tpln-'+k).value.trim().slice(0,30);if(!n){toast('Bitte zuerst einen Namen eingeben');$('#tpln-'+k).focus();return}
+  const a=tplGet(k).filter(t=>t.n!==n);a.push({n,o:JSON.parse(JSON.stringify(T.cur()))});tplSet(k,a);$('#tpln-'+k).value='';tplFill(k);toast('Vorlage „'+n+'“ gespeichert')};
+ $('#tpl-'+k).onchange=e=>{const t=tplGet(k)[+e.target.value];if(!t)return;T.apply(t.o);T.ui();toast('Vorlage „'+t.n+'“ angewendet');const v=e.target.value;tplFill(k);$('#tpl-'+k).value=v};
+ $('#tpld-'+k).onclick=()=>{const s=$('#tpl-'+k),a=tplGet(k),i=+s.value;if(s.value===''||!a[i]){toast('Erst oben eine Vorlage auswählen');return}const n=a[i].n;a.splice(i,1);tplSet(k,a);tplFill(k);toast('Vorlage „'+n+'“ gelöscht')}});
+['#fibset'].forEach(id=>$(id).addEventListener('click',()=>Object.keys(TPL).forEach(tplFill)));
 $('#fall').onclick=()=>setOpt(o=>{o.on=FIBL.filter(l=>l.v>=0).map(l=>l.v)});
 $('#fbase').onclick=()=>setOpt(o=>{o.on=[0,.236,.382,.5,.618,.786,1]});
 $('#fext').onclick=()=>setOpt(o=>{o.on=[0,.236,.382,.5,.618,.65,.786,1,1.236,1.618,2.236,2.618]});
@@ -1175,7 +1194,7 @@ async function gh(path,opt={}){const r=await fetch(GH+path,{cache:'no-store',...
   throw new Error('Kein Zugriff auf Gists'+(msg?' („'+msg.slice(0,60)+'“)':'')+'. Prüfe die Berechtigung „gist“.')}if(r.status===404)throw new Error('nicht gefunden (404)');
  if(!r.ok)throw new Error('GitHub-Fehler '+r.status);return r.json()}
 function localState(){const m={};SYMS.forEach(s=>{lays(s.id).flatMap(l=>[l.id,l.id+'eur']).forEach(lid=>{const e=ek(s.id,lid);let d=[];try{d=JSON.parse(lsGet('chartwerk:'+e)||'[]')}catch(x){}m[e]={u:+lsGet('chartwerk:u:'+e)||0,d,x:tombs(e)}});m['L:'+s.id]={u:+lsGet('chartwerk:u:L:'+s.id)||0,d:lays(s.id)}});
- return{app:'chartwerk',v:2,markets:m,settings:{u:+lsGet('chartwerk:us')||0,fib,magnet,lockAll,zz:zzo}}}
+ return{app:'chartwerk',v:2,markets:m,settings:{u:+lsGet('chartwerk:us')||0,fib,magnet,lockAll,zz:zzo,tpl:{fib:tplGet('fib'),chan:tplGet('chan'),fan:tplGet('fan')}}}}
 // Alle Gists mit der Abgleich-Datei, älteste zuerst. Alle Geräte nehmen so immer dasselbe (das älteste) Gist,
 // auch wenn früher versehentlich mehrere angelegt wurden.
 async function findGists(){const o=[];for(let p=1;p<=5;p++){const a=await gh(`/gists?per_page=100&page=${p}`);a.forEach(x=>{if(x.files&&x.files[GF])o.push(x)});if(a.length<100)break}
@@ -1187,7 +1206,7 @@ function mergeStates(A,B){if(!A)return B;if(!B)return A;const m=Object.assign({}
 let gistDup=[];
 async function readGist(id){const g=await gh('/gists/'+(id||gistId));const f=g.files&&g.files[GF];if(!f)return null;let t=f.content;
  if(f.truncated){const r=await fetch(f.raw_url,{cache:'no-store'});t=await r.text()}try{return JSON.parse(t)}catch(e){return null}}
-function applySettings(rs){try{if(rs.fib&&Array.isArray(rs.fib.on)){fib=Object.assign(JSON.parse(JSON.stringify(FIBDEF)),rs.fib);localStorage.setItem('chartwerk:fib',JSON.stringify(fib))}
+function applySettings(rs){try{if(rs.tpl&&typeof rs.tpl==='object')['fib','chan','fan'].forEach(k=>{if(Array.isArray(rs.tpl[k]))localStorage.setItem('chartwerk:tpl:'+k,JSON.stringify(rs.tpl[k]))});if(rs.fib&&Array.isArray(rs.fib.on)){fib=Object.assign(JSON.parse(JSON.stringify(FIBDEF)),rs.fib);localStorage.setItem('chartwerk:fib',JSON.stringify(fib))}
  if([0,1,2].includes(rs.magnet)){magnet=rs.magnet;localStorage.setItem('chartwerk:mag',magnet)}
  lockAll=!!rs.lockAll;localStorage.setItem('chartwerk:lockall',lockAll?'1':'0');
  if(rs.zz&&isFinite(rs.zz.dev)){zzo=Object.assign(JSON.parse(JSON.stringify(ZZDEF)),rs.zz);localStorage.setItem('chartwerk:zz',JSON.stringify(zzo));zz=calcZZ()}localStorage.setItem('chartwerk:us',rs.u||0)}catch(e){}}
