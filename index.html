@@ -321,6 +321,7 @@ const SYMS=[
  {id:'ZEC',name:'Zcash',pair:'ZEC/USD',p:400,v:.06,m:0,bn:'ZECUSDT'},
  {id:'XAU',name:'Gold',pair:'XAU/USD',p:4050,v:.011,m:1,bn:'PAXGUSDT',lp:'Gold (PAXG/USDT)',td:'XAU/USD'},
  {id:'XAG',name:'Silber',pair:'XAG/USD',p:50,v:.02,m:1,td:'XAG/USD',fb:'XAGUSDT'},
+ {id:'OIL',name:'Brent-Öl',pair:'XBR/USD',p:87,v:.025,m:1,td:'XBR/USD',fb:'BZUSDT'},
  {id:'EUR',name:'EUR/USD',pair:'EUR/USD',p:1.09,v:.006,m:1,td:'EUR/USD',bn:'EURUSDT',lp:'EUR/USDT'}];
 const TFS=[{id:'1h',h:1,l:'1 Std'},{id:'4h',h:4,l:'4 Std'},{id:'1D',h:24,l:'Tag'},{id:'1W',h:168,l:'Woche'},{id:'1M',h:730.5,l:'Monat'}];
 const COLORS=['#4c8dff','#f2c94c','#e573d8','#ffffff'];
@@ -357,7 +358,7 @@ function buildLQ(kl,oi){const om=new Map();oi.forEach(o=>om.set(Math.floor(o.tim
  const c2=document.createElement('canvas');c2.width=N;c2.height=R;const g=c2.getContext('2d'),im=g.createImageData(N,R);
  for(let i=0;i<N;i++)for(let r=0;r<R;r++){const c=hm(Math.min(1,grid[i*R+r]/mx)),o=((R-1-r)*N+i)*4;im.data[o]=c[0];im.data[o+1]=c[1];im.data[o+2]=c[2];im.data[o+3]=c[3]}
  g.putImageData(im,0,0);let tot=0;for(const q of lv)if(q.a)tot+=q.v*G;return{img:c2,t0:T[0],t1:T[N-1]+36e5,pLo,pHi,N,R,tot}}
-const LQS={BTC:'BTCUSDT',XAU:'XAUUSDT',XAG:'XAGUSDT'};
+const LQS={BTC:'BTCUSDT',XAU:'XAUUSDT',XAG:'XAGUSDT',OIL:'BZUSDT'};
 async function loadLQ(force){const sid=sym.id,fs=LQS[sid];if(!showLQ||!fs||lqBusy)return;const c=LQ[sid];if(!force&&c&&Date.now()-c.at<15*60e3)return;lqBusy=true;
  try{const[kl,oi]=await Promise.all([getJSON('https://fapi.binance.com/fapi/v1/klines?symbol='+fs+'&interval=1h&limit=500'),getJSON('https://fapi.binance.com/futures/data/openInterestHist?symbol='+fs+'&period=1h&limit=500')]);
   if(!Array.isArray(kl)||!Array.isArray(oi)||kl.length<50)throw new Error('keine Daten');LQ[sid]=buildLQ(kl,oi);LQ[sid].at=Date.now()}
@@ -1055,7 +1056,7 @@ $('#lss').onclick=e=>{const b=e.target.closest('button');if(b)penSet('ls',b.data
 $('#lws').onclick=e=>{const b=e.target.closest('button');if(b)penSet('lw',+b.dataset.lw)};
 $('#colok').onclick=()=>$('#colp').classList.remove('on');
 const KN={trend:'Trendlinie',ray:'Strahl',ext:'Erweiterte Linie',chan:'Parallelkanal',info:'Info-Linie',hline:'Horizontale Linie',goal:'Ziel',rect:'Rechteck',fib:'Fibonacci-Retracement',fan:'Fib-Fächer',brush:'Freihand'};
-const IND=[['ma','MA 20/50'],['zzb','Zickzack'],['cyb','Halving-Zyklus (Bitcoin)'],['lqb','Liquidations-Heatmap (BTC, Gold, Silber)'],['emb','EMA 12 Long/Short mit Check'],['trb','Trendlinien (automatisch)'],['znb','Kauf- und Verkaufszonen'],['pgb','Prognose'],['scb','Szenarien']];
+const IND=[['ma','MA 20/50'],['zzb','Zickzack'],['cyb','Halving-Zyklus (Bitcoin)'],['lqb','Liquidations-Heatmap (BTC, Gold, Silber, Öl)'],['emb','EMA 12 Long/Short mit Check'],['trb','Trendlinien (automatisch)'],['znb','Kauf- und Verkaufszonen'],['pgb','Prognose'],['scb','Szenarien']];
 const EYE=(on)=>'<svg viewBox="0 0 22 22"><path d="M2 11s3.5-6 9-6 9 6 9 6-3.5 6-9 6-9-6-9-6z"/><circle cx="11" cy="11" r="2.5"/>'+(on?'':'<path d="M4 3l14 16"/>')+'</svg>';
 const LCK='<svg viewBox="0 0 22 22"><rect x="5" y="10" width="12" height="9" rx="1.5"/><path d="M8 10V7a3 3 0 016 0v3"/></svg>',BIN='<svg viewBox="0 0 22 22"><path d="M4 6h14M8.5 6V4h5v2M6 6l1 13h8l1-13"/></svg>';
 let obSig='';
