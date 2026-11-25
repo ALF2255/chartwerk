@@ -452,7 +452,7 @@ const MW={
     const c=MW.curve(e.ms);if(!c)return;L.push({id:e.id,st:e.st,ct,h:(ct-now)/36e5,c,vol:e.ms.reduce((s,m)=>s+MW.vol(m),0),n:e.ms.length})});
    // gleicher Termin bei mehreren Serien (Leiter + Spanne): die mit mehr Handel nehmen
    L.sort((x,y)=>x.ct-y.ct);const D=[];L.forEach(e=>{const o=D.find(d=>Math.abs(d.ct-e.ct)<30*60e3);if(!o)D.push(e);else if(e.vol>o.vol)D[D.indexOf(o)]=e});
-   S.all=D;S.pick=MW.BK.map(([lo,hi,lab])=>{const c=D.filter(e=>e.h>=lo&&e.h<hi);if(!c.length)return null;const e=c.find(x=>x.vol>0)||c[0];return Object.assign({lab},e)}).filter(Boolean);
+   S.all=D;S.pick=MW.BK.map(([lo,hi,lab])=>{const c=D.filter(e=>e.h>=lo&&e.h<hi);if(!c.length)return null;const cov=x=>x.c.P[0]>=.5&&x.c.P[x.c.P.length-1]<=.5;const e=c.find(x=>cov(x)&&x.vol>0)||c.find(cov)||c.find(x=>x.vol>0)||c[0];return Object.assign({lab},e)}).filter(Boolean);
    S.at=Date.now();S.err=null;
    try{if(a!=='XAU'){const [u,e]=await Promise.all(['USD','EUR'].map(q=>fetch(`https://api.exchange.coinbase.com/products/BTC-${q}/ticker`,{cache:'no-store'}).then(r=>r.json())));const r=parseFloat(u.price)/parseFloat(e.price);if(r>0&&isFinite(r))MW.eurusd=r}}catch(e){}
   }catch(e){S.err=e&&e.message==='Failed to fetch'||e instanceof TypeError?'cors':(e&&e.message||'Fehler');S.at=Date.now()}finally{S.busy=false}return S},
@@ -695,7 +695,7 @@ function draw(){
  let lo=Infinity,hi=-Infinity,vmax=0;
  for(let i=i0;i<=i1;i++){const b=data[i];if(b.l<lo)lo=b.l;if(b.h>hi)hi=b.h;if(b.v>vmax)vmax=b.v}
  const SC=showSC?scenario():null;if(SC&&lo<Infinity){hi=Math.max(hi,SC.bullHi);lo=Math.min(lo,SC.bearLo)}
- const MWV=mwVis().filter(q=>q.i>=i0-.5&&q.i<=idx(w)+.5);if(lo<Infinity)MWV.forEach(q=>{hi=Math.max(hi,q.hi);lo=Math.min(lo,q.lo)});
+ const MWV=mwDraw().filter(q=>q.i>=i0-.5&&q.i<=idx(w)+.5);if(lo<Infinity)MWV.forEach(q=>{hi=Math.max(hi,q.hi);lo=Math.min(lo,q.lo)});
  if(view.man){sc.lo=view.man.lo;sc.hi=view.man.hi}else if(lo<Infinity){const pad=(hi-lo)*.08||hi*.01||1;sc.lo=Math.max(0,lo-pad);sc.hi=hi+pad}
  $('#autob').style.display=view.man?'block':'none';
  ctx.lineWidth=1;ctx.font='12px "IBM Plex Sans",system-ui';ctx.textBaseline='middle';ctx.textAlign='left';
@@ -1354,13 +1354,14 @@ if('serviceWorker' in navigator&&location.protocol==='https:'&&!/claude/.test(lo
 const mwA=()=>sym&&({BTC:'BTC',ETH:'ETH',XAU:'XAU'})[sym.id]||null;
 function mwVis(){const a=mwA(),S=a&&MW.S[a];if(!showMW||!S||!S.pick||!data.length)return[];const k=fxNow();
  return S.pick.map(e=>{const s=MW.stats(e,data[data.length-1].c*k);return{e,s,i:idxOfT(e.ct),m:s.m.v/k,lo:s.lo.v/k,hi:s.hi.v/k}})}
+const mwDraw=()=>mwVis().filter(q=>!q.s.m.lt&&!q.s.m.gt); // im Chart nur Termine, deren Stufen den aktuellen Bereich abdecken
 function mwUI(){const el=$('#mwx'),a=mwA();$('#mwb').style.display=a?'':'none';$('#mwb').setAttribute('aria-pressed',showMW);
  if(!showMW||!a){el.hidden=true;return}el.hidden=false;const S=MW.S[a];
  if(!S||!S.at){$('#mwc').innerHTML='<div class="pgf">lädt…</div>';if(!S||!S.busy)MW.load(a).then(()=>{mwUI();draw()});return}
  const pr=`<input id="mwpx" placeholder="Umweg-Adresse, z. B. http://nas:8080/?url=" value="${(MW.prox()||'').replace(/"/g,'&quot;')}" style="width:100%;margin-top:6px;box-sizing:border-box;font-size:11px">`;
  if(S.err){$('#mwc').innerHTML=`<div class="pgf" style="display:block;color:var(--dn)">${MW.errTxt(S)}</div>${pr}`;mwPx();return}
  const V=mwVis(),pc=v=>Math.round(v*100)+' %';
- $('#mwc').innerHTML=(V.length?'<div class="pgk" style="font-size:11px"><span>Termin</span><span>Mitte · höher als jetzt</span></div>'+V.map(({e,s,m,lo,hi})=>`<div class="pgk" style="border-top:1px solid var(--line);padding-top:4px"><span>${e.lab}<br><small>${MW.when(e.ct)}</small></span><b style="text-align:right">${(s.m.lt?'< ':s.m.gt?'> ':'')+fmt(m)} · <span class="${s.pa&&s.pa.p>.52?'up':s.pa&&s.pa.p<.48?'dn':''}">${s.pa?(s.pa.ge?'≥ ':s.pa.le?'≤ ':'')+pc(s.pa.p):'–'}</span><br><small style="color:var(--mute);font-weight:400">80 %: ${fmt(lo)} – ${fmt(hi)}</small></b></div>`).join(''):'<div class="pgf" style="display:block">Gerade keine offenen Märkte.</div>')+
+ $('#mwc').innerHTML=(V.length?'<div class="pgk" style="font-size:11px"><span>Termin</span><span>Mitte · höher als jetzt</span></div>'+V.map(({e,s,m,lo,hi})=>`<div class="pgk" style="border-top:1px solid var(--line);padding-top:4px"><span>${e.lab}<br><small>${MW.when(e.ct)}</small></span><b style="text-align:right">${(s.m.lt?'< ':s.m.gt?'> ':'')+fmt(m)} · <span class="${s.pa&&s.pa.p>.52?'up':s.pa&&s.pa.p<.48?'dn':''}">${s.pa?(s.pa.ge?'≥ ':s.pa.le?'≤ ':'')+pc(s.pa.p):'–'}</span><br><small style="color:var(--mute);font-weight:400">80 %: ${(s.lo.lt?'< ':s.lo.gt?'> ':'')+fmt(lo)} – ${(s.hi.lt?'< ':s.hi.gt?'> ':'')+fmt(hi)}</small></b></div>`).join(''):'<div class="pgf" style="display:block">Gerade keine offenen Märkte.</div>')+
   `<div class="pgf" style="display:block">Kalshi (USD${curE()==='EUR'?', umgerechnet':''}) · Stand ${new Date(S.at).toLocaleTimeString('de-DE',{hour:'2-digit',minute:'2-digit'})}${MW.via()} · nur Anzeige</div>`;
  $('#mwt').textContent=sym.name}
 function mwPx(){const i=$('#mwpx');if(i)i.onchange=()=>{MW.setProx(i.value);const a=mwA();if(a)MW.load(a,true).then(()=>{mwUI();draw()})}}
