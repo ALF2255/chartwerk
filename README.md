@@ -5,7 +5,7 @@ Echtzeitkursen und Abgleich zwischen Geräten. Installierbar als App (PWA).
 
 ## Marktwetten (Kalshi)
 
-Knopf „Marktwetten“ (nur Bitcoin, Ethereum, Gold): zeigt, was Händler auf der US-Prognosebörse Kalshi für den
+Knopf „Marktwetten“ (alle Instrumente: Bitcoin, Ethereum, Solana, Zcash, Gold, Silber, Brent-Öl, EUR/USD – und künftige Kryptowährungen automatisch, soweit Kalshi Kursmärkte dafür hat): zeigt, was Händler auf der US-Prognosebörse Kalshi für den
 Kurs zu festen Terminen einpreisen – nächste Stunde, heute/morgen, Woche, Monat, länger. Im Chart erscheint am
 Termin eine senkrechte Spanne (80 %-Bereich, Punkt = Mitte), im Kasten zusätzlich die Chance „höher als jetzt“.
 Kasten antippen klappt ihn ein und aus. Nur Anzeige. Blockiert der Browser den Abruf, im Kasten eine

@@ -395,8 +395,13 @@ let showMW=false;try{showMW=localStorage.getItem('chartwerk:mw')==='1'}catch(e){
 // Alle Werte in USD (Kalshi rechnet in USD). Nur Anzeige.
 const MW={
  base:'https://api.elections.kalshi.com/trade-api/v2',
- SER:{BTC:['KXBTCD','KXBTC','KXBTCW','KXBTCM','KXBTCY'],ETH:['KXETHD','KXETH','KXETHW'],XAU:['KXGOLDH','KXGOLDD','KXGOLDW','KXGOLDM','KXGOLDY']},
- PFX:{BTC:'KXBTC',ETH:'KXETH',XAU:'KXGOLD'},CAT:{BTC:'Crypto',ETH:'Crypto',XAU:'Commodities'},
+ // Je Instrument: Kalshi-Kürzel-Anfang (p), Kategorie für die Suche (c, null = keine Suche) und bekannte Kursserien (s).
+ // Neue Instrumente ohne Eintrag: Kürzel 'KX'+ID in der Kategorie Crypto (passt für die meisten Kryptowährungen).
+ A:{BTC:{p:'KXBTC',c:'Crypto',s:['KXBTCD','KXBTC','KXBTCY']},ETH:{p:'KXETH',c:'Crypto',s:['KXETHD','KXETH','KXETHY']},
+  SOL:{p:'KXSOL',c:'Crypto',s:['KXSOLD','KXSOL','KXSOLY']},ZEC:{p:'KXZEC',c:'Crypto',s:['KXZEC','KXZECY']},
+  XAU:{p:'KXGOLD',c:'Commodities',s:['KXGOLDH','KXGOLDD','KXGOLDW','KXGOLDMON']},XAG:{p:'KXSILVER',c:'Commodities',s:['KXSILVERH','KXSILVERD','KXSILVERW','KXSILVERMON']},
+  OIL:{p:'KXBRENT',c:'Commodities',s:['KXBRENTD','KXBRENTW','KXBRENTMON']},EUR:{p:'KXEURUSD',c:null,s:['KXEURUSDH','KXEURUSD','KXEURUSDW']}},
+ cfg(a){return MW.A[a]||{p:'KX'+a,c:'Crypto',s:['KX'+a+'D','KX'+a]}},
  BK:[[.15,3,'Nächste Stunde'],[3,30,'Heute/morgen'],[30,192,'Diese Woche'],[192,1080,'Monat'],[1080,9600,'Länger']],
  S:{},
  prox(){try{return localStorage.getItem('mw:proxy')||''}catch(e){return''}},
@@ -441,10 +446,14 @@ const MW={
  // Alle offenen Märkte einer Serie (mit Blättern)
  async series(st){const out=[];let cur='';for(let k=0;k<5;k++){const j=await MW.get(`/markets?series_ticker=${st}&status=open&limit=1000${cur?'&cursor='+encodeURIComponent(cur):''}`);
   (j.markets||[]).forEach(m=>out.push(m));cur=j.cursor;if(!cur||!(j.markets||[]).length)break}return out},
- async discover(a){const pf=MW.PFX[a];let x=[];try{const j=await MW.get('/series?category='+encodeURIComponent(MW.CAT[a]));
-  x=(j.series||[]).map(s=>s.ticker).filter(t=>t&&t.startsWith(pf)&&!/(\d+M|MAX|MIN|ATH|UP|DOWN|ETF|HALF|RES)/.test(t.slice(pf.length)))}catch(e){}return x},
+ // Weitere Kursserien suchen (Liste je Kategorie 24 Std im Browser gemerkt). Nur Endungen für Termin-Kurse
+ // (D/H/W/M/MON/Y/EOY …), keine „Höchst/Tiefst“-, Richtungs-, 15-Min- oder Ereignis-Serien.
+ async discover(a){const C=MW.cfg(a);if(!C.c)return[];const k='mw:ser:'+C.c;let L=null;
+  try{const o=JSON.parse(localStorage.getItem(k)||'null');if(o&&Date.now()-o.t<864e5)L=o.l}catch(e){}
+  if(!L){try{const j=await MW.get('/series?category='+encodeURIComponent(C.c));L=(j.series||[]).map(x=>x&&x.ticker).filter(Boolean);try{localStorage.setItem(k,JSON.stringify({t:Date.now(),l:L}))}catch(e){}}catch(e){L=[]}}
+  return L.filter(t=>t.startsWith(C.p)&&/^(|D|H|HA|W|W2|M|MON|MON2|Y|EOY)$/.test(t.slice(C.p.length)))},
  async load(a,force){const S=MW.S[a]||(MW.S[a]={});if(S.busy||(!force&&S.at&&Date.now()-S.at<120e3))return S;S.busy=true;
-  try{const ser=[...new Set([...MW.SER[a],...(await MW.discover(a))])].slice(0,10),ev={};let ok=0,err=null;
+  try{const ser=[...new Set([...MW.cfg(a).s,...(await MW.discover(a))])].slice(0,10),ev={};let ok=0,err=null;
    for(const st of ser){try{const ms=await MW.series(st);ok++;ms.forEach(m=>{const e=m.event_ticker||m.ticker;(ev[e]||(ev[e]={id:e,st,ms:[]})).ms.push(m)})}catch(e){err=e;if(!ok)break}} // erster Abruf scheitert ganz → nicht alle Serien durchprobieren
    if(!ok)throw err||new Error('keine Antwort');
    const now=Date.now(),L=[];
@@ -454,7 +463,7 @@ const MW={
    L.sort((x,y)=>x.ct-y.ct);const D=[];L.forEach(e=>{const o=D.find(d=>Math.abs(d.ct-e.ct)<30*60e3);if(!o)D.push(e);else if(e.vol>o.vol)D[D.indexOf(o)]=e});
    S.all=D;S.pick=MW.BK.map(([lo,hi,lab])=>{const c=D.filter(e=>e.h>=lo&&e.h<hi);if(!c.length)return null;const cov=x=>x.c.P[0]>=.5&&x.c.P[x.c.P.length-1]<=.5;const e=c.find(x=>cov(x)&&x.vol>0)||c.find(cov)||c.find(x=>x.vol>0)||c[0];return Object.assign({lab},e)}).filter(Boolean);
    S.at=Date.now();S.err=null;
-   try{if(a!=='XAU'){const [u,e]=await Promise.all(['USD','EUR'].map(q=>fetch(`https://api.exchange.coinbase.com/products/BTC-${q}/ticker`,{cache:'no-store'}).then(r=>r.json())));const r=parseFloat(u.price)/parseFloat(e.price);if(r>0&&isFinite(r))MW.eurusd=r}}catch(e){}
+   try{if(MW.cfg(a).c==='Crypto'){const [u,e]=await Promise.all(['USD','EUR'].map(q=>fetch(`https://api.exchange.coinbase.com/products/BTC-${q}/ticker`,{cache:'no-store'}).then(r=>r.json())));const r=parseFloat(u.price)/parseFloat(e.price);if(r>0&&isFinite(r))MW.eurusd=r}}catch(e){}
   }catch(e){S.err=e&&e.message==='Failed to fetch'||e instanceof TypeError?'cors':(e&&e.message||'Fehler');S.at=Date.now()}finally{S.busy=false}return S},
  stats(e,spot){const c=e.c,m=MW.q(c,.5),lo=MW.q(c,.9),hi=MW.q(c,.1),pa=spot>0?MW.pGt(c,spot):null;return{m,lo,hi,pa}},
  when(t){const d=new Date(t),now=new Date(),same=d.toDateString()===now.toDateString(),tm=d.toLocaleTimeString('de-DE',{hour:'2-digit',minute:'2-digit'});
@@ -1351,7 +1360,7 @@ document.addEventListener('visibilitychange',()=>{if(document.visibilityState===
 setInterval(()=>{if(document.visibilityState==='visible')sync()},45000);
 if('serviceWorker' in navigator&&location.protocol==='https:'&&!/claude/.test(location.hostname)){try{navigator.serviceWorker.register('sw.js').catch(()=>{})}catch(e){}}
 // Marktwetten im Chart: Kalshi-Termine als senkrechte Spanne (80 %-Bereich, Punkt = Mitte) am Termin + Infokasten
-const mwA=()=>sym&&({BTC:'BTC',ETH:'ETH',XAU:'XAU'})[sym.id]||null;
+const mwA=()=>sym&&sym.id||null; // alle Instrumente, auch künftige (Kürzel siehe MW.A)
 function mwVis(){const a=mwA(),S=a&&MW.S[a];if(!showMW||!S||!S.pick||!data.length)return[];const k=fxNow();
  return S.pick.map(e=>{const s=MW.stats(e,data[data.length-1].c*k);return{e,s,i:idxOfT(e.ct),m:s.m.v/k,lo:s.lo.v/k,hi:s.hi.v/k}})}
 const mwDraw=()=>mwVis().filter(q=>!q.s.m.lt&&!q.s.m.gt); // im Chart nur Termine, deren Stufen den aktuellen Bereich abdecken
@@ -1361,7 +1370,7 @@ function mwUI(){const el=$('#mwx'),a=mwA();$('#mwb').style.display=a?'':'none';$
  const pr=`<input id="mwpx" placeholder="Umweg-Adresse, z. B. http://nas:8080/?url=" value="${(MW.prox()||'').replace(/"/g,'&quot;')}" style="width:100%;margin-top:6px;box-sizing:border-box;font-size:11px">`;
  if(S.err){$('#mwc').innerHTML=`<div class="pgf" style="display:block;color:var(--dn)">${MW.errTxt(S)}</div>${pr}`;mwPx();return}
  const V=mwVis(),pc=v=>Math.round(v*100)+' %';
- $('#mwc').innerHTML=(V.length?'<div class="pgk" style="font-size:11px"><span>Termin</span><span>Mitte · höher als jetzt</span></div>'+V.map(({e,s,m,lo,hi})=>`<div class="pgk" style="border-top:1px solid var(--line);padding-top:4px"><span>${e.lab}<br><small>${MW.when(e.ct)}</small></span><b style="text-align:right">${(s.m.lt?'< ':s.m.gt?'> ':'')+fmt(m)} · <span class="${s.pa&&s.pa.p>.52?'up':s.pa&&s.pa.p<.48?'dn':''}">${s.pa?(s.pa.ge?'≥ ':s.pa.le?'≤ ':'')+pc(s.pa.p):'–'}</span><br><small style="color:var(--mute);font-weight:400">80 %: ${(s.lo.lt?'< ':s.lo.gt?'> ':'')+fmt(lo)} – ${(s.hi.lt?'< ':s.hi.gt?'> ':'')+fmt(hi)}</small></b></div>`).join(''):'<div class="pgf" style="display:block">Gerade keine offenen Märkte.</div>')+
+ $('#mwc').innerHTML=(V.length?'<div class="pgk" style="font-size:11px"><span>Termin</span><span>Mitte · höher als jetzt</span></div>'+V.map(({e,s,m,lo,hi})=>`<div class="pgk" style="border-top:1px solid var(--line);padding-top:4px"><span>${e.lab}<br><small>${MW.when(e.ct)}</small></span><b style="text-align:right">${(s.m.lt?'< ':s.m.gt?'> ':'')+fmt(m)} · <span class="${s.pa&&s.pa.p>.52?'up':s.pa&&s.pa.p<.48?'dn':''}">${s.pa?(s.pa.ge?'≥ ':s.pa.le?'≤ ':'')+pc(s.pa.p):'–'}</span><br><small style="color:var(--mute);font-weight:400">80 %: ${(s.lo.lt?'< ':s.lo.gt?'> ':'')+fmt(lo)} – ${(s.hi.lt?'< ':s.hi.gt?'> ':'')+fmt(hi)}</small></b></div>`).join(''):`<div class="pgf" style="display:block">Für ${sym.name} gibt es auf Kalshi gerade keine passenden Kursmärkte.</div>`)+
   `<div class="pgf" style="display:block">Kalshi (USD${curE()==='EUR'?', umgerechnet':''}) · Stand ${new Date(S.at).toLocaleTimeString('de-DE',{hour:'2-digit',minute:'2-digit'})}${MW.via()} · nur Anzeige</div>`;
  $('#mwt').textContent=sym.name}
 function mwPx(){const i=$('#mwpx');if(i)i.onchange=()=>{MW.setProx(i.value);const a=mwA();if(a)MW.load(a,true).then(()=>{mwUI();draw()})}}
