@@ -11,6 +11,12 @@ Termin eine senkrechte Spanne (80 %-Bereich, Punkt = Mitte), im Kasten zusätzli
 Kasten antippen klappt ihn ein und aus. Nur Anzeige. Blockiert der Browser den Abruf, im Kasten eine
 Umweg-Adresse eintragen (z. B. ein kleiner Weiterleiter auf dem NAS).
 
+## Hoch/Tief-Wetten (Kalshi)
+
+Eigener Knopf „Hoch/Tief-Wetten“: Kalshi-Wetten darauf, ob der Kurs **bis** zum Termin **irgendwann** eine Marke
+erreicht (Höchst- bzw. Tiefststand bis Tag/Woche/Monat/Jahr). Kasten rechts oben mit den Marken für 90 %, 50 % und
+10 % Wahrscheinlichkeit; im Chart gepunktete Linie auf der 50:50-Marke bis zum Termin (grün = Hoch, rot = Tief).
+
 ## Einrichten auf GitHub Pages
 
 1. Auf github.com ein neues Repository anlegen, Name `chartwerk`, Sichtbarkeit **Public**.
