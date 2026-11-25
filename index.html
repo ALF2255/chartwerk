@@ -487,7 +487,9 @@ const MW={
    S.at=Date.now();S.err=null}
   catch(e){S.err=e instanceof TypeError?'cors':(e&&e.message||'Fehler');S.at=Date.now()}finally{S.busy=false}return S},
  // p90 = wird mit 90 % erreicht, p50 = 50:50, p10 = nur 10 % Chance
- tstats(e){const c=e.c;return e.kind==='max'?{p90:MW.q(c,.9),p50:MW.q(c,.5),p10:MW.q(c,.1)}:{p90:MW.q(c,.1),p50:MW.q(c,.5),p10:MW.q(c,.9)}},
+ // edge: nächstliegende Stufe der Leiter und Chance, sie zu erreichen (für den Fall, dass die Marken außerhalb der Leiter liegen)
+ tstats(e){const c=e.c,n=c.K.length,r=e.kind==='max'?{p90:MW.q(c,.9),p50:MW.q(c,.5),p10:MW.q(c,.1),edge:{k:c.K[0],p:c.P[0]}}:{p90:MW.q(c,.1),p50:MW.q(c,.5),p10:MW.q(c,.9),edge:{k:c.K[n-1],p:1-c.P[n-1]}};
+  r.out=!!(r.p50.lt||r.p50.gt);return r},
  stats(e,spot){const c=e.c,m=MW.q(c,.5),lo=MW.q(c,.9),hi=MW.q(c,.1),pa=spot>0?MW.pGt(c,spot):null;return{m,lo,hi,pa}},
  when(t){const d=new Date(t),now=new Date(),same=d.toDateString()===now.toDateString(),tm=d.toLocaleTimeString('de-DE',{hour:'2-digit',minute:'2-digit'});
   if(same)return'heute '+tm;const tom=new Date(now.getTime()+864e5);if(d.toDateString()===tom.toDateString())return'morgen '+tm;
@@ -1413,7 +1415,7 @@ function htUI(){const el=$('#htx'),a=mwA();$('#htb').setAttribute('aria-pressed'
  if(S.err){$('#htc').innerHTML=`<div class="pgf" style="display:block;color:var(--dn)">${MW.errTxt(S)}</div>`;return}
  const k=fxNow(),f=o=>(o.lt?'< ':o.gt?'> ':'')+fmt(o.v/k),V=htVis();
  $('#htc').innerHTML=(V.length?'<div class="pgk" style="font-size:11px"><span>Bis</span><span>90 % · 50 % · 10 %</span></div>'+['max','min'].map(kd=>{const R=V.filter(q=>q.e.kind===kd);if(!R.length)return'';
-  return`<div class="pgs" style="margin-top:6px"><span class="${kd==='max'?'up':'dn'}">${kd==='max'?'▲ Höchststand':'▼ Tiefststand'}</span><span></span></div>`+R.map(({e,s})=>`<div class="pgk" style="border-top:1px solid var(--line);padding-top:3px"><span>${e.lab}<br><small>${MW.when(e.ct)}</small></span><b style="text-align:right;font-weight:500">${f(s.p90)}<br><span class="${kd==='max'?'up':'dn'}" style="font-weight:700">${f(s.p50)}</span> · <small>${f(s.p10)}</small></b></div>`).join('')}).join('')
+  return`<div class="pgs" style="margin-top:6px"><span class="${kd==='max'?'up':'dn'}">${kd==='max'?'▲ Höchststand':'▼ Tiefststand'}</span><span></span></div>`+R.map(({e,s})=>`<div class="pgk" style="border-top:1px solid var(--line);padding-top:3px"><span>${e.lab}<br><small>${MW.when(e.ct)}</small></span><b style="text-align:right;font-weight:500">${s.out?`${fmt(s.edge.k/k)} erreicht:<br><span class="${kd==='max'?'up':'dn'}" style="font-weight:700">${s.edge.p<.01?'< 1':Math.round(s.edge.p*100)} %</span>`:`${f(s.p90)}<br><span class="${kd==='max'?'up':'dn'}" style="font-weight:700">${f(s.p50)}</span> · <small>${f(s.p10)}</small>`}</b></div>`).join('')}).join('')
   :`<div class="pgf" style="display:block">Für ${sym.name} gibt es auf Kalshi gerade keine Hoch/Tief-Wetten.</div>`)+
   `<div class="pgf" style="display:block">Wird der Kurs bis zum Termin irgendwann erreicht? 90 % = fast sicher, 50 % = 50:50, 10 % = kaum. Kalshi${MW.via()} · Stand ${new Date(S.at).toLocaleTimeString('de-DE',{hour:'2-digit',minute:'2-digit'})}</div>`;
  $('#htt').textContent=sym.name}
