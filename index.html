@@ -403,8 +403,8 @@ const MW={
  setProx(v){try{v?localStorage.setItem('mw:proxy',v.trim()):localStorage.removeItem('mw:proxy')}catch(e){}},
  // Kalshi erlaubt keinen direkten Browser-Abruf (CORS) → der Reihe nach über öffentliche Weiterleiter; der funktionierende wird gemerkt.
  // Es laufen nur öffentliche Marktdaten darüber, keine Schlüssel. Eigene Umweg-Adresse hat Vorrang.
- RELAYS:['','https://corsproxy.io/?url=','https://api.allorigins.win/raw?url=','https://api.codetabs.com/v1/proxy/?quest='],
- route:null,
+ RELAYS:['https://kalshi.moberlaender71.workers.dev/?url=','','https://corsproxy.io/?url=','https://api.allorigins.win/raw?url=','https://api.codetabs.com/v1/proxy/?quest='],
+ route:null, // eigener Cloudflare-Weiterleiter des Nutzers steht vorn (seit 25.11.)
  async get(p){const u=MW.base+p,own=MW.prox();let ord;
   if(own)ord=[own];else{if(MW.route==null)try{MW.route=localStorage.getItem('mw:route')}catch(e){}ord=MW.RELAYS.slice();const r=MW.route;if(r!=null&&ord.includes(r)){ord.splice(ord.indexOf(r),1);ord.unshift(r)}}
   let err;for(const pr of ord){const ac=typeof AbortController!=='undefined'?new AbortController():null,to=ac?setTimeout(()=>ac.abort(),own?20000:8000):0;
