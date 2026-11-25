@@ -80,6 +80,7 @@ canvas{position:absolute;inset:0;width:100%;height:100%;touch-action:none;cursor
 .pgs{display:flex;justify-content:space-between;margin-top:6px;padding-top:6px;border-top:1px solid var(--line);font-size:12px;font-weight:600}.pgs span:last-child{color:var(--mute);font-weight:400}
 .pgf{color:var(--mute);font-size:11px;margin-top:6px;line-height:1.3}
 @media(max-width:700px){.pg{top:58px;left:8px;width:186px;padding:8px 10px}.pgr b{font-size:17px}.pgf{display:none}}
+.pg.mwx{top:auto;left:auto;right:84px;bottom:34px;width:240px;max-height:60%;overflow:auto}.pg.mwx.mini #mwc{display:none}.pg.mwx.mini .pgh{margin-bottom:0}@media(max-width:700px){.pg.mwx{top:auto;left:auto;right:62px;bottom:30px;width:190px;max-height:45%}}
 .pal{display:grid;grid-template-columns:repeat(10,1fr);gap:5px;margin:4px 0 12px}
 .pal button{appearance:none;aspect-ratio:1;min-height:24px;border-radius:6px;border:1px solid #0007;background:var(--c);cursor:pointer;padding:0}
 .pal button[aria-pressed=true]{box-shadow:0 0 0 2px #182027,0 0 0 4px var(--ink)}
@@ -145,6 +146,7 @@ canvas{position:absolute;inset:0;width:100%;height:100%;touch-action:none;cursor
   <button class="chip" id="znb" aria-pressed="true">Zonen</button>
   <button class="chip" id="pgb" aria-pressed="true">Prognose</button>
   <button class="chip" id="scb" aria-pressed="true">Szenarien</button>
+  <button class="chip" id="mwb" aria-pressed="false" title="Kalshi-Prognosebörse: was der Markt für feste Termine einpreist">Marktwetten</button>
   <button class="chip" id="fit">Ansicht zurücksetzen</button></div>
  </div>
  <nav class="tools" aria-label="Zeichenwerkzeuge">
@@ -193,6 +195,7 @@ canvas{position:absolute;inset:0;width:100%;height:100%;touch-action:none;cursor
   <div class="pgk"><span>Richtung richtig</span><b id="pgacc">–</b></div>
   <div class="pgf" id="pgf"></div>
  </div>
+ <div class="pg mwx" id="mwx" hidden><div class="pgh"><b>Marktwetten</b><span id="mwt"></span></div><div id="mwc"></div></div>
  <div class="panel" id="zzp" role="dialog" aria-label="Zickzack-Einstellungen">
   <h2>Zickzack</h2>
   <div class="frow"><label for="zz-dev">Preisabweichung für Umkehr (%)</label><input id="zz-dev" type="number" min="0.1" max="100" step="0.1" inputmode="decimal"></div>
@@ -385,6 +388,71 @@ let showTR=true;try{showTR=localStorage.getItem('chartwerk:tr')!=='0'}catch(e){}
 let showZN=true;try{showZN=localStorage.getItem('chartwerk:zn')!=='0'}catch(e){}
 let showPG=true;try{showPG=localStorage.getItem('chartwerk:pg')!=='0'}catch(e){}
 let showSC=true;try{showSC=localStorage.getItem('chartwerk:sc')!=='0'}catch(e){}
+let showMW=false;try{showMW=localStorage.getItem('chartwerk:mw')==='1'}catch(e){}
+// ===== Marktwetten (Kalshi-Prognosebörse) – identischer Block in Dashboard und Chartwerk =====
+// Liest die öffentlichen Kalshi-Märkte „Kurs über X zum Termin T?“ bzw. „Kurs zwischen A und B?“ und
+// rechnet daraus, was der Markt für den Kurs zum Termin einpreist (Mitte, 80-%-Bereich, Chance höher als jetzt).
+// Alle Werte in USD (Kalshi rechnet in USD). Nur Anzeige.
+const MW={
+ base:'https://api.elections.kalshi.com/trade-api/v2',
+ SER:{BTC:['KXBTCD','KXBTC','KXBTCW','KXBTCM','KXBTCY'],ETH:['KXETHD','KXETH','KXETHW'],XAU:['KXGOLDH','KXGOLDD','KXGOLDW','KXGOLDM','KXGOLDY']},
+ PFX:{BTC:'KXBTC',ETH:'KXETH',XAU:'KXGOLD'},CAT:{BTC:'Crypto',ETH:'Crypto',XAU:'Commodities'},
+ BK:[[.15,3,'Nächste Stunde'],[3,30,'Heute/morgen'],[30,192,'Diese Woche'],[192,1080,'Monat'],[1080,9600,'Länger']],
+ S:{},
+ prox(){try{return localStorage.getItem('mw:proxy')||''}catch(e){return''}},
+ setProx(v){try{v?localStorage.setItem('mw:proxy',v.trim()):localStorage.removeItem('mw:proxy')}catch(e){}},
+ async get(p){const u=MW.base+p,pr=MW.prox(),r=await fetch(pr?pr+encodeURIComponent(u):u,{cache:'no-store'});if(!r.ok)throw new Error('HTTP '+r.status);return r.json()},
+ n(v){const x=typeof v==='string'?parseFloat(v):v;return typeof x==='number'&&isFinite(x)?x:null},
+ d(m,k){const a=MW.n(m[k+'_dollars']);if(a!=null)return a;const c=MW.n(m[k]);return c==null?null:c/100},
+ prob(m){const b=MW.d(m,'yes_bid'),a=MW.d(m,'yes_ask'),l=MW.d(m,'last_price');
+  if(b!=null&&a!=null&&a>0&&a<=1&&a>=b&&a-b<=.12)return(a+b)/2;
+  if(l!=null&&l>0&&l<1&&(b==null||a==null||(l>=b-.02&&(a<=0||l<=a+.02))))return l;
+  if(b!=null&&a!=null&&a>0&&a<=1&&a>=b)return(a+b)/2;return l!=null&&l>0?l:null},
+ vol(m){return MW.n(m.volume_fp)??MW.n(m.volume)??0},
+ pav(ys){const st=[];ys.forEach(y=>{st.push({s:y,n:1});while(st.length>1&&st[st.length-2].s/st[st.length-2].n<st[st.length-1].s/st[st.length-1].n){const b=st.pop();st[st.length-1].s+=b.s;st[st.length-1].n+=b.n}});
+  const o=[];st.forEach(b=>{for(let i=0;i<b.n;i++)o.push(b.s/b.n)});return o},
+ // Aus allen Märkten eines Termins: Kurve P(Kurs > K) über K (aufsteigend, fallend in P)
+ curve(ms){const lad=[],bins=[];
+  ms.forEach(m=>{const p=MW.prob(m);if(p==null)return;const t=m.strike_type,f=MW.n(m.floor_strike),c=MW.n(m.cap_strike);
+   if((t==='greater'||t==='greater_or_equal')&&f!=null){lad.push([f,p]);bins.push([f,Infinity,p])}
+   else if((t==='less'||t==='less_or_equal')&&c!=null){lad.push([c,1-p]);bins.push([-Infinity,c,p])}
+   else if(t==='between'&&f!=null&&c!=null)bins.push([f,c,p])});
+  const nb=bins.filter(b=>isFinite(b[0])&&isFinite(b[1])).length;let pts;
+  if(nb>=3){bins.sort((a,b)=>a[0]-b[0]||a[1]-b[1]);const S=bins.reduce((s,b)=>s+b[2],0);if(!(S>.3))return null;
+   pts=[];let cum=1;bins.forEach(b=>{if(isFinite(b[0]))pts.push([b[0],cum]);cum-=b[2]/S});}
+  else{if(lad.length<3)return null;lad.sort((a,b)=>a[0]-b[0]);pts=lad}
+  const K=[],P=[];pts.forEach(([k,p])=>{if(K.length&&Math.abs(k-K[K.length-1])<1e-9){P[P.length-1]=(P[P.length-1]+p)/2}else{K.push(k);P.push(Math.max(0,Math.min(1,p)))}});
+  return K.length>=3?{K,P:MW.pav(P)}:null},
+ pGt(c,x){const{K,P}=c,n=K.length;if(x<=K[0])return{p:P[0],ge:true};if(x>=K[n-1])return{p:P[n-1],le:true};
+  let i=1;while(K[i]<x)i++;const f=(x-K[i-1])/(K[i]-K[i-1]);return{p:P[i-1]+f*(P[i]-P[i-1])}},
+ q(c,t){const{K,P}=c,n=K.length;if(t>P[0])return{v:K[0],lt:true};if(t<P[n-1])return{v:K[n-1],gt:true};
+  for(let i=1;i<n;i++)if(P[i]<=t){const a=P[i-1],b=P[i];return{v:a===b?(K[i-1]+K[i])/2:K[i-1]+(a-t)/(a-b)*(K[i]-K[i-1])}}return{v:K[n-1],gt:true}},
+ // Alle offenen Märkte einer Serie (mit Blättern)
+ async series(st){const out=[];let cur='';for(let k=0;k<5;k++){const j=await MW.get(`/markets?series_ticker=${st}&status=open&limit=1000${cur?'&cursor='+encodeURIComponent(cur):''}`);
+  (j.markets||[]).forEach(m=>out.push(m));cur=j.cursor;if(!cur||!(j.markets||[]).length)break}return out},
+ async discover(a){const pf=MW.PFX[a];let x=[];try{const j=await MW.get('/series?category='+encodeURIComponent(MW.CAT[a]));
+  x=(j.series||[]).map(s=>s.ticker).filter(t=>t&&t.startsWith(pf)&&!/(\d+M|MAX|MIN|ATH|UP|DOWN|ETF|HALF|RES)/.test(t.slice(pf.length)))}catch(e){}return x},
+ async load(a,force){const S=MW.S[a]||(MW.S[a]={});if(S.busy||(!force&&S.at&&Date.now()-S.at<120e3))return S;S.busy=true;
+  try{const ser=[...new Set([...MW.SER[a],...(await MW.discover(a))])].slice(0,10),ev={};let ok=0,err=null;
+   for(const st of ser){try{const ms=await MW.series(st);ok++;ms.forEach(m=>{const e=m.event_ticker||m.ticker;(ev[e]||(ev[e]={id:e,st,ms:[]})).ms.push(m)})}catch(e){err=e}}
+   if(!ok)throw err||new Error('keine Antwort');
+   const now=Date.now(),L=[];
+   Object.values(ev).forEach(e=>{const ct=Date.parse(e.ms[0].close_time||e.ms[0].expected_expiration_time||'');if(!isFinite(ct)||ct<=now)return;
+    const c=MW.curve(e.ms);if(!c)return;L.push({id:e.id,st:e.st,ct,h:(ct-now)/36e5,c,vol:e.ms.reduce((s,m)=>s+MW.vol(m),0),n:e.ms.length})});
+   // gleicher Termin bei mehreren Serien (Leiter + Spanne): die mit mehr Handel nehmen
+   L.sort((x,y)=>x.ct-y.ct);const D=[];L.forEach(e=>{const o=D.find(d=>Math.abs(d.ct-e.ct)<30*60e3);if(!o)D.push(e);else if(e.vol>o.vol)D[D.indexOf(o)]=e});
+   S.all=D;S.pick=MW.BK.map(([lo,hi,lab])=>{const c=D.filter(e=>e.h>=lo&&e.h<hi);if(!c.length)return null;const e=c.find(x=>x.vol>0)||c[0];return Object.assign({lab},e)}).filter(Boolean);
+   S.at=Date.now();S.err=null;
+   try{if(a!=='XAU'){const [u,e]=await Promise.all(['USD','EUR'].map(q=>fetch(`https://api.exchange.coinbase.com/products/BTC-${q}/ticker`,{cache:'no-store'}).then(r=>r.json())));const r=parseFloat(u.price)/parseFloat(e.price);if(r>0&&isFinite(r))MW.eurusd=r}}catch(e){}
+  }catch(e){S.err=e&&e.message==='Failed to fetch'||e instanceof TypeError?'cors':(e&&e.message||'Fehler');S.at=Date.now()}finally{S.busy=false}return S},
+ stats(e,spot){const c=e.c,m=MW.q(c,.5),lo=MW.q(c,.9),hi=MW.q(c,.1),pa=spot>0?MW.pGt(c,spot):null;return{m,lo,hi,pa}},
+ when(t){const d=new Date(t),now=new Date(),same=d.toDateString()===now.toDateString(),tm=d.toLocaleTimeString('de-DE',{hour:'2-digit',minute:'2-digit'});
+  if(same)return'heute '+tm;const tom=new Date(now.getTime()+864e5);if(d.toDateString()===tom.toDateString())return'morgen '+tm;
+  return d.toLocaleDateString('de-DE',{weekday:'short',day:'2-digit',month:'2-digit',year:d.getFullYear()!==now.getFullYear()?'2-digit':undefined})+' '+tm},
+ inH(h){return h<1?'in '+Math.max(1,Math.round(h*60))+' Min':h<48?'in '+Math.round(h)+' Std':'in '+Math.round(h/24)+' Tagen'},
+ errTxt(s){return s.err==='cors'?'Kalshi lässt den Abruf aus diesem Browser nicht zu oder ist nicht erreichbar. Abhilfe: unten eine Umweg-Adresse eintragen (z. B. ein kleiner Weiterleiter auf deinem NAS).':'Abruf fehlgeschlagen ('+s.err+').'}
+};
+
 let zzo=JSON.parse(JSON.stringify(ZZDEF));try{const z=JSON.parse(localStorage.getItem('chartwerk:zz')||'null');if(z&&isFinite(z.dev))zzo=Object.assign(zzo,z)}catch(e){}
 let view={end:0,bw:8},sc={lo:0,hi:1},W=0,H=0,dpr=1,hover=null,act=null,inited=false,clearArm=0,toastT=0;
 const cv=$('#cv'),ctx=cv.getContext('2d'),stage=$('#stage');
@@ -616,6 +684,7 @@ function draw(){
  let lo=Infinity,hi=-Infinity,vmax=0;
  for(let i=i0;i<=i1;i++){const b=data[i];if(b.l<lo)lo=b.l;if(b.h>hi)hi=b.h;if(b.v>vmax)vmax=b.v}
  const SC=showSC?scenario():null;if(SC&&lo<Infinity){hi=Math.max(hi,SC.bullHi);lo=Math.min(lo,SC.bearLo)}
+ const MWV=mwVis().filter(q=>q.i>=i0-.5&&q.i<=idx(w)+.5);if(lo<Infinity)MWV.forEach(q=>{hi=Math.max(hi,q.hi);lo=Math.min(lo,q.lo)});
  if(view.man){sc.lo=view.man.lo;sc.hi=view.man.hi}else if(lo<Infinity){const pad=(hi-lo)*.08||hi*.01||1;sc.lo=Math.max(0,lo-pad);sc.hi=hi+pad}
  $('#autob').style.display=view.man?'block':'none';
  ctx.lineWidth=1;ctx.font='12px "IBM Plex Sans",system-ui';ctx.textBaseline='middle';ctx.textAlign='left';
@@ -696,6 +765,9 @@ function draw(){
   ctx.setLineDash([4,4]);ctx.strokeStyle='rgba(76,141,255,.8)';seg(x(c0),y(FC.cur),x(c0+K),y(FC.cur*Math.exp(FC.mu*(FC.rem+(K-1)*m)/m)));
   const by=Math.round(y(FC.beat))+.5,bx=x(c0)-view.bw*.6;ctx.setLineDash([2,3]);ctx.strokeStyle='#e7ecef';seg(bx,by,x(c0+K),by);ctx.setLineDash([]);
   ctx.font='11px "IBM Plex Sans",system-ui';ctx.fillStyle='#e7ecef';ctx.textAlign='right';ctx.textBaseline=FC.cur>=FC.beat?'top':'bottom';ctx.fillText('Zu schlagen',x(c0+K),by+(FC.cur>=FC.beat?3:-3));ctx.textAlign='left'}
+ if(MWV.length){ctx.font='11px "IBM Plex Sans",system-ui';const PK='#e573d8';let px=-1e9;MWV.slice().sort((a,b)=>a.i-b.i).forEach(q=>{const xx=Math.round(x(q.i))+.5,ya=y(q.hi),yb=y(q.lo),ym=y(q.m),R=xx>w-120,dx=R?-8:8;if(xx<0||xx>w||xx-px<14)return;const lab=xx-px>=110;px=xx;
+  ctx.fillStyle='rgba(229,115,216,.12)';ctx.fillRect(xx-5,ya,10,yb-ya);ctx.strokeStyle=PK;ctx.lineWidth=1.5;ctx.setLineDash([]);seg(xx,ya,xx,yb);seg(xx-6,ya,xx+6,ya);seg(xx-6,yb,xx+6,yb);
+  ctx.fillStyle=PK;ctx.beginPath();ctx.arc(xx,ym,4,0,7);ctx.fill();if(!lab)return;ctx.textAlign=R?'right':'left';ctx.textBaseline='bottom';ctx.fillText('Markt '+MW.when(q.e.ct),xx+dx,ya-3);ctx.textBaseline='middle';ctx.fillText(fmt(q.m),xx+dx,ym)});ctx.textAlign='left'}
  if(scL.length){ctx.textBaseline='middle';scL.forEach(([t,c,yy,r])=>{ctx.font=(r?'600 ':'')+'11px "IBM Plex Sans",system-ui';const tw=ctx.measureText(t).width,tx=r?Math.max(4,w-tw-10):Math.max(6,Math.min(w*.42,w-tw-10));
   ctx.fillStyle='rgba(15,19,22,.82)';ctx.fillRect(tx-4,yy-9,tw+8,18);ctx.fillStyle=c;ctx.textAlign='left';ctx.fillText(t,tx,yy)})}
  if(!hidden)drawings.forEach((d,k)=>{if(!d.hd)shape(d,k===sel)});
@@ -773,7 +845,7 @@ function ui(){
  penUI();
  $('#vis').setAttribute('aria-pressed',hidden);$('#vis').innerHTML='<svg viewBox="0 0 22 22"><path d="M2 11s3.5-6 9-6 9 6 9 6-3.5 6-9 6-9-6-9-6z"/><circle cx="11" cy="11" r="2.5"/>'+(hidden?'<path d="M4 3l14 16"/>':'')+'</svg>';$('#vis').title=hidden?'Zeichnungen einblenden':'Zeichnungen ausblenden';
  if($('#fibp').classList.contains('on'))fibUI();if($('#chp').classList.contains('on'))chUI();obUI();layUI();if($('#fnp').classList.contains('on'))fnUI();
- $('#ma').setAttribute('aria-pressed',showMA);$('#emb').setAttribute('aria-pressed',showEMA);if($('#emp').classList.contains('on'))$('#emh').textContent='EMA-Strategie · '+sym.name;emaUI();$('#mag').setAttribute('aria-pressed',magnet>0);$('#magbd').textContent=['','•','••'][magnet];$('#mag').title=['Magnet aus','Magnet schwach','Magnet stark'][magnet];$('#zzb').setAttribute('aria-pressed',showZZ);$('#pgb').setAttribute('aria-pressed',showPG);$('#scb').setAttribute('aria-pressed',showSC);$('#znb').setAttribute('aria-pressed',showZN);$('#trb').setAttribute('aria-pressed',showTR);$('#cyb').setAttribute('aria-pressed',showCY);$('#lqb').setAttribute('aria-pressed',showLQ);$('#lqb').style.display=LQS[sym.id]?'':'none';$('#cyb').style.display=sym.id==='BTC'?'':'none';progUI();
+ $('#ma').setAttribute('aria-pressed',showMA);$('#emb').setAttribute('aria-pressed',showEMA);if($('#emp').classList.contains('on'))$('#emh').textContent='EMA-Strategie · '+sym.name;emaUI();$('#mag').setAttribute('aria-pressed',magnet>0);$('#magbd').textContent=['','•','••'][magnet];$('#mag').title=['Magnet aus','Magnet schwach','Magnet stark'][magnet];$('#zzb').setAttribute('aria-pressed',showZZ);$('#pgb').setAttribute('aria-pressed',showPG);$('#scb').setAttribute('aria-pressed',showSC);$('#znb').setAttribute('aria-pressed',showZN);$('#trb').setAttribute('aria-pressed',showTR);$('#cyb').setAttribute('aria-pressed',showCY);$('#lqb').setAttribute('aria-pressed',showLQ);$('#lqb').style.display=LQS[sym.id]?'':'none';$('#cyb').style.display=sym.id==='BTC'?'':'none';progUI();mwUI();
  $('#undo').disabled=!undo.length;$('#del').disabled=sel<0||locked(drawings[sel]);$('#lock').disabled=sel<0||lockAll;$('#lock').setAttribute('aria-pressed',sel>=0&&!!drawings[sel]?.lk);$('#lockall').setAttribute('aria-pressed',lockAll);$('#clear').disabled=!drawings.length;
  status();
  $('#pair').textContent=pairName();$('#curb').textContent=cur==='EUR'?'€ Euro':'$ Dollar';$('#curb').setAttribute('aria-pressed',cur==='EUR');$('#curb').style.display=sym.id==='EUR'?'none':'';if(curE()==='EUR')$('#ntxt').textContent+=' In Euro umgerechnet (EUR/USDT von Binance, Kurs der jeweiligen Kerze).';
@@ -867,10 +939,10 @@ const LWS=[1,1.6,2.4,3.4];
 $('#pal').innerHTML=PAL.map(c=>`<button data-c="${c}" style="--c:${c}" aria-label="Farbe ${c}"></button>`).join('');
 $('#lss').innerHTML=['solid','dash','dot'].map(k=>`<button data-ls="${k}" aria-label="${{solid:'Durchgezogen',dash:'Gestrichelt',dot:'Gepunktet'}[k]}" title="${{solid:'Durchgezogen',dash:'Gestrichelt',dot:'Gepunktet'}[k]}">${LSI[k]}</button>`).join('');
 $('#lws').innerHTML=LWS.map((w,i)=>`<button data-lw="${w}" aria-label="Stärke ${i+1}" title="Stärke ${i+1}"><svg viewBox="0 0 30 12"><path d="M2 6h26" stroke="currentColor" stroke-width="${w*1.2}"/></svg></button>`).join('');
-function layCapture(){const a=lays(sym.id),L=a.find(l=>l.id===lay);if(!L)return;const nw={tf:tf.id,ind:{ma:showMA,zzb:showZZ,trb:showTR,znb:showZN,pgb:showPG,scb:showSC,cyb:showCY,lqb:showLQ,emb:showEMA}};
+function layCapture(){const a=lays(sym.id),L=a.find(l=>l.id===lay);if(!L)return;const nw={tf:tf.id,ind:{ma:showMA,zzb:showZZ,trb:showTR,znb:showZN,pgb:showPG,scb:showSC,mwb:showMW,cyb:showCY,lqb:showLQ,emb:showEMA}};
  if(L.tf===nw.tf&&JSON.stringify(L.ind)===JSON.stringify(nw.ind))return;Object.assign(L,nw);setLays(sym.id,a)}
-function applyLay(L){const i=L&&L.ind;if(i){if('ma'in i)showMA=!!i.ma;if('zzb'in i)showZZ=!!i.zzb;if('trb'in i)showTR=!!i.trb;if('znb'in i)showZN=!!i.znb;if('pgb'in i)showPG=!!i.pgb;if('scb'in i)showSC=!!i.scb;if('cyb'in i)showCY=!!i.cyb;if('lqb'in i)showLQ=!!i.lqb;if('emb'in i)showEMA=!!i.emb;
-  try{localStorage.setItem('chartwerk:tr',showTR?'1':'0');localStorage.setItem('chartwerk:zn',showZN?'1':'0');localStorage.setItem('chartwerk:pg',showPG?'1':'0');localStorage.setItem('chartwerk:sc',showSC?'1':'0');localStorage.setItem('chartwerk:cy',showCY?'1':'0');localStorage.setItem('chartwerk:lq',showLQ?'1':'0');localStorage.setItem('chartwerk:ema',showEMA?'1':'0')}catch(e){}}
+function applyLay(L){const i=L&&L.ind;if(i){if('ma'in i)showMA=!!i.ma;if('zzb'in i)showZZ=!!i.zzb;if('trb'in i)showTR=!!i.trb;if('znb'in i)showZN=!!i.znb;if('pgb'in i)showPG=!!i.pgb;if('scb'in i)showSC=!!i.scb;if('mwb'in i)showMW=!!i.mwb;if('cyb'in i)showCY=!!i.cyb;if('lqb'in i)showLQ=!!i.lqb;if('emb'in i)showEMA=!!i.emb;
+  try{localStorage.setItem('chartwerk:tr',showTR?'1':'0');localStorage.setItem('chartwerk:zn',showZN?'1':'0');localStorage.setItem('chartwerk:pg',showPG?'1':'0');localStorage.setItem('chartwerk:sc',showSC?'1':'0');localStorage.setItem('chartwerk:mw',showMW?'1':'0');localStorage.setItem('chartwerk:cy',showCY?'1':'0');localStorage.setItem('chartwerk:lq',showLQ?'1':'0');localStorage.setItem('chartwerk:ema',showEMA?'1':'0')}catch(e){}}
  const t=L&&L.tf&&TFS.find(x=>x.id===L.tf);if(t&&t!==tf){tf=t;return true}return false}
 function layInit(){let l='';try{l=localStorage.getItem('chartwerk:lay:'+sym.id)||''}catch(e){}return lays(sym.id).some(q=>q.id===l)?l:''}
 function setLay(lid){layCapture();lay=lid;try{localStorage.setItem('chartwerk:lay:'+sym.id,lid)}catch(e){}const tch=applyLay(curLay());load();sel=-1;undo=[];chanP=-1;if(tch)loadData(true);else{ui();draw()}}
@@ -908,7 +980,7 @@ $('#autob').onclick=()=>{view.man=null;draw()};
 $('#layb').onclick=()=>{if(openPanel('#layp')){laySig='';layUI()}};
 $('#layok').onclick=()=>$('#layp').classList.remove('on');
 function newLay(copy){const n=($('#layn').value.trim()||'Layout '+lays(sym.id).length).slice(0,30),id=Math.random().toString(36).slice(2,10),a=lays(sym.id);
- layCapture();a.push({id,n,tf:tf.id,ind:{ma:showMA,zzb:showZZ,trb:showTR,znb:showZN,pgb:showPG,scb:showSC,cyb:showCY,lqb:showLQ,emb:showEMA}});setLays(sym.id,a);
+ layCapture();a.push({id,n,tf:tf.id,ind:{ma:showMA,zzb:showZZ,trb:showTR,znb:showZN,pgb:showPG,scb:showSC,mwb:showMW,cyb:showCY,lqb:showLQ,emb:showEMA}});setLays(sym.id,a);
  try{localStorage.setItem('chartwerk:'+ek(sym.id,cl(id)),copy?snap():'[]');localStorage.setItem('chartwerk:u:'+ek(sym.id,cl(id)),Date.now())}catch(e){}
  $('#layn').value='';setLay(id);toast('Layout „'+n+'“ angelegt'+(copy?' (Kopie)':''))}
 $('#laynew').onclick=()=>newLay(false);$('#laycp').onclick=()=>newLay(true);
@@ -1087,7 +1159,7 @@ $('#lss').onclick=e=>{const b=e.target.closest('button');if(b)penSet('ls',b.data
 $('#lws').onclick=e=>{const b=e.target.closest('button');if(b)penSet('lw',+b.dataset.lw)};
 $('#colok').onclick=()=>$('#colp').classList.remove('on');
 const KN={trend:'Trendlinie',ray:'Strahl',ext:'Erweiterte Linie',chan:'Parallelkanal',info:'Info-Linie',hline:'Horizontale Linie',goal:'Ziel',rect:'Rechteck',fib:'Fibonacci-Retracement',fan:'Fib-Fächer',brush:'Freihand'};
-const IND=[['ma','MA 20/50'],['zzb','Zickzack'],['cyb','Halving-Zyklus (Bitcoin)'],['lqb','Liquidations-Heatmap (BTC, Gold, Silber, Öl)'],['emb','EMA 12 Long/Short mit Check'],['trb','Trendlinien (automatisch)'],['znb','Kauf- und Verkaufszonen'],['pgb','Prognose'],['scb','Szenarien']];
+const IND=[['ma','MA 20/50'],['zzb','Zickzack'],['cyb','Halving-Zyklus (Bitcoin)'],['lqb','Liquidations-Heatmap (BTC, Gold, Silber, Öl)'],['emb','EMA 12 Long/Short mit Check'],['trb','Trendlinien (automatisch)'],['znb','Kauf- und Verkaufszonen'],['pgb','Prognose'],['scb','Szenarien'],['mwb','Marktwetten (Kalshi)']];
 const EYE=(on)=>'<svg viewBox="0 0 22 22"><path d="M2 11s3.5-6 9-6 9 6 9 6-3.5 6-9 6-9-6-9-6z"/><circle cx="11" cy="11" r="2.5"/>'+(on?'':'<path d="M4 3l14 16"/>')+'</svg>';
 const LCK='<svg viewBox="0 0 22 22"><rect x="5" y="10" width="12" height="9" rx="1.5"/><path d="M8 10V7a3 3 0 016 0v3"/></svg>',BIN='<svg viewBox="0 0 22 22"><path d="M4 6h14M8.5 6V4h5v2M6 6l1 13h8l1-13"/></svg>';
 let obSig='';
@@ -1267,6 +1339,24 @@ $('#ghoff').onclick=()=>{ghTok='';gistId='';try{localStorage.removeItem('chartwe
 document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')sync()});
 setInterval(()=>{if(document.visibilityState==='visible')sync()},45000);
 if('serviceWorker' in navigator&&location.protocol==='https:'&&!/claude/.test(location.hostname)){try{navigator.serviceWorker.register('sw.js').catch(()=>{})}catch(e){}}
+// Marktwetten im Chart: Kalshi-Termine als senkrechte Spanne (80 %-Bereich, Punkt = Mitte) am Termin + Infokasten
+const mwA=()=>sym&&({BTC:'BTC',ETH:'ETH',XAU:'XAU'})[sym.id]||null;
+function mwVis(){const a=mwA(),S=a&&MW.S[a];if(!showMW||!S||!S.pick||!data.length)return[];const k=fxNow();
+ return S.pick.map(e=>{const s=MW.stats(e,data[data.length-1].c*k);return{e,s,i:idxOfT(e.ct),m:s.m.v/k,lo:s.lo.v/k,hi:s.hi.v/k}})}
+function mwUI(){const el=$('#mwx'),a=mwA();$('#mwb').style.display=a?'':'none';$('#mwb').setAttribute('aria-pressed',showMW);
+ if(!showMW||!a){el.hidden=true;return}el.hidden=false;const S=MW.S[a];
+ if(!S||!S.at){$('#mwc').innerHTML='<div class="pgf">lädt…</div>';if(!S||!S.busy)MW.load(a).then(()=>{mwUI();draw()});return}
+ const pr=`<input id="mwpx" placeholder="Umweg-Adresse, z. B. http://nas:8080/?url=" value="${(MW.prox()||'').replace(/"/g,'&quot;')}" style="width:100%;margin-top:6px;box-sizing:border-box;font-size:11px">`;
+ if(S.err){$('#mwc').innerHTML=`<div class="pgf" style="display:block;color:var(--dn)">${MW.errTxt(S)}</div>${pr}`;mwPx();return}
+ const V=mwVis(),pc=v=>Math.round(v*100)+' %';
+ $('#mwc').innerHTML=(V.length?'<div class="pgk" style="font-size:11px"><span>Termin</span><span>Mitte · höher als jetzt</span></div>'+V.map(({e,s,m,lo,hi})=>`<div class="pgk" style="border-top:1px solid var(--line);padding-top:4px"><span>${e.lab}<br><small>${MW.when(e.ct)}</small></span><b style="text-align:right">${(s.m.lt?'< ':s.m.gt?'> ':'')+fmt(m)} · <span class="${s.pa&&s.pa.p>.52?'up':s.pa&&s.pa.p<.48?'dn':''}">${s.pa?(s.pa.ge?'≥ ':s.pa.le?'≤ ':'')+pc(s.pa.p):'–'}</span><br><small style="color:var(--mute);font-weight:400">80 %: ${fmt(lo)} – ${fmt(hi)}</small></b></div>`).join(''):'<div class="pgf" style="display:block">Gerade keine offenen Märkte.</div>')+
+  `<div class="pgf" style="display:block">Kalshi (USD${curE()==='EUR'?', umgerechnet':''}) · Stand ${new Date(S.at).toLocaleTimeString('de-DE',{hour:'2-digit',minute:'2-digit'})} · nur Anzeige</div>`;
+ $('#mwt').textContent=sym.name}
+function mwPx(){const i=$('#mwpx');if(i)i.onchange=()=>{MW.setProx(i.value);const a=mwA();if(a)MW.load(a,true).then(()=>{mwUI();draw()})}}
+$('#mwb').onclick=()=>{showMW=!showMW;try{localStorage.setItem('chartwerk:mw',showMW?'1':'0')}catch(e){}ui();draw()};
+if(innerWidth<700)$('#mwx').classList.add('mini');
+$('#mwx').addEventListener('click',e=>{if(e.target.closest('input'))return;$('#mwx').classList.toggle('mini')});
+setInterval(()=>{const a=mwA();if(showMW&&a&&document.visibilityState==='visible')MW.load(a).then(()=>{mwUI();draw()})},20000);
 lay=layInit();applyLay(curLay());load();agg();recalc();ui();ro.observe(stage);
 if(document.fonts)document.fonts.ready.then(draw);
 probe().then(ok=>{net=ok;if(ok)loadData(true);else ui()});
