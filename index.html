@@ -401,7 +401,18 @@ const MW={
  S:{},
  prox(){try{return localStorage.getItem('mw:proxy')||''}catch(e){return''}},
  setProx(v){try{v?localStorage.setItem('mw:proxy',v.trim()):localStorage.removeItem('mw:proxy')}catch(e){}},
- async get(p){const u=MW.base+p,pr=MW.prox(),r=await fetch(pr?pr+encodeURIComponent(u):u,{cache:'no-store'});if(!r.ok)throw new Error('HTTP '+r.status);return r.json()},
+ // Kalshi erlaubt keinen direkten Browser-Abruf (CORS) → der Reihe nach über öffentliche Weiterleiter; der funktionierende wird gemerkt.
+ // Es laufen nur öffentliche Marktdaten darüber, keine Schlüssel. Eigene Umweg-Adresse hat Vorrang.
+ RELAYS:['','https://corsproxy.io/?url=','https://api.allorigins.win/raw?url=','https://api.codetabs.com/v1/proxy/?quest='],
+ route:null,
+ async get(p){const u=MW.base+p,own=MW.prox();let ord;
+  if(own)ord=[own];else{if(MW.route==null)try{MW.route=localStorage.getItem('mw:route')}catch(e){}ord=MW.RELAYS.slice();const r=MW.route;if(r!=null&&ord.includes(r)){ord.splice(ord.indexOf(r),1);ord.unshift(r)}}
+  let err;for(const pr of ord){const ac=typeof AbortController!=='undefined'?new AbortController():null,to=ac?setTimeout(()=>ac.abort(),15000):0;
+   try{const r=await fetch(pr?pr+encodeURIComponent(u):u,{cache:'no-store',signal:ac?ac.signal:undefined});if(!r.ok)throw new Error('HTTP '+r.status);const j=await r.json();
+    if(!j||typeof j!=='object')throw new Error('keine Daten');if(!own&&MW.route!==pr){MW.route=pr;try{localStorage.setItem('mw:route',pr)}catch(e){}}return j}
+   catch(e){err=e}finally{clearTimeout(to)}}
+  throw err||new Error('keine Antwort')},
+ via(){const p=MW.prox()||MW.route||'';return p?' · über '+(p.match(/^https?:\/\/([^/?]+)/)||[,'Umweg'])[1]:''},
  n(v){const x=typeof v==='string'?parseFloat(v):v;return typeof x==='number'&&isFinite(x)?x:null},
  d(m,k){const a=MW.n(m[k+'_dollars']);if(a!=null)return a;const c=MW.n(m[k]);return c==null?null:c/100},
  prob(m){const b=MW.d(m,'yes_bid'),a=MW.d(m,'yes_ask'),l=MW.d(m,'last_price');
@@ -450,7 +461,7 @@ const MW={
   if(same)return'heute '+tm;const tom=new Date(now.getTime()+864e5);if(d.toDateString()===tom.toDateString())return'morgen '+tm;
   return d.toLocaleDateString('de-DE',{weekday:'short',day:'2-digit',month:'2-digit',year:d.getFullYear()!==now.getFullYear()?'2-digit':undefined})+' '+tm},
  inH(h){return h<1?'in '+Math.max(1,Math.round(h*60))+' Min':h<48?'in '+Math.round(h)+' Std':'in '+Math.round(h/24)+' Tagen'},
- errTxt(s){return s.err==='cors'?'Kalshi lässt den Abruf aus diesem Browser nicht zu oder ist nicht erreichbar. Abhilfe: unten eine Umweg-Adresse eintragen (z. B. ein kleiner Weiterleiter auf deinem NAS).':'Abruf fehlgeschlagen ('+s.err+').'}
+ errTxt(s){return(s.err==='cors'?'Kalshi war weder direkt noch über die öffentlichen Weiterleiter erreichbar.':'Abruf fehlgeschlagen ('+s.err+').')+' Nächster Versuch in 2 Minuten. Dauerhafte Abhilfe: eigene Umweg-Adresse eintragen (z. B. Weiterleiter auf deinem NAS).'}
 };
 
 let zzo=JSON.parse(JSON.stringify(ZZDEF));try{const z=JSON.parse(localStorage.getItem('chartwerk:zz')||'null');if(z&&isFinite(z.dev))zzo=Object.assign(zzo,z)}catch(e){}
@@ -1350,7 +1361,7 @@ function mwUI(){const el=$('#mwx'),a=mwA();$('#mwb').style.display=a?'':'none';$
  if(S.err){$('#mwc').innerHTML=`<div class="pgf" style="display:block;color:var(--dn)">${MW.errTxt(S)}</div>${pr}`;mwPx();return}
  const V=mwVis(),pc=v=>Math.round(v*100)+' %';
  $('#mwc').innerHTML=(V.length?'<div class="pgk" style="font-size:11px"><span>Termin</span><span>Mitte · höher als jetzt</span></div>'+V.map(({e,s,m,lo,hi})=>`<div class="pgk" style="border-top:1px solid var(--line);padding-top:4px"><span>${e.lab}<br><small>${MW.when(e.ct)}</small></span><b style="text-align:right">${(s.m.lt?'< ':s.m.gt?'> ':'')+fmt(m)} · <span class="${s.pa&&s.pa.p>.52?'up':s.pa&&s.pa.p<.48?'dn':''}">${s.pa?(s.pa.ge?'≥ ':s.pa.le?'≤ ':'')+pc(s.pa.p):'–'}</span><br><small style="color:var(--mute);font-weight:400">80 %: ${fmt(lo)} – ${fmt(hi)}</small></b></div>`).join(''):'<div class="pgf" style="display:block">Gerade keine offenen Märkte.</div>')+
-  `<div class="pgf" style="display:block">Kalshi (USD${curE()==='EUR'?', umgerechnet':''}) · Stand ${new Date(S.at).toLocaleTimeString('de-DE',{hour:'2-digit',minute:'2-digit'})} · nur Anzeige</div>`;
+  `<div class="pgf" style="display:block">Kalshi (USD${curE()==='EUR'?', umgerechnet':''}) · Stand ${new Date(S.at).toLocaleTimeString('de-DE',{hour:'2-digit',minute:'2-digit'})}${MW.via()} · nur Anzeige</div>`;
  $('#mwt').textContent=sym.name}
 function mwPx(){const i=$('#mwpx');if(i)i.onchange=()=>{MW.setProx(i.value);const a=mwA();if(a)MW.load(a,true).then(()=>{mwUI();draw()})}}
 $('#mwb').onclick=()=>{showMW=!showMW;try{localStorage.setItem('chartwerk:mw',showMW?'1':'0')}catch(e){}ui();draw()};
