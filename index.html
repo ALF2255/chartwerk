@@ -407,10 +407,10 @@ const MW={
  route:null,
  async get(p){const u=MW.base+p,own=MW.prox();let ord;
   if(own)ord=[own];else{if(MW.route==null)try{MW.route=localStorage.getItem('mw:route')}catch(e){}ord=MW.RELAYS.slice();const r=MW.route;if(r!=null&&ord.includes(r)){ord.splice(ord.indexOf(r),1);ord.unshift(r)}}
-  let err;for(const pr of ord){const ac=typeof AbortController!=='undefined'?new AbortController():null,to=ac?setTimeout(()=>ac.abort(),15000):0;
+  let err;for(const pr of ord){const ac=typeof AbortController!=='undefined'?new AbortController():null,to=ac?setTimeout(()=>ac.abort(),own?20000:8000):0;
    try{const r=await fetch(pr?pr+encodeURIComponent(u):u,{cache:'no-store',signal:ac?ac.signal:undefined});if(!r.ok)throw new Error('HTTP '+r.status);const j=await r.json();
     if(!j||typeof j!=='object')throw new Error('keine Daten');if(!own&&MW.route!==pr){MW.route=pr;try{localStorage.setItem('mw:route',pr)}catch(e){}}return j}
-   catch(e){err=e}finally{clearTimeout(to)}}
+   catch(e){err=e&&e.name==='AbortError'?new Error('Zeitüberschreitung'):e}finally{clearTimeout(to)}}
   throw err||new Error('keine Antwort')},
  via(){const p=MW.prox()||MW.route||'';return p?' · über '+(p.match(/^https?:\/\/([^/?]+)/)||[,'Umweg'])[1]:''},
  n(v){const x=typeof v==='string'?parseFloat(v):v;return typeof x==='number'&&isFinite(x)?x:null},
@@ -445,7 +445,7 @@ const MW={
   x=(j.series||[]).map(s=>s.ticker).filter(t=>t&&t.startsWith(pf)&&!/(\d+M|MAX|MIN|ATH|UP|DOWN|ETF|HALF|RES)/.test(t.slice(pf.length)))}catch(e){}return x},
  async load(a,force){const S=MW.S[a]||(MW.S[a]={});if(S.busy||(!force&&S.at&&Date.now()-S.at<120e3))return S;S.busy=true;
   try{const ser=[...new Set([...MW.SER[a],...(await MW.discover(a))])].slice(0,10),ev={};let ok=0,err=null;
-   for(const st of ser){try{const ms=await MW.series(st);ok++;ms.forEach(m=>{const e=m.event_ticker||m.ticker;(ev[e]||(ev[e]={id:e,st,ms:[]})).ms.push(m)})}catch(e){err=e}}
+   for(const st of ser){try{const ms=await MW.series(st);ok++;ms.forEach(m=>{const e=m.event_ticker||m.ticker;(ev[e]||(ev[e]={id:e,st,ms:[]})).ms.push(m)})}catch(e){err=e;if(!ok)break}} // erster Abruf scheitert ganz → nicht alle Serien durchprobieren
    if(!ok)throw err||new Error('keine Antwort');
    const now=Date.now(),L=[];
    Object.values(ev).forEach(e=>{const ct=Date.parse(e.ms[0].close_time||e.ms[0].expected_expiration_time||'');if(!isFinite(ct)||ct<=now)return;
@@ -461,7 +461,7 @@ const MW={
   if(same)return'heute '+tm;const tom=new Date(now.getTime()+864e5);if(d.toDateString()===tom.toDateString())return'morgen '+tm;
   return d.toLocaleDateString('de-DE',{weekday:'short',day:'2-digit',month:'2-digit',year:d.getFullYear()!==now.getFullYear()?'2-digit':undefined})+' '+tm},
  inH(h){return h<1?'in '+Math.max(1,Math.round(h*60))+' Min':h<48?'in '+Math.round(h)+' Std':'in '+Math.round(h/24)+' Tagen'},
- errTxt(s){return(s.err==='cors'?'Kalshi war weder direkt noch über die öffentlichen Weiterleiter erreichbar.':'Abruf fehlgeschlagen ('+s.err+').')+' Nächster Versuch in 2 Minuten. Dauerhafte Abhilfe: eigene Umweg-Adresse eintragen (z. B. Weiterleiter auf deinem NAS).'}
+ errTxt(s){return(s.err==='cors'||s.err==='Zeitüberschreitung'||/^HTTP/.test(s.err)?'Kalshi war weder direkt noch über die öffentlichen Weiterleiter erreichbar'+(MW.prox()?' (auch nicht über deine Umweg-Adresse)':'')+'.':'Abruf fehlgeschlagen ('+s.err+').')+' Nächster Versuch in 2 Minuten. Dauerhafte Abhilfe: eigene Umweg-Adresse eintragen (z. B. Weiterleiter auf deinem NAS).'}
 };
 
 let zzo=JSON.parse(JSON.stringify(ZZDEF));try{const z=JSON.parse(localStorage.getItem('chartwerk:zz')||'null');if(z&&isFinite(z.dev))zzo=Object.assign(zzo,z)}catch(e){}
