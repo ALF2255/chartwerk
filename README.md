@@ -28,6 +28,10 @@ nächsten offenen Lücken mit Abstand zum Kurs und wie oft Lücken innerhalb von
 wurden (geschlossen = Kurs wieder auf dem Schluss vor der Lücke). Mindestgröße einstellbar. Feiertage werden nicht
 berücksichtigt. Für die Statistik am besten den Zeitrahmen „Tag“ nehmen.
 
+Schalter „Wende nach dem Schließen“ im Gaps-Kasten: wie oft der Kurs 1 W / 4 W / 3 M nach dem Schließen wieder auf der Seite
+liegt, von der er in die Lücke kam (also an der Lücke gedreht hat) – im Vergleich zum Zufall (wie oft der Kurs nach derselben
+Zeit überhaupt höher bzw. tiefer liegt). Im Chart ein Punkt am Schließ-Niveau: grün = nach 4 Wochen gewendet, rot = weitergelaufen.
+
 ## Einrichten auf GitHub Pages
 
 1. Auf github.com ein neues Repository anlegen, Name `chartwerk`, Sichtbarkeit **Public**.
