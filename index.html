@@ -1459,14 +1459,15 @@ function calcGaps(){const n=data.length;if(n<3)return null;const key=sym.id+tf.i
  return GPS={G,thr,up:st(true),dn:st(false),t0:data[0].t}}
 function gpDraw(w){if(!showGP)return;const S=calcGaps();if(!S)return;ctx.font='11px "IBM Plex Sans",system-ui';ctx.textAlign='right';
  S.G.forEach(g=>{const xa=x(g.i)-view.bw/2;if(xa>=w)return;const c=g.up?'41,98,255':'255,152,0';
-  if(g.j>=0){const xe=x(g.j)+view.bw/2;if(xe<0)return;const y0=y(Math.max(g.a,g.o)),y1=y(Math.min(g.a,g.o));ctx.fillStyle=`rgba(${c},.08)`;ctx.fillRect(xa,y0,xe-xa,Math.max(1,y1-y0));return}
+  if(g.j>=0){const xe=x(g.j)+view.bw/2;if(xe<0)return;const y0=y(Math.max(g.a,g.o)),y1=y(Math.min(g.a,g.o)),hh=Math.max(2,y1-y0);ctx.fillStyle=`rgba(${c},.2)`;ctx.fillRect(xa,y0,xe-xa,hh);ctx.strokeStyle=`rgba(${c},.55)`;ctx.lineWidth=1;ctx.strokeRect(xa+.5,y0+.5,Math.max(1,xe-xa-1),hh-1);
+   if(xe-xa>=34){ctx.save();ctx.textAlign='left';ctx.textBaseline='bottom';ctx.fillStyle=`rgba(${c},.9)`;ctx.font='10px "IBM Plex Sans",system-ui';ctx.fillText('Gap ✓',xa+2,y0-2);ctx.restore()}return}
   const lo=Math.min(g.a,g.rem),hi=Math.max(g.a,g.rem),y0=y(hi),y1=y(lo),x0=Math.max(0,xa);ctx.fillStyle=`rgba(${c},.2)`;ctx.fillRect(x0,y0,w-x0,Math.max(1,y1-y0));
   ctx.strokeStyle=`rgba(${c},.85)`;ctx.lineWidth=1;ctx.setLineDash([4,3]);seg(x0,y0,w,y0);seg(x0,y1,w,y1);ctx.setLineDash([]);
   const t='Gap '+(g.up?'▲ ':'▼ ')+fmt(lo)+' – '+fmt(hi)+' offen';ctx.fillStyle=`rgb(${c})`;
   if(y1-y0>15){ctx.textBaseline='middle';ctx.fillText(t,w-6,(y0+y1)/2)}else if(g.up){ctx.textBaseline='top';ctx.fillText(t,w-6,y1+3)}else{ctx.textBaseline='bottom';ctx.fillText(t,w-6,y0-3)}});
  ctx.textAlign='left';ctx.textBaseline='middle'}
 const gpPct=v=>(v*100).toLocaleString('de-DE',{maximumFractionDigits:2})+' %';
-const gpDur=v=>v<=0?'in der 1. Kerze':v<1.5*DAY?(v<DAY?'unter 1 Tag':'1 Tag'):v<14*DAY?Math.round(v/DAY)+' Tagen':Math.round(v/7/DAY)+' Wochen';
+const gpDur=v=>v<=0?'1. Kerze':v<1.5*DAY?(v<DAY?'unter 1 Tag':'1 Tag'):v<14*DAY?Math.round(v/DAY)+' Tagen':Math.round(v/7/DAY)+' Wochen';
 function gpUI(){const el=$('#gpx');$('#gpb').setAttribute('aria-pressed',showGP);if(!showGP||!data.length){el.hidden=true;return}el.hidden=false;
  const S=calcGaps(),n=data.length;$('#gpt').textContent=sym.name+' · '+tf.l;if(!S){$('#gpc').innerHTML='<div class="pgf" style="display:block">Zu wenige Kerzen.</div>';return}
  const C=data[n-1].c,O=S.G.filter(g=>g.j<0).map(g=>{const lo=Math.min(g.a,g.rem),hi=Math.max(g.a,g.rem),z=C>hi?hi:C<lo?lo:C;return{g,lo,hi,dist:z/C-1}}).sort((p,q)=>Math.abs(p.dist)-Math.abs(q.dist));

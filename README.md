@@ -23,7 +23,7 @@ Knopf „Gaps“: Binance handelt rund um die Uhr, die Börse nicht (Fr 17 Uhr b
 also etwa Fr 23 bis So 24 Uhr deutscher Zeit). Mit eingeschaltetem Knopf werden die Wochenend-Kerzen weggelassen – dann
 entsteht zwischen Freitagsschluss und Wochenstart die Lücke wie bei TradingView (bei Bitcoin & Co. die bekannte „CME-Lücke“).
 Woche und Monat werden dafür aus Tageskerzen gebaut. Offene Lücken erscheinen als Zone (blau = Lücke nach oben,
-orange = nach unten), teilweise gefüllte Lücken schrumpfen, geschlossene bleiben blass sichtbar. Der Kasten zeigt die
+orange = nach unten), teilweise gefüllte Lücken schrumpfen, geschlossene bleiben als umrandete Fläche „Gap ✓“ sichtbar (vom Entstehen bis zum Schließen). Der Kasten zeigt die
 nächsten offenen Lücken mit Abstand zum Kurs und wie oft Lücken innerhalb von 1 Woche, 4 Wochen und 3 Monaten geschlossen
 wurden (geschlossen = Kurs wieder auf dem Schluss vor der Lücke). Mindestgröße einstellbar. Feiertage werden nicht
 berücksichtigt. Für die Statistik am besten den Zeitrahmen „Tag“ nehmen.
