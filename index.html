@@ -82,6 +82,7 @@ canvas{position:absolute;inset:0;width:100%;height:100%;touch-action:none;cursor
 @media(max-width:700px){.pg{top:58px;left:8px;width:186px;padding:8px 10px}.pgr b{font-size:17px}.pgf{display:none}}
 .pg.htx{left:auto;right:84px;top:46px;width:250px;max-height:calc(50% - 56px);overflow:auto}.pg.htx.mini #htc{display:none}.pg.htx.mini .pgh{margin-bottom:0}@media(max-width:700px){.pg.htx{right:62px;top:58px;width:190px}}
 .pg.gpx{left:auto;right:84px;top:46px;width:250px;max-height:calc(100% - 80px);overflow:auto;cursor:pointer}.pg.gpx.mini #gpc{display:none}.pg.gpx.mini .pgh{margin-bottom:0}.pg.gpx select{background:var(--bg);color:var(--ink);border:1px solid var(--line);border-radius:6px;font:inherit;font-size:12px;padding:2px 4px}@media(max-width:700px){.pg.gpx{left:auto;right:62px;top:58px;width:190px}}
+.pg.gpx .gpo{padding:3px 0;border-top:1px solid var(--line);font-size:12px}.pg.gpx .gpo>div:last-child{display:flex;justify-content:space-between;gap:6px;color:var(--mute)}.pg.gpx .gpo b{color:var(--ink);font-weight:500}.pg.gpx .gpt{width:100%;border-collapse:collapse;font-size:12px}.pg.gpx .gpt td{padding:2px 0;text-align:right;white-space:nowrap}.pg.gpx .gpt td:first-child{text-align:left}.pg.gpx .gpt tr:first-child td{color:var(--mute)}
 .pg.mwx{top:auto;left:auto;right:84px;bottom:34px;width:240px;max-height:calc(50% - 40px);overflow:auto}.pg.mwx.mini #mwc{display:none}.pg.mwx.mini .pgh{margin-bottom:0}@media(max-width:700px){.pg.mwx{top:auto;left:auto;right:62px;bottom:30px;width:190px;max-height:45%}}
 .pal{display:grid;grid-template-columns:repeat(10,1fr);gap:5px;margin:4px 0 12px}
 .pal button{appearance:none;aspect-ratio:1;min-height:24px;border-radius:6px;border:1px solid #0007;background:var(--c);cursor:pointer;padding:0}
@@ -1472,13 +1473,14 @@ function gpUI(){const el=$('#gpx');$('#gpb').setAttribute('aria-pressed',showGP)
  const S=calcGaps(),n=data.length;$('#gpt').textContent=sym.name+' · '+tf.l;if(!S){$('#gpc').innerHTML='<div class="pgf" style="display:block">Zu wenige Kerzen.</div>';return}
  const C=data[n-1].c,O=S.G.filter(g=>g.j<0).map(g=>{const lo=Math.min(g.a,g.rem),hi=Math.max(g.a,g.rem),z=C>hi?hi:C<lo?lo:C;return{g,lo,hi,dist:z/C-1}}).sort((p,q)=>Math.abs(p.dist)-Math.abs(q.dist));
  const dt=t=>new Date(t).toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit',year:'2-digit',timeZone:'UTC'});
- const row=(lab,st,cls)=>`<div class="pgk"><span><span class="${cls}">${lab}</span> (${st.n})</span><b>${st.r.map(q=>q.n>=5?Math.round(q.f/q.n*100)+' %':'–').join(' · ')}</b></div>`;
- const live=src==='binance'||src==='bfut'||src==='twelve';
- $('#gpc').innerHTML=`<div class="pgs" style="margin-top:0;padding-top:0;border-top:0"><span>Offene Lücken (${O.length})</span><span>Abstand</span></div>`+
-  (O.length?O.slice(0,5).map(q=>`<div class="pgk"><span class="${q.g.up?'up':'dn'}">${q.g.up?'▲':'▼'} ${fmt(q.lo)} – ${fmt(q.hi)}<br><small style="color:var(--mute)">seit ${dt(q.g.t)}</small></span><b>${q.dist===0?'im Gap':(q.dist>0?'+':'−')+gpPct(Math.abs(q.dist))}</b></div>`).join(''):'<div class="pgk"><span>keine</span></div>')+
-  `<div class="pgs"><span>Geschlossen nach</span><span>${GPH.map(q=>q[0]).join(' · ')}</span></div>`+row('▲ nach oben',S.up,'up')+row('▼ nach unten',S.dn,'dn')+
-  `<div class="pgk"><span>Meist nach</span><b>${[S.up.med,S.dn.med].filter(v=>v!=null).length?(S.up.med!=null?'▲ '+gpDur(S.up.med):'')+(S.up.med!=null&&S.dn.med!=null?' · ':'')+(S.dn.med!=null?'▼ '+gpDur(S.dn.med):''):'–'}</b></div>`+
-  `<div class="pgk"><span>Mindestgröße</span><select id="gpmin">${[[.5,'klein'],[1,'mittel'],[2,'groß']].map(([v,l])=>`<option value="${v}"${v===gpMin?' selected':''}>${l} (${gpPct(sym.v*.2*v)})</option>`).join('')}</select></div>`+
+ const cell=(st,k)=>{const q=st.r[k];return q.n>=5?Math.round(q.f/q.n*100)+' %':'–'};
+ const row=(lab,st,cls)=>`<tr><td class="${cls}">${lab} <small style="color:var(--mute)">${st.n}</small></td>${[0,1,2].map(k=>`<td>${cell(st,k)}</td>`).join('')}</tr>`;
+ const live=src==='binance'||src==='bfut'||src==='twelve',med=[[S.up.med,'▲'],[S.dn.med,'▼']].filter(q=>q[0]!=null).map(q=>q[1]+' '+gpDur(q[0])).join(' · ')||'–';
+ $('#gpc').innerHTML=`<div class="pgs" style="margin-top:0;padding-top:0;border-top:0"><span>Offen (${O.length})</span><span>Abstand</span></div>`+
+  (O.length?O.slice(0,5).map(q=>`<div class="gpo"><div class="${q.g.up?'up':'dn'}">${q.g.up?'▲':'▼'} ${fmt(q.lo)} – ${fmt(q.hi)}</div><div><small>seit ${dt(q.g.t)}</small><b>${q.dist===0?'im Gap':(q.dist>0?'+':'−')+gpPct(Math.abs(q.dist))}</b></div></div>`).join(''):'<div class="pgk"><span>keine</span></div>')+
+  `<div class="pgs"><span>Geschlossen nach</span><span></span></div><table class="gpt"><tr><td></td>${GPH.map(q=>`<td>${q[0]}</td>`).join('')}</tr>${row('▲ oben',S.up,'up')}${row('▼ unten',S.dn,'dn')}</table>`+
+  `<div class="gpo" style="border:0"><div style="color:var(--mute)">Meist geschlossen nach</div><div><b>${med}</b></div></div>`+
+  `<div class="gpo" style="border:0"><div><span style="color:var(--mute)">Mindestgröße:</span><br><select id="gpmin">${[[.5,'klein'],[1,'mittel'],[2,'groß']].map(([v,l])=>`<option value="${v}"${v===gpMin?' selected':''}>${l} ${gpPct(sym.v*.2*v)}</option>`).join('')}</select></div></div>`+
   `<div class="pgf" style="display:block">${S.up.n+S.dn.n} Lücken seit ${dt(S.t0)}. Geschlossen = Kurs wieder auf dem Schluss vor der Lücke. „–“ = unter 5 Fälle. Auflösung ${tf.l}: für die Statistik am besten „Tag“.${src==='binance'||src==='bfut'?' Wochenende wie an der Börse ausgeblendet.':''}${live?'':' Simulierte Kurse – Werte ohne Aussagekraft.'}</div>`;
  gpPos();
  const sl=$('#gpmin');if(sl)sl.onchange=()=>{gpMin=+sl.value;try{localStorage.setItem('chartwerk:gpmin',String(gpMin))}catch(e){}GPK='';ui();draw()}}
