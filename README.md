@@ -43,8 +43,8 @@ Drei Knöpfe, jeder einzeln abschaltbar (auch im Objektbaum, in „Indikatoren �
 - **MACD** – 12/26/9, Linie grün über / rot unter der Signallinie, Histogramm 4-farbig (steigend/fallend über/unter null).
   Knopf „TF“: wie Chart oder **nächsthöherer Zeitrahmen** (z. B. Woche auf dem Tageschart); der laufende Abschnitt wird mit dem aktuellen Kurs gerechnet.
 - **MACD-Signale** – BUY/SELL im Chart bei MACD-Kreuzung (immer im Chart-Zeitrahmen), aktuelle Position mit Einstieg,
-  Ziel (3× ATR 14) und Stop (2× ATR 14) als Linien, in der Kopfzeile BULL/BEAR, Trend und ein Check (wie oft Ziel vor Stop).
-  Knopf „Signale“: alle Kreuzungen / gefiltert (BUY nur unter, SELL nur über der Nulllinie) / nur Nulllinien-Durchgänge (wenigste Signale).
+  Ziel (3× ATR 14) und Stop (2× ATR 14) als Linien, in der Kopfzeile MACD über/unter 0, Schwung steigt/fällt, letztes Signal mit Ziel/Stop in % und ein Check (wie oft Ziel vor Stop).
+  Knopf „Signale“: alle Kreuzungen / gefiltert (BUY unter oder nahe, SELL über oder nahe der Nulllinie – Spielraum ¼ des üblichen MACD-Ausschlags; Wackler mit kleinem Histogramm davor zählen nicht) / nur Nulllinien-Durchgänge (wenigste Signale).
 Nachgerechnet nach den bekannten Formeln, angelehnt an die TradingView-Indikatoren von LuxAlgo, ChrisMoody und blackcat (kein Originalcode).
 
 ## Vollbild
