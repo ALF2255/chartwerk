@@ -42,7 +42,7 @@ Drei Knöpfe, jeder einzeln abschaltbar (auch im Objektbaum, in „Indikatoren �
 - **RSI** – Ultimate RSI (Länge 14, Glättung TMA, Signal EMA 14) mit Zonen 80 / 50 / 20, über 50 grün, unter 50 rot gefüllt.
 - **MACD** – 12/26/9, Linie grün über / rot unter der Signallinie, Histogramm 4-farbig (steigend/fallend über/unter null).
   Knopf „TF“: wie Chart oder **nächsthöherer Zeitrahmen** (z. B. Woche auf dem Tageschart); der laufende Abschnitt wird mit dem aktuellen Kurs gerechnet.
-- **MACD-Signale** – BUY/SELL im Chart bei MACD-Kreuzung (aus demselben MACD wie im Fenster, also auch im höheren Zeitrahmen, wenn „TF“ umgestellt ist), aktuelle Position mit Einstieg,
+- **MACD-Signale** – BUY/SELL im Chart bei MACD-Kreuzung (aus demselben MACD wie im Fenster, also auch im höheren Zeitrahmen, wenn „TF“ umgestellt ist); im höheren Zeitrahmen zählen nur abgeschlossene Kerzen (Signal erst nach Monats- bzw. Wochenschluss, kein Hin und Her innerhalb des Monats), aktuelle Position mit Einstieg,
   Ziel (3× ATR 14) und Stop (2× ATR 14, ATR im Zeitrahmen des Signals) als Linien, in der Kopfzeile MACD über/unter 0, Schwung steigt/fällt, letztes Signal mit Ziel/Stop in % und ein Check (wie oft Ziel vor Stop).
   Knopf „Ausstieg“: Ziel/Stop (wie oben) oder **Gegensignal** – Position halten bis zur Kreuzung in die andere Richtung (Ausstieg ohne Filter, auch wenn daraus kein neuer Einstieg wird; im Chart „EXIT ±x %“ bzw. „STOP“), Stop bleibt als Notbremse;
   der Check zeigt dann Anzahl, Ø Gewinn/Verlust je Signal in %, bestes und schlechtestes (offene Position zum aktuellen Kurs mitgezählt, ohne Gebühren).

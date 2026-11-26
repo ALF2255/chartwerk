@@ -1019,7 +1019,7 @@ function upTf(){const k=TFS.findIndex(q=>q.id===tf.id);return k>=0&&k<TFS.length
 function grpKey(t,T){if(T.id==='1M'){const d=new Date(t);return d.getUTCFullYear()*12+d.getUTCMonth()}if(T.id==='1W')return Math.floor((t/864e5+3)/7);return Math.floor(t/(T.h*36e5))}
 function macdOf(cl){const f=emaA(cl,MC_F),sl=emaA(cl,MC_S),m=cl.map((_,i)=>f[i]!=null&&sl[i]!=null?f[i]-sl[i]:null),g=emaA(m,MC_G);return{m,g,h:m.map((v,i)=>v!=null&&g[i]!=null?v-g[i]:null)}}
 // MACD des höheren Zeitrahmens: abgeschlossene Gruppen + laufende Gruppe mit aktuellem Schluss (wie live, ohne Blick in die Zukunft)
-function macdUp(T){const n=data.length,m=new Array(n).fill(null),g=new Array(n).fill(null),h=new Array(n).fill(null),kf=2/(MC_F+1),ks=2/(MC_S+1),kg=2/(MC_G+1);
+function macdUp(T){const n=data.length,cm=new Array(n).fill(null),cg=new Array(n).fill(null),ch=new Array(n).fill(null),m=new Array(n).fill(null),g=new Array(n).fill(null),h=new Array(n).fill(null),kf=2/(MC_F+1),ks=2/(MC_S+1),kg=2/(MC_G+1);
  let key=null,ef=null,es=null,eg=null,cnt=0,sf=0,ss=0,mq=[],gs=0,last=null;
  const step=(st,c)=>{let{ef,es,eg,cnt,sf,ss,mq,gs}=st;cnt++;let mv=null,gv=null;
   if(ef==null){sf+=c;if(cnt===MC_F)ef=sf/MC_F}else ef=c*kf+ef*(1-kf);
@@ -1028,8 +1028,9 @@ function macdUp(T){const n=data.length,m=new Array(n).fill(null),g=new Array(n).
   return{ef,es,eg,cnt,sf,ss,mq,gs,mv,gv}};
  let base={ef:null,es:null,eg:null,cnt:0,sf:0,ss:0,mq:[],gs:0},pend=null;
  for(let i=0;i<n;i++){const k=grpKey(data[i].t,T);if(key!==null&&k!==key&&pend)base=pend;key=k;pend=step(base,data[i].c);
-  if(pend.mv!=null){m[i]=pend.mv;if(pend.gv!=null){g[i]=pend.gv;h[i]=pend.mv-pend.gv}}}
- return{m,g,h}}
+  if(pend.mv!=null){m[i]=pend.mv;if(pend.gv!=null){g[i]=pend.gv;h[i]=pend.mv-pend.gv}}
+  if(base.mv!=null){cm[i]=base.mv;if(base.gv!=null){cg[i]=base.gv;ch[i]=base.mv-base.gv}}}
+ return{m,g,h,c:{m:cm,g:cg,h:ch}}}
 function uRsi(){const n=data.length,c=data.map(b=>b.c),up=new Array(n).fill(null),lo=new Array(n).fill(null),df=new Array(n).fill(null);
  for(let i=RSI_N-1;i<n;i++){let a=-Infinity,b=Infinity;for(let j=i-RSI_N+1;j<=i;j++){if(c[j]>a)a=c[j];if(c[j]<b)b=c[j]}up[i]=a;lo[i]=b}
  for(let i=RSI_N;i<n;i++){const r=up[i]-lo[i];df[i]=up[i]>up[i-1]?r:lo[i]<lo[i-1]?-r:c[i]-c[i-1]}
@@ -1055,7 +1056,7 @@ function msSignals(M,T){const n=data.length,A=T?atrUp(T,14):atr(14),sg=[],tr=[];
   const e=data[i].c,at=A[i]||Math.abs(e)*.01;cur={i,d,e,sl:e-d*MS_SL*at,tp:e+d*MS_TP*at,done:null};sg.push(cur);pos=d}
  if(cur&&!cur.done)cur.r=cur.d*(data[n-1].c/cur.e-1);
  return{sg,cur,pos,stat,tr}}
-function indCalc(){if(!data.length){IN=null;return}const R=uRsi(),T=mcUp&&showMC?upTf():null,M=T?macdUp(T):macdOf(data.map(b=>b.c)),MS=msSignals(M,T);IN={rsi:R.r,rsig:R.s,m:M.m,g:M.g,h:M.h,T,ms:MS}}
+function indCalc(){if(!data.length){IN=null;return}const R=uRsi(),T=mcUp&&showMC?upTf():null,M=T?macdUp(T):macdOf(data.map(b=>b.c)),MS=msSignals(T?M.c:M,T);IN={rsi:R.r,rsig:R.s,m:M.m,g:M.g,h:M.h,T,ms:MS}}
 function indUI(){$('#rsib').setAttribute('aria-pressed',showRSI);$('#mcb').setAttribute('aria-pressed',showMC);$('#msb').setAttribute('aria-pressed',showMS);$('#msf').style.display=showMS?'':'none';$('#msf').textContent='Signale: '+MSF[msF];$('#msx').style.display=showMS?'':'none';$('#msx').textContent='Ausstieg: '+(msX?'Gegensignal':'Ziel/Stop');
  const T=upTf();$('#mcf').style.display=showMC&&T?'':'none';$('#mcf').textContent='TF: '+(mcUp&&T?T.l:'Chart');$('#mcf').setAttribute('aria-pressed',mcUp&&!!T)}
 function indTog(k){if(k==='rsi')showRSI=!showRSI;else if(k==='mc')showMC=!showMC;else if(k==='ms')showMS=!showMS;else if(k==='mcf')mcUp=!mcUp;else if(k==='msf')msF=(msF+1)%3;else if(k==='msx')msX=1-msX;indSave();if(k==='mcf'||k==='msf'||k==='mc'||k==='msx')indCalc();clampView();ui();draw()}
@@ -1075,7 +1076,7 @@ function msText(i){if(!showMS||!IN)return'';const MS=IN.ms,m=IN.m[i],g=IN.g[i];c
  if(!c)return`<span>${head} · noch kein Signal</span>`;
  const last=c===MS.cur;
  if(msX){const R=MS.tr.concat(last&&!c.done&&c.r!=null?[c.r]:[]),avg=R.length?R.reduce((a,b)=>a+b,0)/R.length:0;
-  const now=last?(c.done==='sl'?' · Stop erreicht ('+p1(c.r)+')':c.r!=null?` · jetzt <b class="${c.r>=0?'up':'dn'}">${p1(c.r)}</b> (offen)`:''):'';
+  const now=last?(c.done?` · <b>ausgestiegen</b> ${tfull(data[c.xi].t)} bei ${fmt(c.done==='sl'?c.sl:data[c.xi].c)} (${c.done==='sl'?'Notbremse':'Gegenkreuzung'}, ${p1(c.r)}) · warte auf neues Signal`:c.r!=null?` · jetzt <b class="${c.r>=0?'up':'dn'}">${p1(c.r)}</b> (offen)`:''):'';
   return`<span>${head} · letztes Signal <b class="${c.d>0?'up':'dn'}">${c.d>0?'LONG':'SHORT'}</b> seit ${tfull(data[c.i].t)} bei ${fmt(c.e)} · halten bis Gegensignal, Notbremse ${fmt(c.sl)} (${pc(c.sl)})${now}${R.length?` <span class="m">· Check: ${R.length} Signale · Ø ${p1(avg)} je Signal · bestes ${p1(Math.max(...R))} · schlechtestes ${p1(Math.min(...R))}${last&&!c.done?' (inkl. offener Position)':''}</span>`:''}</span>`}
  const done=c.done&&last?(c.done==='tp'?' · Ziel erreicht':c.done==='sl'?' · Stop erreicht':''):'';
  return`<span>${head} · letztes Signal <b class="${c.d>0?'up':'dn'}">${c.d>0?'LONG':'SHORT'}</b> seit ${tfull(data[c.i].t)} bei ${fmt(c.e)} · Ziel ${fmt(c.tp)} (${pc(c.tp)}) / Stop ${fmt(c.sl)} (${pc(c.sl)})${done}${tot?` <span class="m">· Check: ${st.w} Ziel / ${st.l} Stop (${Math.round(st.w/tot*100)} %)</span>`:''}</span>`}
