@@ -17,6 +17,17 @@ Eigener Knopf „Hoch/Tief-Wetten“: Kalshi-Wetten darauf, ob der Kurs **bis** 
 erreicht (Höchst- bzw. Tiefststand bis Tag/Woche/Monat/Jahr). Kasten rechts oben mit den Marken für 90 %, 50 % und
 10 % Wahrscheinlichkeit; im Chart gepunktete Linie auf der 50:50-Marke bis zum Termin (grün = Hoch, rot = Tief).
 
+## Gaps (Kurslücken)
+
+Knopf „Gaps“: Binance handelt rund um die Uhr, die Börse nicht (Fr 17 Uhr bis So 18 Uhr New Yorker Zeit geschlossen,
+also etwa Fr 23 bis So 24 Uhr deutscher Zeit). Mit eingeschaltetem Knopf werden die Wochenend-Kerzen weggelassen – dann
+entsteht zwischen Freitagsschluss und Wochenstart die Lücke wie bei TradingView (bei Bitcoin & Co. die bekannte „CME-Lücke“).
+Woche und Monat werden dafür aus Tageskerzen gebaut. Offene Lücken erscheinen als Zone (blau = Lücke nach oben,
+orange = nach unten), teilweise gefüllte Lücken schrumpfen, geschlossene bleiben blass sichtbar. Der Kasten zeigt die
+nächsten offenen Lücken mit Abstand zum Kurs und wie oft Lücken innerhalb von 1 Woche, 4 Wochen und 3 Monaten geschlossen
+wurden (geschlossen = Kurs wieder auf dem Schluss vor der Lücke). Mindestgröße einstellbar. Feiertage werden nicht
+berücksichtigt. Für die Statistik am besten den Zeitrahmen „Tag“ nehmen.
+
 ## Einrichten auf GitHub Pages
 
 1. Auf github.com ein neues Repository anlegen, Name `chartwerk`, Sichtbarkeit **Public**.

@@ -81,6 +81,7 @@ canvas{position:absolute;inset:0;width:100%;height:100%;touch-action:none;cursor
 .pgf{color:var(--mute);font-size:11px;margin-top:6px;line-height:1.3}
 @media(max-width:700px){.pg{top:58px;left:8px;width:186px;padding:8px 10px}.pgr b{font-size:17px}.pgf{display:none}}
 .pg.htx{left:auto;right:84px;top:46px;width:250px;max-height:calc(50% - 56px);overflow:auto}.pg.htx.mini #htc{display:none}.pg.htx.mini .pgh{margin-bottom:0}@media(max-width:700px){.pg.htx{right:62px;top:58px;width:190px}}
+.pg.gpx{left:auto;right:84px;top:46px;width:250px;max-height:calc(100% - 80px);overflow:auto;cursor:pointer}.pg.gpx.mini #gpc{display:none}.pg.gpx.mini .pgh{margin-bottom:0}.pg.gpx select{background:var(--bg);color:var(--ink);border:1px solid var(--line);border-radius:6px;font:inherit;font-size:12px;padding:2px 4px}@media(max-width:700px){.pg.gpx{left:auto;right:62px;top:58px;width:190px}}
 .pg.mwx{top:auto;left:auto;right:84px;bottom:34px;width:240px;max-height:calc(50% - 40px);overflow:auto}.pg.mwx.mini #mwc{display:none}.pg.mwx.mini .pgh{margin-bottom:0}@media(max-width:700px){.pg.mwx{top:auto;left:auto;right:62px;bottom:30px;width:190px;max-height:45%}}
 .pal{display:grid;grid-template-columns:repeat(10,1fr);gap:5px;margin:4px 0 12px}
 .pal button{appearance:none;aspect-ratio:1;min-height:24px;border-radius:6px;border:1px solid #0007;background:var(--c);cursor:pointer;padding:0}
@@ -149,6 +150,7 @@ canvas{position:absolute;inset:0;width:100%;height:100%;touch-action:none;cursor
   <button class="chip" id="scb" aria-pressed="true">Szenarien</button>
   <button class="chip" id="mwb" aria-pressed="false" title="Kalshi-Prognosebörse: was der Markt für feste Termine einpreist">Marktwetten</button>
   <button class="chip" id="htb" aria-pressed="false" title="Kalshi: Welche Hochs und Tiefs werden bis zum Termin erreicht?">Hoch/Tief-Wetten</button>
+  <button class="chip" id="gpb" aria-pressed="false" title="Kurslücken übers Wochenende (wie an der Börse): offene Lücken als Zonen und wie oft sie geschlossen werden">Gaps</button>
   <button class="chip" id="fit">Ansicht zurücksetzen</button></div>
  </div>
  <nav class="tools" aria-label="Zeichenwerkzeuge">
@@ -198,6 +200,7 @@ canvas{position:absolute;inset:0;width:100%;height:100%;touch-action:none;cursor
   <div class="pgf" id="pgf"></div>
  </div>
  <div class="pg htx" id="htx" hidden><div class="pgh"><b>Hoch/Tief-Wetten</b><span id="htt"></span></div><div id="htc"></div></div>
+ <div class="pg gpx" id="gpx" hidden><div class="pgh"><b>Gaps</b><span id="gpt"></span></div><div id="gpc"></div></div>
  <div class="pg mwx" id="mwx" hidden><div class="pgh"><b>Marktwetten</b><span id="mwt"></span></div><div id="mwc"></div></div>
  <div class="panel" id="zzp" role="dialog" aria-label="Zickzack-Einstellungen">
   <h2>Zickzack</h2>
@@ -393,6 +396,13 @@ let showPG=true;try{showPG=localStorage.getItem('chartwerk:pg')!=='0'}catch(e){}
 let showSC=true;try{showSC=localStorage.getItem('chartwerk:sc')!=='0'}catch(e){}
 let showMW=false;try{showMW=localStorage.getItem('chartwerk:mw')==='1'}catch(e){}
 let showHT=false;try{showHT=localStorage.getItem('chartwerk:ht')==='1'}catch(e){}
+// ===== Gaps (Kurslücken) =====
+// Binance handelt rund um die Uhr, die Börse (CME, Spot-Gold, Öl, Devisen) nicht: Fr 17 Uhr bis So 18 Uhr New Yorker Zeit geschlossen.
+// Mit „Gaps“ werden Kerzen aus diesen Stunden weggelassen – dann entsteht die Lücke zwischen Freitagsschluss und Wochenstart wie bei TradingView.
+let showGP=false,gpMin=1;try{showGP=localStorage.getItem('chartwerk:gp')==='1';gpMin=[.5,1,2].includes(+localStorage.getItem('chartwerk:gpmin'))?+localStorage.getItem('chartwerk:gpmin'):1}catch(e){}
+function nyOff(t){const yr=new Date(t).getUTCFullYear(),sun=(m,k)=>{const d=new Date(Date.UTC(yr,m,1)).getUTCDay();return Date.UTC(yr,m,1+(7-d)%7+7*(k-1))};
+ return t>=sun(2,2)+7*36e5&&t<sun(10,1)+6*36e5?-4:-5}
+function gpClosed(t){const d=new Date(t+nyOff(t)*36e5),w=d.getUTCDay(),h=d.getUTCHours();return w===6||(w===5&&h>=17)||(w===0&&h<18)}
 // ===== Marktwetten (Kalshi-Prognosebörse) – identischer Block in Dashboard und Chartwerk =====
 // Liest die öffentlichen Kalshi-Märkte „Kurs über X zum Termin T?“ bzw. „Kurs zwischen A und B?“ und
 // rechnet daraus, was der Markt für den Kurs zum Termin einpreist (Mitte, 80-%-Bereich, Chance höher als jetzt).
@@ -759,6 +769,7 @@ function draw(){
    const t=(z.buy?'Kaufzone ':'Verkaufszone ')+fmt(z.lo)+' – '+fmt(z.hi);ctx.fillStyle=`rgb(${c})`;
    if(y1-y0>15){ctx.textBaseline='middle';ctx.fillText(t,w-6,(y0+y1)/2)}else if(z.buy){ctx.textBaseline='top';ctx.fillText(t,w-6,y1+3)}else{ctx.textBaseline='bottom';ctx.fillText(t,w-6,y0-3)}});
   ctx.textAlign='left';ctx.textBaseline='middle'}
+ gpDraw(w);
  const scL=[];if(SC){const xf=Math.min(w,x(n-1)+view.bw*.6),SEI='242,201,76',PU='#b78cff',lab=tf.l;
   const zone=(lo2,hi2,c,t)=>{const y0=y(hi2),y1=y(lo2);ctx.fillStyle=`rgba(${c},.05)`;ctx.fillRect(0,y0,w,y1-y0);if(xf<w){ctx.fillStyle=`rgba(${c},.2)`;ctx.fillRect(xf,y0,w-xf,y1-y0)}
    ctx.strokeStyle=`rgba(${c},.5)`;ctx.lineWidth=1;seg(Math.max(0,xf-40),y0,w,y0);seg(Math.max(0,xf-40),y1,w,y1);scL.push([t,`rgb(${c})`,(y0+y1)/2,1])};
@@ -894,7 +905,7 @@ function ui(){
  penUI();
  $('#vis').setAttribute('aria-pressed',hidden);$('#vis').innerHTML='<svg viewBox="0 0 22 22"><path d="M2 11s3.5-6 9-6 9 6 9 6-3.5 6-9 6-9-6-9-6z"/><circle cx="11" cy="11" r="2.5"/>'+(hidden?'<path d="M4 3l14 16"/>':'')+'</svg>';$('#vis').title=hidden?'Zeichnungen einblenden':'Zeichnungen ausblenden';
  if($('#fibp').classList.contains('on'))fibUI();if($('#chp').classList.contains('on'))chUI();obUI();layUI();if($('#fnp').classList.contains('on'))fnUI();
- $('#ma').setAttribute('aria-pressed',showMA);$('#emb').setAttribute('aria-pressed',showEMA);if($('#emp').classList.contains('on'))$('#emh').textContent='EMA-Strategie · '+sym.name;emaUI();$('#mag').setAttribute('aria-pressed',magnet>0);$('#magbd').textContent=['','•','••'][magnet];$('#mag').title=['Magnet aus','Magnet schwach','Magnet stark'][magnet];$('#zzb').setAttribute('aria-pressed',showZZ);$('#pgb').setAttribute('aria-pressed',showPG);$('#scb').setAttribute('aria-pressed',showSC);$('#znb').setAttribute('aria-pressed',showZN);$('#trb').setAttribute('aria-pressed',showTR);$('#cyb').setAttribute('aria-pressed',showCY);$('#lqb').setAttribute('aria-pressed',showLQ);$('#lqb').style.display=LQS[sym.id]?'':'none';$('#cyb').style.display=sym.id==='BTC'?'':'none';progUI();mwUI();htUI();
+ $('#ma').setAttribute('aria-pressed',showMA);$('#emb').setAttribute('aria-pressed',showEMA);if($('#emp').classList.contains('on'))$('#emh').textContent='EMA-Strategie · '+sym.name;emaUI();$('#mag').setAttribute('aria-pressed',magnet>0);$('#magbd').textContent=['','•','••'][magnet];$('#mag').title=['Magnet aus','Magnet schwach','Magnet stark'][magnet];$('#zzb').setAttribute('aria-pressed',showZZ);$('#pgb').setAttribute('aria-pressed',showPG);$('#scb').setAttribute('aria-pressed',showSC);$('#znb').setAttribute('aria-pressed',showZN);$('#trb').setAttribute('aria-pressed',showTR);$('#cyb').setAttribute('aria-pressed',showCY);$('#lqb').setAttribute('aria-pressed',showLQ);$('#lqb').style.display=LQS[sym.id]?'':'none';$('#cyb').style.display=sym.id==='BTC'?'':'none';progUI();mwUI();htUI();gpUI();
  $('#undo').disabled=!undo.length;$('#del').disabled=sel<0||locked(drawings[sel]);$('#lock').disabled=sel<0||lockAll;$('#lock').setAttribute('aria-pressed',sel>=0&&!!drawings[sel]?.lk);$('#lockall').setAttribute('aria-pressed',lockAll);$('#clear').disabled=!drawings.length;
  status();
  $('#pair').textContent=pairName();$('#curb').textContent=cur==='EUR'?'€ Euro':'$ Dollar';$('#curb').setAttribute('aria-pressed',cur==='EUR');$('#curb').style.display=sym.id==='EUR'?'none':'';if(curE()==='EUR')$('#ntxt').textContent+=' In Euro umgerechnet (EUR/USDT von Binance, Kurs der jeweiligen Kerze).';
@@ -939,7 +950,7 @@ function rateAt(t){const T=fx.T,C=fx.C;if(!T.length)return 1;if(t<=T[0])return C
 const fxB=b=>{const r=rateAt(b.t);return{...b,o:b.o/r,h:b.h/r,l:b.l/r,c:b.c/r}};
 const fxNow=()=>curE()==='EUR'&&fx.C.length?fx.C[fx.C.length-1]:1;
 const pairName=()=>{const q=src==='binance'&&sym.lp?sym.lp:sym.pair;return curE()==='EUR'?q.replace(/USDT|USD/,'EUR'):q};
-function merge(b){if(curE()==='EUR'&&fx.T.length)b=fxB(b);const L=data[data.length-1];if(L&&b.t===L.t)Object.assign(L,b);else if(!L||b.t>L.t){if(view.end>data.length-3)view.end++;data.push(b)}}
+function merge(b){if(gpLive()&&(gpClosed(b.t)||gpClosed(Date.now())))return;if(curE()==='EUR'&&fx.T.length)b=fxB(b);const L=data[data.length-1];if(L&&b.t===L.t)Object.assign(L,b);else if(!L||b.t>L.t){if(view.end>data.length-3)view.end++;data.push(b)}}
 function openWS(id){const w=new WebSocket(`wss://stream.binance.com:9443/ws/${sym.bn.toLowerCase()}@kline_${BNI[tf.id]}`);ws=w;
  w.onmessage=ev=>{if(id!==loadId)return;try{const k=JSON.parse(ev.data).k;if(!k)return;merge({t:k.t,o:+k.o,h:+k.h,l:+k.l,c:+k.c,v:+k.v});schedule()}catch(e){}};
  w.onclose=()=>{if(id===loadId)setTimeout(()=>{if(id===loadId)openWS(id)},3000)}}
@@ -955,6 +966,17 @@ const transient=m=>/credit|limit|minute|429|timeout|abort|Failed to fetch|Networ
 async function loadBn(id){const a=await getJSON(`${bnHost}/api/v3/klines?symbol=${sym.bn}&interval=${BNI[tf.id]}&limit=1000`);if(id!==loadId)return false;
  data=a.map(k=>({t:k[0],o:+k[1],h:+k[2],l:+k[3],c:+k[4],v:+k[5]}));src='binance';openWS(id);return true}
 const tdC={},tdNo={};let retryT=0,retryP=false;
+const gpLive=()=>showGP&&(src==='binance'||src==='bfut'),gpW=()=>showGP&&(tf.id==='1W'||tf.id==='1M');
+const gpURL=fut=>fut?`https://fapi.binance.com/fapi/v1/klines?symbol=${sym.fb}&interval=1d`:`${bnHost}/api/v3/klines?symbol=${sym.bn}&interval=1d`;
+const kBar=k=>({t:k[0],o:+k[1],h:+k[2],l:+k[3],c:+k[4],v:+k[5]});
+function gpAgg(d){const out=[];let cur=null;for(const q of d){const k=bucket(q.t,ms());if(!cur||cur.t!==k){cur={...q,t:k};out.push(cur)}else{cur.h=Math.max(cur.h,q.h);cur.l=Math.min(cur.l,q.l);cur.c=q.c;cur.v+=q.v}}return out}
+// Woche/Monat mit Gaps: aus Tageskerzen ohne Wochenende bauen (bis zu 4000 Tage)
+async function loadGPD(id,fut){let raw=[],end=0;for(let p=0;p<4;p++){const a=await getJSON(gpURL(fut)+'&limit=1000'+(end?'&endTime='+end:''),12000);if(id!==loadId)return false;if(!Array.isArray(a)||!a.length)break;raw=a.concat(raw);if(a.length<1000)break;end=a[0][0]-1}
+ const d=raw.map(kBar).filter(b=>!gpClosed(b.t));if(!d.length)throw new Error('keine Daten');data=gpAgg(d);src=fut?'bfut':'binance';
+ poll=setInterval(async()=>{if(document.visibilityState!=='visible'||gpClosed(Date.now()))return;try{const a=await getJSON(gpURL(fut)+'&limit=8');if(id!==loadId)return;
+  a.map(kBar).filter(b=>!gpClosed(b.t)).forEach(b=>{const i=d.findIndex(q=>q.t===b.t);if(i>=0)d[i]=b;else if(b.t>d[d.length-1].t)d.push(b)});
+  let nd=gpAgg(d);if(curE()==='EUR'&&fx.T.length)nd=nd.map(fxB);if(nd.length>data.length&&view.end>data.length-3)view.end++;data=nd;schedule()}catch(e){}},fut?5*60000:60000);return true}
+const ldF=id=>gpW()?loadGPD(id,true):loadFut(id),ldB=id=>gpW()?loadGPD(id,false):loadBn(id);
 function retryLater(){clearTimeout(retryT);retryP=true;const s0=sym.id,t0=tf.id;retryT=setTimeout(()=>{retryP=false;if(sym.id===s0&&tf.id===t0&&src!=='twelve')loadData(false);else ui()},65000)}
 async function loadData(reset){
  const id=++loadId;stopLive();err='';clearTimeout(retryT);retryP=false;
@@ -964,14 +986,16 @@ async function loadData(reset){
   try{
    if(useTd){try{const ck=sym.id+tf.id,c=tdC[ck];let a;if(c&&Date.now()-c.t<tdMin()*60000)a=c.d.map(o=>({...o}));else{a=await tdFetch(1000);tdC[ck]={t:Date.now(),d:a.map(o=>({...o}))}}if(id!==loadId)return;data=a;src='twelve';
      let lastP=Date.now();poll=setInterval(async()=>{if(document.visibilityState!=='visible'||!mktOpen()||Date.now()-lastP<tdMin()*60000)return;lastP=Date.now();try{const b=await tdFetch(3);if(id!==loadId)return;b.forEach(merge);schedule()}catch(e){}},20000)}
-    catch(e){if(id!==loadId)return;err='Twelve Data: '+String(e.message||e).slice(0,60);if(transient(e.message||e))retryLater();else tdNo[sym.id]=Date.now();if(sym.fb){try{if(!await loadFut(id))return}catch(f){if(!sym.bn)throw e;if(!await loadBn(id))return}}else{if(!sym.bn)throw e;if(!await loadBn(id))return}}}
-   else if(sym.fb&&!sym.bn){if(!await loadFut(id))return}else if(!await loadBn(id))return}
+    catch(e){if(id!==loadId)return;err='Twelve Data: '+String(e.message||e).slice(0,60);if(transient(e.message||e))retryLater();else tdNo[sym.id]=Date.now();if(sym.fb){try{if(!await ldF(id))return}catch(f){if(!sym.bn)throw e;if(!await ldB(id))return}}else{if(!sym.bn)throw e;if(!await ldB(id))return}}}
+   else if(sym.fb&&!sym.bn){if(!await ldF(id))return}else if(!await ldB(id))return}
   catch(e){if(id!==loadId)return;agg();src='sim';err=String(e.message||e).slice(0,80);if(useTd&&transient(err))retryLater()}}
+ if(gpLive()&&!gpW())data=data.filter(b=>!gpClosed(b.t));
  if(curE()==='EUR'&&data.length){if(!await loadFx()){if(id!==loadId)return;cur='USD';try{localStorage.setItem('chartwerk:cur','USD')}catch(e){}load();sel=-1;toast('Euro-Kurs nicht erreichbar, Anzeige in Dollar')}else{if(id!==loadId)return;data=data.map(fxB)}}
  recalc();if(reset)resetView();clampView();ui();draw();loadLQ()}
 function status(){const b=$('#src'),t=b.querySelector('span');b.className='chip src'+(src==='binance'||src==='bfut'||src==='twelve'?' live':src==='wait'||net===null?' wait':'');
  t.textContent=net===null?'Prüfe Verbindung…':src==='wait'?'Lade…':src==='bfut'?'Live · Binance Futures'+(retryP?' · Twelve gleich':''):src==='binance'?'Live · Binance'+(retryP?' · Twelve gleich':''):src==='twelve'?'Live · '+tdMin()+' Min.':err==='Schlüssel fehlt'?'Simuliert · Schlüssel fehlt':retryP?(src==='binance'?'Binance · neuer Versuch gleich':'Simuliert · neuer Versuch gleich'):'Simuliert';
  $('#ntxt').textContent=src==='binance'?'Echtzeitkurse von Binance in USDT'+(sym.id==='XAU'?', Gold über den Token PAXG.':'.'):src==='bfut'?(sym.id==='EUR'?'Devisen':sym.name)+'kurs vom Binance-Kontrakt '+sym.fb+' (folgt dem Spotpreis), Aktualisierung alle 15 Minuten.':src==='twelve'?(sym.id==='EUR'?'Devisen':sym.name)+'kurs (Spot '+sym.pair+') von Twelve Data, Aktualisierung alle '+tdMin()+' Minuten'+(mktOpen()?'':' (Markt geschlossen)')+'.':'Simulierte Kurse zur Demonstration, keine echten Marktdaten.';
+ if(gpLive())$('#ntxt').textContent+=' Gaps an: Wochenende ausgeblendet (Fr 23 bis So 24 Uhr deutscher Zeit, Börsenzeiten der CME) – Feiertage nicht berücksichtigt.';
  $('#pinfo').textContent=net?'Verbindung zu den Kursanbietern steht.':net===null?'Verbindung wird geprüft …':'Hier sind keine Verbindungen zu Kursanbietern möglich, deshalb laufen simulierte Kurse. Öffne Chartwerk als Datei auf deinem Computer oder auf einer eigenen Webadresse, dann laden Echtzeitkurse automatisch.';
  $('#plist').innerHTML=SYMS.map(s=>`<li><span>${s.name}</span><span>${!net?'simuliert':s.td&&tdKey?'Twelve Data, alle '+tdMin()+' Min.'+(s.fb?' (sonst Binance Futures)':''):s.bn?'Binance live'+(s.id==='XAU'?' (PAXG)':''):'simuliert, Schlüssel fehlt'}</span></li>`).join('')+(err&&err!=='Schlüssel fehlt'?`<li><span>Letzter Fehler</span><span>${err.replace(/</g,'&lt;')}</span></li>`:'')}
 
@@ -988,11 +1012,11 @@ const LWS=[1,1.6,2.4,3.4];
 $('#pal').innerHTML=PAL.map(c=>`<button data-c="${c}" style="--c:${c}" aria-label="Farbe ${c}"></button>`).join('');
 $('#lss').innerHTML=['solid','dash','dot'].map(k=>`<button data-ls="${k}" aria-label="${{solid:'Durchgezogen',dash:'Gestrichelt',dot:'Gepunktet'}[k]}" title="${{solid:'Durchgezogen',dash:'Gestrichelt',dot:'Gepunktet'}[k]}">${LSI[k]}</button>`).join('');
 $('#lws').innerHTML=LWS.map((w,i)=>`<button data-lw="${w}" aria-label="Stärke ${i+1}" title="Stärke ${i+1}"><svg viewBox="0 0 30 12"><path d="M2 6h26" stroke="currentColor" stroke-width="${w*1.2}"/></svg></button>`).join('');
-function layCapture(){const a=lays(sym.id),L=a.find(l=>l.id===lay);if(!L)return;const nw={tf:tf.id,ind:{ma:showMA,zzb:showZZ,trb:showTR,znb:showZN,pgb:showPG,scb:showSC,mwb:showMW,htb:showHT,cyb:showCY,lqb:showLQ,emb:showEMA}};
+function layCapture(){const a=lays(sym.id),L=a.find(l=>l.id===lay);if(!L)return;const nw={tf:tf.id,ind:{ma:showMA,zzb:showZZ,trb:showTR,znb:showZN,pgb:showPG,scb:showSC,mwb:showMW,htb:showHT,gpb:showGP,cyb:showCY,lqb:showLQ,emb:showEMA}};
  if(L.tf===nw.tf&&JSON.stringify(L.ind)===JSON.stringify(nw.ind))return;Object.assign(L,nw);setLays(sym.id,a)}
-function applyLay(L){const i=L&&L.ind;if(i){if('ma'in i)showMA=!!i.ma;if('zzb'in i)showZZ=!!i.zzb;if('trb'in i)showTR=!!i.trb;if('znb'in i)showZN=!!i.znb;if('pgb'in i)showPG=!!i.pgb;if('scb'in i)showSC=!!i.scb;if('mwb'in i)showMW=!!i.mwb;if('htb'in i)showHT=!!i.htb;if('cyb'in i)showCY=!!i.cyb;if('lqb'in i)showLQ=!!i.lqb;if('emb'in i)showEMA=!!i.emb;
-  try{localStorage.setItem('chartwerk:tr',showTR?'1':'0');localStorage.setItem('chartwerk:zn',showZN?'1':'0');localStorage.setItem('chartwerk:pg',showPG?'1':'0');localStorage.setItem('chartwerk:sc',showSC?'1':'0');localStorage.setItem('chartwerk:mw',showMW?'1':'0');localStorage.setItem('chartwerk:ht',showHT?'1':'0');localStorage.setItem('chartwerk:cy',showCY?'1':'0');localStorage.setItem('chartwerk:lq',showLQ?'1':'0');localStorage.setItem('chartwerk:ema',showEMA?'1':'0')}catch(e){}}
- const t=L&&L.tf&&TFS.find(x=>x.id===L.tf);if(t&&t!==tf){tf=t;return true}return false}
+function applyLay(L){const i=L&&L.ind,g0=showGP;if(i){if('gpb'in i)showGP=!!i.gpb;if('ma'in i)showMA=!!i.ma;if('zzb'in i)showZZ=!!i.zzb;if('trb'in i)showTR=!!i.trb;if('znb'in i)showZN=!!i.znb;if('pgb'in i)showPG=!!i.pgb;if('scb'in i)showSC=!!i.scb;if('mwb'in i)showMW=!!i.mwb;if('htb'in i)showHT=!!i.htb;if('cyb'in i)showCY=!!i.cyb;if('lqb'in i)showLQ=!!i.lqb;if('emb'in i)showEMA=!!i.emb;
+  try{localStorage.setItem('chartwerk:tr',showTR?'1':'0');localStorage.setItem('chartwerk:zn',showZN?'1':'0');localStorage.setItem('chartwerk:pg',showPG?'1':'0');localStorage.setItem('chartwerk:sc',showSC?'1':'0');localStorage.setItem('chartwerk:mw',showMW?'1':'0');localStorage.setItem('chartwerk:ht',showHT?'1':'0');localStorage.setItem('chartwerk:gp',showGP?'1':'0');localStorage.setItem('chartwerk:cy',showCY?'1':'0');localStorage.setItem('chartwerk:lq',showLQ?'1':'0');localStorage.setItem('chartwerk:ema',showEMA?'1':'0')}catch(e){}}
+ const t=L&&L.tf&&TFS.find(x=>x.id===L.tf);if(t&&t!==tf){tf=t;return true}return showGP!==g0}
 function layInit(){let l='';try{l=localStorage.getItem('chartwerk:lay:'+sym.id)||''}catch(e){}return lays(sym.id).some(q=>q.id===l)?l:''}
 function setLay(lid){layCapture();lay=lid;try{localStorage.setItem('chartwerk:lay:'+sym.id,lid)}catch(e){}const tch=applyLay(curLay());load();sel=-1;undo=[];chanP=-1;if(tch)loadData(true);else{ui();draw()}}
 $('#syms').onclick=e=>{const b=e.target.closest('.chip');if(!b)return;layCapture();sym=SYMS.find(s=>s.id===b.dataset.id);lay=layInit();applyLay(curLay());load();sel=-1;undo=[];chanP=-1;loadData(true)};
@@ -1029,7 +1053,7 @@ $('#autob').onclick=()=>{view.man=null;draw()};
 $('#layb').onclick=()=>{if(openPanel('#layp')){laySig='';layUI()}};
 $('#layok').onclick=()=>$('#layp').classList.remove('on');
 function newLay(copy){const n=($('#layn').value.trim()||'Layout '+lays(sym.id).length).slice(0,30),id=Math.random().toString(36).slice(2,10),a=lays(sym.id);
- layCapture();a.push({id,n,tf:tf.id,ind:{ma:showMA,zzb:showZZ,trb:showTR,znb:showZN,pgb:showPG,scb:showSC,mwb:showMW,htb:showHT,cyb:showCY,lqb:showLQ,emb:showEMA}});setLays(sym.id,a);
+ layCapture();a.push({id,n,tf:tf.id,ind:{ma:showMA,zzb:showZZ,trb:showTR,znb:showZN,pgb:showPG,scb:showSC,mwb:showMW,htb:showHT,gpb:showGP,cyb:showCY,lqb:showLQ,emb:showEMA}});setLays(sym.id,a);
  try{localStorage.setItem('chartwerk:'+ek(sym.id,cl(id)),copy?snap():'[]');localStorage.setItem('chartwerk:u:'+ek(sym.id,cl(id)),Date.now())}catch(e){}
  $('#layn').value='';setLay(id);toast('Layout „'+n+'“ angelegt'+(copy?' (Kopie)':''))}
 $('#laynew').onclick=()=>newLay(false);$('#laycp').onclick=()=>newLay(true);
@@ -1208,7 +1232,7 @@ $('#lss').onclick=e=>{const b=e.target.closest('button');if(b)penSet('ls',b.data
 $('#lws').onclick=e=>{const b=e.target.closest('button');if(b)penSet('lw',+b.dataset.lw)};
 $('#colok').onclick=()=>$('#colp').classList.remove('on');
 const KN={trend:'Trendlinie',ray:'Strahl',ext:'Erweiterte Linie',chan:'Parallelkanal',info:'Info-Linie',hline:'Horizontale Linie',goal:'Ziel',rect:'Rechteck',fib:'Fibonacci-Retracement',fan:'Fib-Fächer',brush:'Freihand'};
-const IND=[['ma','MA 20/50'],['zzb','Zickzack'],['cyb','Halving-Zyklus (Bitcoin)'],['lqb','Liquidations-Heatmap (BTC, Gold, Silber, Öl)'],['emb','EMA 12 Long/Short mit Check'],['trb','Trendlinien (automatisch)'],['znb','Kauf- und Verkaufszonen'],['pgb','Prognose'],['scb','Szenarien'],['mwb','Marktwetten (Kalshi)'],['htb','Hoch/Tief-Wetten (Kalshi)']];
+const IND=[['ma','MA 20/50'],['zzb','Zickzack'],['cyb','Halving-Zyklus (Bitcoin)'],['lqb','Liquidations-Heatmap (BTC, Gold, Silber, Öl)'],['emb','EMA 12 Long/Short mit Check'],['trb','Trendlinien (automatisch)'],['znb','Kauf- und Verkaufszonen'],['pgb','Prognose'],['scb','Szenarien'],['mwb','Marktwetten (Kalshi)'],['htb','Hoch/Tief-Wetten (Kalshi)'],['gpb','Gaps (Kurslücken)']];
 const EYE=(on)=>'<svg viewBox="0 0 22 22"><path d="M2 11s3.5-6 9-6 9 6 9 6-3.5 6-9 6-9-6-9-6z"/><circle cx="11" cy="11" r="2.5"/>'+(on?'':'<path d="M4 3l14 16"/>')+'</svg>';
 const LCK='<svg viewBox="0 0 22 22"><rect x="5" y="10" width="12" height="9" rx="1.5"/><path d="M8 10V7a3 3 0 016 0v3"/></svg>',BIN='<svg viewBox="0 0 22 22"><path d="M4 6h14M8.5 6V4h5v2M6 6l1 13h8l1-13"/></svg>';
 let obSig='';
@@ -1422,6 +1446,47 @@ function htUI(){const el=$('#htx'),a=mwA();$('#htb').setAttribute('aria-pressed'
 $('#htb').onclick=()=>{showHT=!showHT;try{localStorage.setItem('chartwerk:ht',showHT?'1':'0')}catch(e){}ui();draw()};
 $('#htx').addEventListener('click',()=>$('#htx').classList.toggle('mini'));if(innerWidth<700)$('#htx').classList.add('mini');
 setInterval(()=>{const a=mwA();if(showHT&&a&&document.visibilityState==='visible')MW.loadTouch(a).then(()=>{htUI();draw()})},60000);
+// ===== Gaps: Lücke = Eröffnung weicht vom vorigen Schlusskurs ab (mind. 0,2 × Tagesschwankung). Geschlossen, sobald der Kurs den Schlusskurs vor der Lücke wieder erreicht.
+let GPK='',GPS=null;
+const GPH=[['1 W',7*DAY],['4 W',28*DAY],['3 M',91*DAY]];
+function calcGaps(){const n=data.length;if(n<3)return null;const key=sym.id+tf.id+n+'|'+data[0].t+'|'+data[n-1].c+'|'+data[n-1].l+'|'+data[n-1].h+'|'+gpMin+'|'+src+curE();if(key===GPK)return GPS;GPK=key;
+ const thr=sym.v*.2*gpMin,G=[];
+ for(let i=1;i<n;i++){const a=data[i-1].c,o=data[i].o,d=o/a-1;if(!(Math.abs(d)>=thr))continue;const up=d>0;let m=up?Infinity:-Infinity,j=-1;
+  for(let k=i;k<n;k++){const b=data[k];if(up){if(b.l<m)m=b.l;if(m<=a){j=k;break}}else{if(b.h>m)m=b.h;if(m>=a){j=k;break}}}
+  G.push({i,t:data[i].t,up,a,o,d,j,ft:j>=0?data[j].t-data[i].t:0,rem:m})}
+ const lastT=data[n-1].t+ms(),st=up=>{const A=G.filter(g=>g.up===up),F=A.filter(g=>g.j>=0).map(g=>g.ft).sort((p,q)=>p-q);
+  return{n:A.length,open:A.length-F.length,med:F.length?F[Math.floor(F.length/2)]:null,r:GPH.map(([l,h])=>{const el=A.filter(g=>(g.j>=0&&g.ft<=h)||lastT-g.t>=h);return{l,n:el.length,f:el.filter(g=>g.j>=0&&g.ft<=h).length}})}};
+ return GPS={G,thr,up:st(true),dn:st(false),t0:data[0].t}}
+function gpDraw(w){if(!showGP)return;const S=calcGaps();if(!S)return;ctx.font='11px "IBM Plex Sans",system-ui';ctx.textAlign='right';
+ S.G.forEach(g=>{const xa=x(g.i)-view.bw/2;if(xa>=w)return;const c=g.up?'41,98,255':'255,152,0';
+  if(g.j>=0){const xe=x(g.j)+view.bw/2;if(xe<0)return;const y0=y(Math.max(g.a,g.o)),y1=y(Math.min(g.a,g.o));ctx.fillStyle=`rgba(${c},.08)`;ctx.fillRect(xa,y0,xe-xa,Math.max(1,y1-y0));return}
+  const lo=Math.min(g.a,g.rem),hi=Math.max(g.a,g.rem),y0=y(hi),y1=y(lo),x0=Math.max(0,xa);ctx.fillStyle=`rgba(${c},.2)`;ctx.fillRect(x0,y0,w-x0,Math.max(1,y1-y0));
+  ctx.strokeStyle=`rgba(${c},.85)`;ctx.lineWidth=1;ctx.setLineDash([4,3]);seg(x0,y0,w,y0);seg(x0,y1,w,y1);ctx.setLineDash([]);
+  const t='Gap '+(g.up?'▲ ':'▼ ')+fmt(lo)+' – '+fmt(hi)+' offen';ctx.fillStyle=`rgb(${c})`;
+  if(y1-y0>15){ctx.textBaseline='middle';ctx.fillText(t,w-6,(y0+y1)/2)}else if(g.up){ctx.textBaseline='top';ctx.fillText(t,w-6,y1+3)}else{ctx.textBaseline='bottom';ctx.fillText(t,w-6,y0-3)}});
+ ctx.textAlign='left';ctx.textBaseline='middle'}
+const gpPct=v=>(v*100).toLocaleString('de-DE',{maximumFractionDigits:2})+' %';
+const gpDur=v=>v<=0?'in der 1. Kerze':v<1.5*DAY?(v<DAY?'unter 1 Tag':'1 Tag'):v<14*DAY?Math.round(v/DAY)+' Tagen':Math.round(v/7/DAY)+' Wochen';
+function gpUI(){const el=$('#gpx');$('#gpb').setAttribute('aria-pressed',showGP);if(!showGP||!data.length){el.hidden=true;return}el.hidden=false;
+ const S=calcGaps(),n=data.length;$('#gpt').textContent=sym.name+' · '+tf.l;if(!S){$('#gpc').innerHTML='<div class="pgf" style="display:block">Zu wenige Kerzen.</div>';return}
+ const C=data[n-1].c,O=S.G.filter(g=>g.j<0).map(g=>{const lo=Math.min(g.a,g.rem),hi=Math.max(g.a,g.rem),z=C>hi?hi:C<lo?lo:C;return{g,lo,hi,dist:z/C-1}}).sort((p,q)=>Math.abs(p.dist)-Math.abs(q.dist));
+ const dt=t=>new Date(t).toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit',year:'2-digit',timeZone:'UTC'});
+ const row=(lab,st,cls)=>`<div class="pgk"><span><span class="${cls}">${lab}</span> (${st.n})</span><b>${st.r.map(q=>q.n>=5?Math.round(q.f/q.n*100)+' %':'–').join(' · ')}</b></div>`;
+ const live=src==='binance'||src==='bfut'||src==='twelve';
+ $('#gpc').innerHTML=`<div class="pgs" style="margin-top:0;padding-top:0;border-top:0"><span>Offene Lücken (${O.length})</span><span>Abstand</span></div>`+
+  (O.length?O.slice(0,5).map(q=>`<div class="pgk"><span class="${q.g.up?'up':'dn'}">${q.g.up?'▲':'▼'} ${fmt(q.lo)} – ${fmt(q.hi)}<br><small style="color:var(--mute)">seit ${dt(q.g.t)}</small></span><b>${q.dist===0?'im Gap':(q.dist>0?'+':'−')+gpPct(Math.abs(q.dist))}</b></div>`).join(''):'<div class="pgk"><span>keine</span></div>')+
+  `<div class="pgs"><span>Geschlossen nach</span><span>${GPH.map(q=>q[0]).join(' · ')}</span></div>`+row('▲ nach oben',S.up,'up')+row('▼ nach unten',S.dn,'dn')+
+  `<div class="pgk"><span>Meist nach</span><b>${[S.up.med,S.dn.med].filter(v=>v!=null).length?(S.up.med!=null?'▲ '+gpDur(S.up.med):'')+(S.up.med!=null&&S.dn.med!=null?' · ':'')+(S.dn.med!=null?'▼ '+gpDur(S.dn.med):''):'–'}</b></div>`+
+  `<div class="pgk"><span>Mindestgröße</span><select id="gpmin">${[[.5,'klein'],[1,'mittel'],[2,'groß']].map(([v,l])=>`<option value="${v}"${v===gpMin?' selected':''}>${l} (${gpPct(sym.v*.2*v)})</option>`).join('')}</select></div>`+
+  `<div class="pgf" style="display:block">${S.up.n+S.dn.n} Lücken seit ${dt(S.t0)}. Geschlossen = Kurs wieder auf dem Schluss vor der Lücke. „–“ = unter 5 Fälle. Auflösung ${tf.l}: für die Statistik am besten „Tag“.${src==='binance'||src==='bfut'?' Wochenende wie an der Börse ausgeblendet.':''}${live?'':' Simulierte Kurse – Werte ohne Aussagekraft.'}</div>`;
+ gpPos();
+ const sl=$('#gpmin');if(sl)sl.onchange=()=>{gpMin=+sl.value;try{localStorage.setItem('chartwerk:gpmin',String(gpMin))}catch(e){}GPK='';ui();draw()}}
+// Kasten rechts oben, unter „Hoch/Tief-Wetten“ und über „Marktwetten“, falls die sichtbar sind
+function gpPos(){const el=$('#gpx'),ht=$('#htx'),mw=$('#mwx');if(el.hidden)return;el.style.top=ht.hidden?'':(ht.offsetTop+ht.offsetHeight+8)+'px';
+ const bot=mw.hidden?stage.clientHeight-34:mw.offsetTop-8;el.style.maxHeight=Math.max(60,bot-el.offsetTop)+'px'}
+['#htx','#mwx'].forEach(q=>$(q).addEventListener('click',()=>setTimeout(gpPos,0)));addEventListener('resize',()=>setTimeout(gpPos,50));
+$('#gpb').onclick=()=>{showGP=!showGP;try{localStorage.setItem('chartwerk:gp',showGP?'1':'0')}catch(e){}GPK='';if(net&&src!=='twelve')loadData(false);else{ui();draw()}};
+$('#gpx').addEventListener('click',e=>{if(e.target.closest('select'))return;$('#gpx').classList.toggle('mini')});if(innerWidth<700)$('#gpx').classList.add('mini');
 lay=layInit();applyLay(curLay());load();agg();recalc();ui();ro.observe(stage);
 if(document.fonts)document.fonts.ready.then(draw);
 probe().then(ok=>{net=ok;if(ok)loadData(true);else ui()});
