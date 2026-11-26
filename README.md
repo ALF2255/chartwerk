@@ -32,6 +32,10 @@ Schalter „Wende nach dem Schließen“ im Gaps-Kasten: wie oft der Kurs 1 W / 
 liegt, von der er in die Lücke kam (also an der Lücke gedreht hat) – im Vergleich zum Zufall (wie oft der Kurs nach derselben
 Zeit überhaupt höher bzw. tiefer liegt). Im Chart ein Punkt am Schließ-Niveau: grün = nach 4 Wochen gewendet, rot = weitergelaufen.
 
+## Vollbild
+
+Im Vollbild ist die Knopfleiste ausgeblendet. Oben im Chart neben Instrument und Zeitrahmen gibt es dann „Indikatoren ▾“: eine Liste aller Indikatoren zum An- und Ausschalten (Häkchen = an). Die Liste bleibt offen, bis man daneben tippt.
+
 ## Einrichten auf GitHub Pages
 
 1. Auf github.com ein neues Repository anlegen, Name `chartwerk`, Sichtbarkeit **Public**.

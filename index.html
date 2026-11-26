@@ -106,6 +106,7 @@ canvas{position:absolute;inset:0;width:100%;height:100%;touch-action:none;cursor
 #fsb{padding:0 11px;color:var(--ink)}#fsb svg,#fsx svg{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
 #fsx{position:absolute;right:80px;top:8px;z-index:4;width:44px;height:44px;border-radius:10px;border:1px solid #2f3a43;background:rgba(20,26,30,.85);color:var(--ink);display:none;place-items:center;cursor:pointer;padding:0}
 .app.fs #fsx{display:grid}
+.legend .pki{display:none}.app.fs .legend .pki{display:inline}#pkm button[data-ind]{display:flex;align-items:center;gap:10px}#pkm button[data-ind] u{text-decoration:none;width:18px;color:inherit;font-weight:700}
 .legend .pk{pointer-events:auto;cursor:pointer;color:var(--ink);padding:6px 5px;margin:-6px -1px;border-radius:7px;white-space:nowrap}
 .legend .pk i{font-style:normal;color:var(--mute);font-size:11px;margin-left:3px}.legend .pk:hover,.legend .pk.on{background:#1f2830}
 #pkm{position:absolute;z-index:6;background:#182027;border:1px solid #2f3a43;border-radius:12px;padding:6px;display:none;flex-direction:column;gap:3px;box-shadow:0 14px 40px #000a;min-width:170px;max-height:calc(100% - 20px);overflow:auto}
@@ -847,7 +848,7 @@ function draw(){
 function legend(){
  const n=data.length;let i=n-1;const hp=hover||cross;if(hp&&hp[0]<pw()){const j=Math.round(idx(hp[0]));if(j>=0&&j<n)i=j}
  const b=data[i],c=b.c>=b.o?'up':'dn';
- $('#legend').innerHTML=`<span><b class="pk${pkOpen==='sym'?' on':''}" data-pk="sym">${pairName()}<i>▾</i></b> · <b class="pk${pkOpen==='tf'?' on':''}" data-pk="tf">${tf.l}<i>▾</i></b></span><span>O <b class="${c}">${fmt(b.o)}</b> H <b class="${c}">${fmt(b.h)}</b> L <b class="${c}">${fmt(b.l)}</b> C <b class="${c}">${fmt(b.c)}</b></span>`+
+ $('#legend').innerHTML=`<span><b class="pk${pkOpen==='sym'?' on':''}" data-pk="sym">${pairName()}<i>▾</i></b> · <b class="pk${pkOpen==='tf'?' on':''}" data-pk="tf">${tf.l}<i>▾</i></b><b class="pk pki${pkOpen==='ind'?' on':''}" data-pk="ind"> · Indikatoren<i>▾</i></b></span><span>O <b class="${c}">${fmt(b.o)}</b> H <b class="${c}">${fmt(b.h)}</b> L <b class="${c}">${fmt(b.l)}</b> C <b class="${c}">${fmt(b.c)}</b></span>`+
   (showEMA&&ema12[i]!=null&&emPos?`<span><b style="color:#00e5ff">EMA${EP.len}</b> ${fmt(ema12[i])} <b class="${emPos[i]>0?'up':emPos[i]<0?'dn':''}">${emPos[i]>0?'Long':emPos[i]<0?'Short':'Flat'}</b></span>`:'')+(showMA?`<span class="m"><b style="color:#f2c94c">MA20</b> ${ma20[i]!=null?fmt(ma20[i]):'–'} <b style="color:#b78cff">MA50</b> ${ma50[i]!=null?fmt(ma50[i]):'–'}</span>`:'')+(showLQ&&LQS[sym.id]&&LQ[sym.id]?`<span class="m"><b style="color:#5ec962">Liquidationen</b> ${LQ[sym.id].err?'nicht erreichbar':'geschätzt, '+(sym.m?'nur Binance-Trader, ':'')+'letzte 20 Tage, Binance Futures'}</span>`:'')+(showCY&&sym.id==='BTC'&&cyState()?(()=>{const c=cyState();return`<span><b style="color:#ff9800">Zyklus</b> Tag ${c.d.toLocaleString('de-DE')} nach Halving ${c.y} · ${c.ph}</span>`})():'')+(showZZ?`<span class="m"><b style="color:${zzo.c}">Zickzack</b> ${zzo.dev.toLocaleString('de-DE')} ${zzo.depth}</span>`:'');
 }
 
@@ -1042,9 +1043,14 @@ let pkOpen='';
 function pkClose(){pkOpen='';$('#pkm').classList.remove('on');legend()}
 $('#legend').addEventListener('pointerdown',e=>{const b=e.target.closest('.pk');if(!b)return;e.preventDefault();e.stopPropagation();
  const k=b.dataset.pk;if(pkOpen===k){pkClose();return}pkOpen=k;const m=$('#pkm');
- m.innerHTML=k==='sym'?SYMS.map(s=>`<button data-s="${s.id}" aria-pressed="${s.id===sym.id}">${s.name}<small>${s.pair}</small></button>`).join(''):TFS.map(t=>`<button data-t="${t.id}" aria-pressed="${t.id===tf.id}">${t.l}</button>`).join('');
+ m.innerHTML=k==='ind'?indMenu():k==='sym'?SYMS.map(s=>`<button data-s="${s.id}" aria-pressed="${s.id===sym.id}">${s.name}<small>${s.pair}</small></button>`).join(''):TFS.map(t=>`<button data-t="${t.id}" aria-pressed="${t.id===tf.id}">${t.l}</button>`).join('');
  const sr=stage.getBoundingClientRect(),r=b.getBoundingClientRect();m.style.left=Math.max(6,r.left-sr.left-6)+'px';m.style.top=(r.bottom-sr.top+8)+'px';m.classList.add('on');legend()});
-$('#pkm').addEventListener('click',e=>{const b=e.target.closest('button');if(!b)return;const s=b.dataset.s,t=b.dataset.t;pkClose();
+// Indikatoren-Auswahl (im Vollbild, wo die Knopfleiste ausgeblendet ist): schaltet dieselben Knöpfe, Menü bleibt offen
+function indMenu(){return IND.map(([id,n])=>{const c=$('#'+id);if(!c||c.style.display==='none')return'';const on=c.getAttribute('aria-pressed')==='true';
+ return`<button data-ind="${id}" aria-pressed="${on}"><u>${on?'✓':''}</u>${esc(c.textContent.trim()||n)}</button>`}).join('')}
+$('#pkm').addEventListener('click',e=>{const b=e.target.closest('button');if(!b)return;
+ if(b.dataset.ind){const c=$('#'+b.dataset.ind);if(c)c.click();$('#pkm').innerHTML=indMenu();return}
+ const s=b.dataset.s,t=b.dataset.t;pkClose();
  if(s&&s!==sym.id)$('#syms .chip[data-id="'+s+'"]').click();if(t&&t!==tf.id)$('#tfs .chip[data-id="'+t+'"]').click()});
 document.addEventListener('pointerdown',e=>{if(pkOpen&&!e.target.closest('#pkm,.pk'))pkClose()},true);
 $('#curb').onclick=()=>{cur=cur==='EUR'?'USD':'EUR';try{localStorage.setItem('chartwerk:cur',cur)}catch(e){}load();sel=-1;undo=[];chanP=-1;
