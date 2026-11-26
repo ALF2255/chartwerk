@@ -528,12 +528,21 @@ const MW={
     const v=MW.pnum(g.replace(/^[↑↓]\s*/,'').replace(/^(above|below|reach|dip to)\s*/i,''))??MW.pnum((/\$([\d.,]+k?)/i.exec(q)||[])[1]);if(v==null)return;
     if(dn){o.strike_type='less';o.cap_strike=v;o.event_ticker+=':min';out.mn.push(o)}else if(up){o.strike_type='greater';o.floor_strike=v;o.event_ticker+=':max';out.mx.push(o)}}});
   return out},
- async pmEvents(a){const n=MW.pmName(a);if(!n)return[];const slugs=new Set();let ok=0,err=null;
+ // Aktuelle Ereignisse finden (die Suche liefert auch alte): a) Schlagwort-Liste nach Termin, b) Suche, c) erwartbare Namen der Tagesleitern.
+ // Nur Ereignisse mit Termin in der Zukunft; fehlende Märkte werden über /events?slug=… nachgeladen.
+ async pmEvents(a){const n=MW.pmName(a);if(!n)return[];const nl=n.toLowerCase(),now=Date.now(),slugs=new Set(),got=new Map();let ok=0,err=null;
+  const fut=e=>{const t=Date.parse(e&&e.endDate||'');return!isFinite(t)||t>now},
+   take=e=>{if(e&&e.slug&&!e.closed&&fut(e)&&MW.pmKind(e.title,n)){slugs.add(e.slug);if(Array.isArray(e.markets)&&e.markets.some(m=>m&&m.groupItemTitle))got.set(e.slug,e)}},
+   arr=j=>Array.isArray(j)?j:(j&&(j.events||j.data))||[];
+  try{const j=await MW.get(MW.PMB+'/events?closed=false&tag_slug='+encodeURIComponent(nl)+'&end_date_min='+encodeURIComponent(new Date(now).toISOString())+'&order=endDate&ascending=true&limit=200');ok++;arr(j).forEach(take)}catch(e){err=e}
   for(const q of [n+' above',n+' price on','what price will '+n+' hit']){
-   try{const j=await MW.get(MW.PMB+'/public-search?q='+encodeURIComponent(q)+'&events_status=active&limit_per_type=30');ok++;
-    (j.events||[]).forEach(e=>{if(e&&e.slug&&!e.closed&&MW.pmKind(e.title,n))slugs.add(e.slug)})}catch(e){err=e;if(!ok)break}}
-  if(!ok)throw err||new Error('keine Antwort');const L=[...slugs].slice(0,40),out=[];
-  for(let i=0;i<L.length;i+=10){const j=await MW.get(MW.PMB+'/events?'+L.slice(i,i+10).map(x=>'slug='+encodeURIComponent(x)).join('&'));(Array.isArray(j)?j:(j.events||j.data||[])).forEach(e=>out.push(e))}
+   try{const j=await MW.get(MW.PMB+'/public-search?q='+encodeURIComponent(q)+'&events_status=active&limit_per_type=50');ok++;arr(j).forEach(take)}catch(e){err=e;if(!ok)break}}
+  if(!ok)throw err||new Error('keine Antwort');
+  const MO=['january','february','march','april','may','june','july','august','september','october','november','december'],guess=new Set();
+  for(let d=0;d<8;d++){const t=new Date(now+d*864e5),x=`${nl}-above-on-${MO[t.getUTCMonth()]}-${t.getUTCDate()}`;guess.add(x);guess.add(x+'-'+t.getUTCFullYear())}
+  const need=[...new Set([...slugs].filter(x=>!got.has(x)).concat([...guess].filter(x=>!slugs.has(x))))].slice(0,40),out=[...got.values()];
+  for(let i=0;i<need.length;i+=10){try{const j=await MW.get(MW.PMB+'/events?'+need.slice(i,i+10).map(x=>'slug='+encodeURIComponent(x)).join('&'));
+   arr(j).forEach(e=>{if(e&&!e.closed&&fut(e)&&MW.pmKind(e.title,n)&&!out.some(o=>o.slug===e.slug))out.push(e)})}catch(e){}}
   return out},
  // lädt Kurswetten (MW.S['P:'+a]) und Hoch/Tief-Wetten (MW.S['PT:'+a]) von Polymarket in einem Durchgang
  async loadPM(a,force){const S=MW.S['P:'+a]||(MW.S['P:'+a]={}),T=MW.S['PT:'+a]||(MW.S['PT:'+a]={});if(S.busy||(!force&&S.at&&Date.now()-S.at<120e3))return S;S.busy=T.busy=true;
