@@ -11,6 +11,10 @@ Termin eine senkrechte Spanne (80 %-Bereich, Punkt = Mitte), im Kasten zusätzli
 Kasten antippen klappt ihn ein und aus. Nur Anzeige. Blockiert der Browser den Abruf, im Kasten eine
 Umweg-Adresse eintragen (z. B. ein kleiner Weiterleiter auf dem NAS).
 
+## Quelle Kalshi / Polymarket
+
+In den Kästen „Marktwetten“ und „Hoch/Tief-Wetten“ lässt sich unten die Quelle wählen: Kalshi, Polymarket oder beide. Bei „beide“ stehen die Werte untereinander; im Chart sind Kalshi-Spannen rosa, Polymarket-Spannen blau (leicht versetzt), Polymarket-Hoch/Tief-Linien gestrichelt. Polymarket-Daten kommen aus der öffentlichen Gamma-API, abgerufen über denselben Cloudflare-Weiterleiter.
+
 ## Hoch/Tief-Wetten (Kalshi)
 
 Eigener Knopf „Hoch/Tief-Wetten“: Kalshi-Wetten darauf, ob der Kurs **bis** zum Termin **irgendwann** eine Marke

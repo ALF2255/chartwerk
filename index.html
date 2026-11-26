@@ -150,8 +150,8 @@ canvas{position:absolute;inset:0;width:100%;height:100%;touch-action:none;cursor
   <button class="chip" id="znb" aria-pressed="true">Zonen</button>
   <button class="chip" id="pgb" aria-pressed="true">Prognose</button>
   <button class="chip" id="scb" aria-pressed="true">Szenarien</button>
-  <button class="chip" id="mwb" aria-pressed="false" title="Kalshi-Prognosebörse: was der Markt für feste Termine einpreist">Marktwetten</button>
-  <button class="chip" id="htb" aria-pressed="false" title="Kalshi: Welche Hochs und Tiefs werden bis zum Termin erreicht?">Hoch/Tief-Wetten</button>
+  <button class="chip" id="mwb" aria-pressed="false" title="Kalshi/Polymarket: was der Markt für feste Termine einpreist">Marktwetten</button>
+  <button class="chip" id="htb" aria-pressed="false" title="Kalshi/Polymarket: Welche Hochs und Tiefs werden bis zum Termin erreicht?">Hoch/Tief-Wetten</button>
   <button class="chip" id="gpb" aria-pressed="false" title="Kurslücken übers Wochenende (wie an der Börse): offene Lücken als Zonen und wie oft sie geschlossen werden">Gaps</button>
   <button class="chip" id="fit">Ansicht zurücksetzen</button></div>
  </div>
@@ -427,7 +427,7 @@ const MW={
  // Es laufen nur öffentliche Marktdaten darüber, keine Schlüssel. Eigene Umweg-Adresse hat Vorrang.
  RELAYS:['https://kalshi.moberlaender71.workers.dev/?url=','','https://corsproxy.io/?url=','https://api.allorigins.win/raw?url=','https://api.codetabs.com/v1/proxy/?quest='],
  route:null, // eigener Cloudflare-Weiterleiter des Nutzers steht vorn (seit 25.11.)
- async get(p){const u=MW.base+p,own=MW.prox();let ord;
+ async get(p){const u=/^https?:/.test(p)?p:MW.base+p,own=MW.prox();let ord;
   if(own)ord=[own];else{if(MW.route==null)try{MW.route=localStorage.getItem('mw:route')}catch(e){}ord=MW.RELAYS.slice();const r=MW.route;if(r!=null&&ord.includes(r)){ord.splice(ord.indexOf(r),1);ord.unshift(r)}}
   let err;for(const pr of ord){const ac=typeof AbortController!=='undefined'?new AbortController():null,to=ac?setTimeout(()=>ac.abort(),own?20000:8000):0;
    try{const r=await fetch(pr?pr+encodeURIComponent(u):u,{cache:'no-store',signal:ac?ac.signal:undefined});if(!r.ok)throw new Error('HTTP '+r.status);const j=await r.json();
@@ -469,6 +469,11 @@ const MW={
   try{const o=JSON.parse(localStorage.getItem(k)||'null');if(o&&Date.now()-o.t<864e5)L=o.l}catch(e){}
   if(!L){try{const j=await MW.get('/series?category='+encodeURIComponent(C.c));L=(j.series||[]).map(x=>x&&x.ticker).filter(Boolean);try{localStorage.setItem(k,JSON.stringify({t:Date.now(),l:L}))}catch(e){}}catch(e){L=[]}}
   return L.filter(t=>t.startsWith(C.p)&&/^(|D|H|HA|W|W2|M|MON|MON2|Y|EOY)$/.test(t.slice(C.p.length)))},
+ // Termine je Zeitfenster auswählen (Kalshi und Polymarket gleich): gleicher Termin bei mehreren Serien → die mit mehr Handel
+ finish(S,L){L.sort((x,y)=>x.ct-y.ct);const D=[];L.forEach(e=>{const o=D.find(d=>Math.abs(d.ct-e.ct)<30*60e3);if(!o)D.push(e);else if(e.vol>o.vol)D[D.indexOf(o)]=e});
+  S.all=D;S.pick=MW.BK.map(([lo,hi,lab])=>{const c=D.filter(e=>e.h>=lo&&e.h<hi);if(!c.length)return null;const cov=x=>x.c.P[0]>=.5&&x.c.P[x.c.P.length-1]<=.5;const e=c.find(x=>cov(x)&&x.vol>0)||c.find(cov)||c.find(x=>x.vol>0)||c[0];return Object.assign({lab},e)}).filter(Boolean)},
+ finishT(S,L){S.rows=[];['max','min'].forEach(kd=>[[0,30,'Tag'],[30,192,'Woche'],[192,1080,'Monat'],[1080,9600,'Jahr']].forEach(([lo,hi,lab])=>{
+  const c=L.filter(e=>e.kind===kd&&e.h>=lo&&e.h<hi).sort((x,y)=>x.ct-y.ct||y.vol-x.vol);if(c.length)S.rows.push(Object.assign({lab},c[0]))}))},
  async load(a,force){const S=MW.S[a]||(MW.S[a]={});if(S.busy||(!force&&S.at&&Date.now()-S.at<120e3))return S;S.busy=true;
   try{const ser=[...new Set([...MW.cfg(a).s,...(await MW.discover(a))])].slice(0,10),ev={};let ok=0,err=null;
    for(const st of ser){try{const ms=await MW.series(st);ok++;ms.forEach(m=>{const e=m.event_ticker||m.ticker;(ev[e]||(ev[e]={id:e,st,ms:[]})).ms.push(m)})}catch(e){err=e;if(!ok)break}} // erster Abruf scheitert ganz → nicht alle Serien durchprobieren
@@ -476,9 +481,7 @@ const MW={
    const now=Date.now(),L=[];
    Object.values(ev).forEach(e=>{const ct=Date.parse(e.ms[0].close_time||e.ms[0].expected_expiration_time||'');if(!isFinite(ct)||ct<=now)return;
     const c=MW.curve(e.ms);if(!c)return;L.push({id:e.id,st:e.st,ct,h:(ct-now)/36e5,c,vol:e.ms.reduce((s,m)=>s+MW.vol(m),0),n:e.ms.length})});
-   // gleicher Termin bei mehreren Serien (Leiter + Spanne): die mit mehr Handel nehmen
-   L.sort((x,y)=>x.ct-y.ct);const D=[];L.forEach(e=>{const o=D.find(d=>Math.abs(d.ct-e.ct)<30*60e3);if(!o)D.push(e);else if(e.vol>o.vol)D[D.indexOf(o)]=e});
-   S.all=D;S.pick=MW.BK.map(([lo,hi,lab])=>{const c=D.filter(e=>e.h>=lo&&e.h<hi);if(!c.length)return null;const cov=x=>x.c.P[0]>=.5&&x.c.P[x.c.P.length-1]<=.5;const e=c.find(x=>cov(x)&&x.vol>0)||c.find(cov)||c.find(x=>x.vol>0)||c[0];return Object.assign({lab},e)}).filter(Boolean);
+   MW.finish(S,L);
    S.at=Date.now();S.err=null;
    try{if(MW.cfg(a).c==='Crypto'){const [u,e]=await Promise.all(['USD','EUR'].map(q=>fetch(`https://api.exchange.coinbase.com/products/BTC-${q}/ticker`,{cache:'no-store'}).then(r=>r.json())));const r=parseFloat(u.price)/parseFloat(e.price);if(r>0&&isFinite(r))MW.eurusd=r}}catch(e){}
   }catch(e){S.err=e&&e.message==='Failed to fetch'||e instanceof TypeError?'cors':(e&&e.message||'Fehler');S.at=Date.now()}finally{S.busy=false}return S},
@@ -495,14 +498,58 @@ const MW={
    if(!ok&&err)throw err;
    const now=Date.now(),L=[];Object.values(ev).forEach(e=>{const ct=Date.parse(e.ms[0].close_time||e.ms[0].expected_expiration_time||'');if(!isFinite(ct)||ct<=now)return;
     const c=MW.curve(e.ms);if(!c)return;L.push({id:e.id,st:e.st,kind:e.kind,ct,h:(ct-now)/36e5,c,vol:e.ms.reduce((x,m)=>x+MW.vol(m),0)})});
-   S.rows=[];['max','min'].forEach(kd=>[[0,30,'Tag'],[30,192,'Woche'],[192,1080,'Monat'],[1080,9600,'Jahr']].forEach(([lo,hi,lab])=>{
-    const c=L.filter(e=>e.kind===kd&&e.h>=lo&&e.h<hi).sort((x,y)=>x.ct-y.ct||y.vol-x.vol);if(c.length)S.rows.push(Object.assign({lab},c[0]))}));
+   MW.finishT(S,L);
    S.at=Date.now();S.err=null}
   catch(e){S.err=e instanceof TypeError?'cors':(e&&e.message||'Fehler');S.at=Date.now()}finally{S.busy=false}return S},
  // p90 = wird mit 90 % erreicht, p50 = 50:50, p10 = nur 10 % Chance
  // edge: nächstliegende Stufe der Leiter und Chance, sie zu erreichen (für den Fall, dass die Marken außerhalb der Leiter liegen)
  tstats(e){const c=e.c,n=c.K.length,r=e.kind==='max'?{p90:MW.q(c,.9),p50:MW.q(c,.5),p10:MW.q(c,.1),edge:{k:c.K[0],p:c.P[0]}}:{p90:MW.q(c,.1),p50:MW.q(c,.5),p10:MW.q(c,.9),edge:{k:c.K[n-1],p:1-c.P[n-1]}};
   r.out=!!(r.p50.lt||r.p50.gt);return r},
+ // ---- Polymarket (Gamma-API, öffentlich) – zweite Quelle, gleiche Rechnung wie Kalshi ----
+ // Ereignisse: „Bitcoin above ___ on …?“ (Leiter), „Bitcoin price on …?“ (Spannen), „What price will Bitcoin hit …?“ (↑ Hoch / ↓ Tief).
+ // Jeder Polymarket-Markt wird in ein Kalshi-ähnliches Objekt übersetzt (strike_type, floor/cap_strike, Geld/Brief, letzter Preis).
+ PMB:'https://gamma-api.polymarket.com',
+ PMN:{BTC:'Bitcoin',ETH:'Ethereum',SOL:'Solana',ZEC:'Zcash',XRP:'XRP',DOGE:'Dogecoin',XAU:'Gold',XAG:'Silver'},
+ pmName(a){return MW.PMN[a]||null},
+ pmKind(t,n){t=(t||'').toLowerCase();n=n.toLowerCase();if(!t.includes(n))return null;if(/what price will .* hit/.test(t))return'touch';
+  if(t.includes(n+' above'))return'above';if(t.includes(n+' price on')||t.includes(n+' price at'))return'range';return null},
+ pnum(x){x=String(x==null?'':x).replace(/[$\s]/g,'').replace(/,/g,'');const m=/^([\d.]+)(k|m)?$/i.exec(x);if(!m)return null;let v=parseFloat(m[1]);if(m[2])v*=m[2].toLowerCase()==='k'?1e3:1e6;return isFinite(v)?v:null},
+ pmMk(m,id,ct){let op=[];try{op=typeof m.outcomePrices==='string'?JSON.parse(m.outcomePrices):(m.outcomePrices||[])}catch(e){}
+  const f=v=>v==null||v===''?undefined:String(v);
+  return{event_ticker:id,yes_bid_dollars:f(m.bestBid),yes_ask_dollars:f(m.bestAsk),last_price_dollars:f(op.length?op[0]:m.lastTradePrice),volume_fp:f(m.volumeNum!=null?m.volumeNum:m.volume)||'0',close_time:m.endDate||ct}},
+ pmParse(e,n){const k=MW.pmKind(e.title,n),out={px:[],mx:[],mn:[]};
+  (e.markets||[]).filter(m=>m&&!m.closed&&m.active!==false).forEach(m=>{const g=String(m.groupItemTitle||'').trim(),q=String(m.question||''),o=MW.pmMk(m,'PM:'+e.slug,e.endDate);let r;
+   if(k==='above'){const v=MW.pnum(g.replace(/^[>≥]\s*/,''))??MW.pnum((/\$([\d.,]+k?)/i.exec(q)||[])[1]);if(v!=null){o.strike_type='greater';o.floor_strike=v;out.px.push(o)}}
+   else if(k==='range'){if(r=/^(?:[<≤]|below|under)\s*\$?([\d.,]+k?)/i.exec(g)){o.strike_type='less';o.cap_strike=MW.pnum(r[1])}
+    else if(r=/^(?:[>≥]|above|over)\s*\$?([\d.,]+k?)/i.exec(g)){o.strike_type='greater';o.floor_strike=MW.pnum(r[1])}
+    else if(r=/\$?([\d.,]+k?)\s*[-–]\s*\$?([\d.,]+k?)/i.exec(g)){o.strike_type='between';o.floor_strike=MW.pnum(r[1]);o.cap_strike=MW.pnum(r[2])}
+    if(o.strike_type)out.px.push(o)}
+   else if(k==='touch'){const dn=/^↓|dip|below|fall/i.test(g)||/\b(dip|fall|drop)\b/i.test(q),up=!dn&&(/^↑|above|reach/i.test(g)||/\b(reach|hit|above)\b/i.test(q));
+    const v=MW.pnum(g.replace(/^[↑↓]\s*/,'').replace(/^(above|below|reach|dip to)\s*/i,''))??MW.pnum((/\$([\d.,]+k?)/i.exec(q)||[])[1]);if(v==null)return;
+    if(dn){o.strike_type='less';o.cap_strike=v;o.event_ticker+=':min';out.mn.push(o)}else if(up){o.strike_type='greater';o.floor_strike=v;o.event_ticker+=':max';out.mx.push(o)}}});
+  return out},
+ async pmEvents(a){const n=MW.pmName(a);if(!n)return[];const slugs=new Set();let ok=0,err=null;
+  for(const q of [n+' above',n+' price on','what price will '+n+' hit']){
+   try{const j=await MW.get(MW.PMB+'/public-search?q='+encodeURIComponent(q)+'&events_status=active&limit_per_type=30');ok++;
+    (j.events||[]).forEach(e=>{if(e&&e.slug&&!e.closed&&MW.pmKind(e.title,n))slugs.add(e.slug)})}catch(e){err=e;if(!ok)break}}
+  if(!ok)throw err||new Error('keine Antwort');const L=[...slugs].slice(0,40),out=[];
+  for(let i=0;i<L.length;i+=10){const j=await MW.get(MW.PMB+'/events?'+L.slice(i,i+10).map(x=>'slug='+encodeURIComponent(x)).join('&'));(Array.isArray(j)?j:(j.events||j.data||[])).forEach(e=>out.push(e))}
+  return out},
+ // lädt Kurswetten (MW.S['P:'+a]) und Hoch/Tief-Wetten (MW.S['PT:'+a]) von Polymarket in einem Durchgang
+ async loadPM(a,force){const S=MW.S['P:'+a]||(MW.S['P:'+a]={}),T=MW.S['PT:'+a]||(MW.S['PT:'+a]={});if(S.busy||(!force&&S.at&&Date.now()-S.at<120e3))return S;S.busy=T.busy=true;
+  try{const n=MW.pmName(a),E=n?await MW.pmEvents(a):[],now=Date.now(),L=[],TL=[];
+   E.forEach(e=>{const p=MW.pmParse(e,n);
+    const add=(ms,arr,kind)=>{if(ms.length<3)return;const t=Date.parse(ms[0].close_time||e.endDate||'');if(!isFinite(t)||t<=now)return;const c=MW.curve(ms);if(!c)return;
+     arr.push({id:ms[0].event_ticker,st:'PM',src:'P',kind,ct:t,h:(t-now)/36e5,c,vol:ms.reduce((x,m)=>x+MW.vol(m),0),n:ms.length})};
+    add(p.px,L);add(p.mx,TL,'max');add(p.mn,TL,'min')});
+   MW.finish(S,L);MW.finishT(T,TL);S.at=T.at=Date.now();S.err=T.err=null;S.none=T.none=!n}
+  catch(e){S.err=T.err=e instanceof TypeError?'cors':(e&&e.message||'Fehler');S.at=T.at=Date.now()}finally{S.busy=T.busy=false}return S},
+ async loadTouchPM(a,force){await MW.loadPM(a,force);return MW.S['PT:'+a]},
+ // Quelle wählen: K = Kalshi, P = Polymarket, B = beide (im Browser gemerkt)
+ src(){try{return localStorage.getItem('mw:src')||'K'}catch(e){return'K'}},
+ setSrc(v){try{localStorage.setItem('mw:src',v)}catch(e){}},
+ srcs(){const v=MW.src();return v==='B'?['K','P']:[v]},
+ SN:{K:'Kalshi',P:'Polymarket'},
  stats(e,spot){const c=e.c,m=MW.q(c,.5),lo=MW.q(c,.9),hi=MW.q(c,.1),pa=spot>0?MW.pGt(c,spot):null;return{m,lo,hi,pa}},
  when(t){const d=new Date(t),now=new Date(),same=d.toDateString()===now.toDateString(),tm=d.toLocaleTimeString('de-DE',{hour:'2-digit',minute:'2-digit'});
   if(same)return'heute '+tm;const tom=new Date(now.getTime()+864e5);if(d.toDateString()===tom.toDateString())return'morgen '+tm;
@@ -827,11 +874,11 @@ function draw(){
   ctx.font='11px "IBM Plex Sans",system-ui';ctx.fillStyle='#e7ecef';ctx.textAlign='right';ctx.textBaseline=FC.cur>=FC.beat?'top':'bottom';ctx.fillText('Zu schlagen',x(c0+K),by+(FC.cur>=FC.beat?3:-3));ctx.textAlign='left'}
  {const HV=htVis().filter(q=>q.ok);if(HV.length){ctx.font='11px "IBM Plex Sans",system-ui';const x0=x(data.length-1);let lbY=[];
   HV.forEach(q=>{const yy=Math.round(y(q.v50))+.5;if(yy<0||yy>h)return;const x1=Math.min(w,Math.max(x0+20,x(q.i)));const C=q.e.kind==='max'?'#3fb68b':'#ef5f5f';
-   ctx.strokeStyle=C;ctx.lineWidth=1.2;ctx.setLineDash([2,4]);seg(x0,yy,x1,yy);ctx.setLineDash([]);if(lbY.some(v=>Math.abs(v-yy)<12))return;lbY.push(yy);
-   ctx.fillStyle=C;ctx.textAlign='right';ctx.textBaseline=q.e.kind==='max'?'bottom':'top';ctx.fillText((q.e.kind==='max'?'Hoch ':'Tief ')+q.e.lab+' 50 % '+fmt(q.v50),x1-2,q.e.kind==='max'?yy-2:yy+2)});ctx.textAlign='left';ctx.textBaseline='middle'}}
- if(MWV.length){ctx.font='11px "IBM Plex Sans",system-ui';const PK='#e573d8';let px=-1e9;MWV.slice().sort((a,b)=>a.i-b.i).forEach(q=>{const xx=Math.round(x(q.i))+.5,ya=y(q.hi),yb=y(q.lo),ym=y(q.m),R=xx>w-120,dx=R?-8:8;if(xx<0||xx>w||xx-px<14)return;const lab=xx-px>=110;px=xx;
-  ctx.fillStyle='rgba(229,115,216,.12)';ctx.fillRect(xx-5,ya,10,yb-ya);ctx.strokeStyle=PK;ctx.lineWidth=1.5;ctx.setLineDash([]);seg(xx,ya,xx,yb);seg(xx-6,ya,xx+6,ya);seg(xx-6,yb,xx+6,yb);
-  ctx.fillStyle=PK;ctx.beginPath();ctx.arc(xx,ym,4,0,7);ctx.fill();if(!lab)return;ctx.textAlign=R?'right':'left';ctx.textBaseline='bottom';ctx.fillText('Markt '+MW.when(q.e.ct),xx+dx,ya-3);ctx.textBaseline='middle';ctx.fillText(fmt(q.m),xx+dx,ym)});ctx.textAlign='left'}
+   ctx.strokeStyle=C;ctx.lineWidth=1.2;ctx.setLineDash(q.src==='P'?[7,4]:[2,4]);seg(x0,yy,x1,yy);ctx.setLineDash([]);if(lbY.some(v=>Math.abs(v-yy)<12))return;lbY.push(yy);
+   ctx.fillStyle=C;ctx.textAlign='right';ctx.textBaseline=q.e.kind==='max'?'bottom':'top';ctx.fillText((MW.srcs().length>1?(q.src==='P'?'PM ':'K '):'')+(q.e.kind==='max'?'Hoch ':'Tief ')+q.e.lab+' 50 % '+fmt(q.v50),x1-2,q.e.kind==='max'?yy-2:yy+2)});ctx.textAlign='left';ctx.textBaseline='middle'}}
+ if(MWV.length){ctx.font='11px "IBM Plex Sans",system-ui';const both=MW.srcs().length>1,pxs={K:-1e9,P:-1e9};MWV.slice().sort((a,b)=>a.i-b.i).forEach(q=>{const PK=PMC[q.src]||'#e573d8',xx=Math.round(x(q.i))+.5+(both&&q.src==='P'?8:0),ya=y(q.hi),yb=y(q.lo),ym=y(q.m),R=xx>w-120,dx=R?-8:8;if(xx<0||xx>w||xx-pxs[q.src]<14)return;const lab=xx-pxs[q.src]>=110;pxs[q.src]=xx;
+  ctx.globalAlpha=.14;ctx.fillStyle=PK;ctx.fillRect(xx-5,ya,10,yb-ya);ctx.globalAlpha=1;ctx.strokeStyle=PK;ctx.lineWidth=1.5;ctx.setLineDash([]);seg(xx,ya,xx,yb);seg(xx-6,ya,xx+6,ya);seg(xx-6,yb,xx+6,yb);
+  ctx.fillStyle=PK;ctx.beginPath();ctx.arc(xx,ym,4,0,7);ctx.fill();if(!lab)return;ctx.textAlign=R?'right':'left';ctx.textBaseline='bottom';ctx.fillText((both?(q.src==='P'?'Polymarket ':'Kalshi '):'Markt ')+MW.when(q.e.ct),xx+dx,ya-3);ctx.textBaseline='middle';ctx.fillText(fmt(q.m),xx+dx,ym)});ctx.textAlign='left'}
  if(scL.length){ctx.textBaseline='middle';scL.forEach(([t,c,yy,r])=>{ctx.font=(r?'600 ':'')+'11px "IBM Plex Sans",system-ui';const tw=ctx.measureText(t).width,tx=r?Math.max(4,w-tw-10):Math.max(6,Math.min(w*.42,w-tw-10));
   ctx.fillStyle='rgba(15,19,22,.82)';ctx.fillRect(tx-4,yy-9,tw+8,18);ctx.fillStyle=c;ctx.textAlign='left';ctx.fillText(t,tx,yy)})}
  if(!hidden)drawings.forEach((d,k)=>{if(!d.hd)shape(d,k===sel)});
@@ -1241,7 +1288,7 @@ $('#lss').onclick=e=>{const b=e.target.closest('button');if(b)penSet('ls',b.data
 $('#lws').onclick=e=>{const b=e.target.closest('button');if(b)penSet('lw',+b.dataset.lw)};
 $('#colok').onclick=()=>$('#colp').classList.remove('on');
 const KN={trend:'Trendlinie',ray:'Strahl',ext:'Erweiterte Linie',chan:'Parallelkanal',info:'Info-Linie',hline:'Horizontale Linie',goal:'Ziel',rect:'Rechteck',fib:'Fibonacci-Retracement',fan:'Fib-Fächer',brush:'Freihand'};
-const IND=[['ma','MA 20/50'],['zzb','Zickzack'],['cyb','Halving-Zyklus (Bitcoin)'],['lqb','Liquidations-Heatmap (BTC, Gold, Silber, Öl)'],['emb','EMA 12 Long/Short mit Check'],['trb','Trendlinien (automatisch)'],['znb','Kauf- und Verkaufszonen'],['pgb','Prognose'],['scb','Szenarien'],['mwb','Marktwetten (Kalshi)'],['htb','Hoch/Tief-Wetten (Kalshi)'],['gpb','Gaps (Kurslücken)']];
+const IND=[['ma','MA 20/50'],['zzb','Zickzack'],['cyb','Halving-Zyklus (Bitcoin)'],['lqb','Liquidations-Heatmap (BTC, Gold, Silber, Öl)'],['emb','EMA 12 Long/Short mit Check'],['trb','Trendlinien (automatisch)'],['znb','Kauf- und Verkaufszonen'],['pgb','Prognose'],['scb','Szenarien'],['mwb','Marktwetten (Kalshi/Polymarket)'],['htb','Hoch/Tief-Wetten (Kalshi/Polymarket)'],['gpb','Gaps (Kurslücken)']];
 const EYE=(on)=>'<svg viewBox="0 0 22 22"><path d="M2 11s3.5-6 9-6 9 6 9 6-3.5 6-9 6-9-6-9-6z"/><circle cx="11" cy="11" r="2.5"/>'+(on?'':'<path d="M4 3l14 16"/>')+'</svg>';
 const LCK='<svg viewBox="0 0 22 22"><rect x="5" y="10" width="12" height="9" rx="1.5"/><path d="M8 10V7a3 3 0 016 0v3"/></svg>',BIN='<svg viewBox="0 0 22 22"><path d="M4 6h14M8.5 6V4h5v2M6 6l1 13h8l1-13"/></svg>';
 let obSig='';
@@ -1421,40 +1468,52 @@ $('#ghoff').onclick=()=>{ghTok='';gistId='';try{localStorage.removeItem('chartwe
 document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')sync()});
 setInterval(()=>{if(document.visibilityState==='visible')sync()},45000);
 if('serviceWorker' in navigator&&location.protocol==='https:'&&!/claude/.test(location.hostname)){try{navigator.serviceWorker.register('sw.js').catch(()=>{})}catch(e){}}
-// Marktwetten im Chart: Kalshi-Termine als senkrechte Spanne (80 %-Bereich, Punkt = Mitte) am Termin + Infokasten
-const mwA=()=>sym&&sym.id||null; // alle Instrumente, auch künftige (Kürzel siehe MW.A)
-function mwVis(){const a=mwA(),S=a&&MW.S[a];if(!showMW||!S||!S.pick||!data.length)return[];const k=fxNow();
- return S.pick.map(e=>{const s=MW.stats(e,data[data.length-1].c*k);return{e,s,i:idxOfT(e.ct),m:s.m.v/k,lo:s.lo.v/k,hi:s.hi.v/k}})}
+// Marktwetten im Chart: Termine als senkrechte Spanne (80 %-Bereich, Punkt = Mitte) am Termin + Infokasten. Quelle: Kalshi, Polymarket oder beide.
+const mwA=()=>sym&&sym.id||null; // alle Instrumente, auch künftige (Kürzel siehe MW.A / MW.PMN)
+const CWK={K:a=>a,P:a=>'P:'+a},CWT={K:a=>'T:'+a,P:a=>'PT:'+a},PMC={K:'#e573d8',P:'#5b9cf6'};
+const cwLoad=(src,a,f)=>src==='P'?MW.loadPM(a,f):MW.load(a,f),cwLoadT=(src,a,f)=>src==='P'?MW.loadPM(a,f):MW.loadTouch(a,f);
+const cwSel=()=>`<select data-src="1" title="Quelle der Wettdaten" style="font-size:12px;margin-top:6px;background:var(--bg);color:var(--ink);border:1px solid #2f3a43;border-radius:6px;padding:3px 4px">${[['K','Kalshi'],['P','Polymarket'],['B','Beide']].map(([v,n])=>`<option value="${v}"${MW.src()===v?' selected':''}>${n}</option>`).join('')}</select>`;
+const cwHead=src=>MW.srcs().length>1?`<div class="pgs" style="margin-top:6px"><span style="color:${PMC[src]};font-weight:600">● ${MW.SN[src]}</span><span></span></div>`:'';
+function mwVis(){const a=mwA();if(!showMW||!a||!data.length)return[];const k=fxNow();
+ return MW.srcs().flatMap(src=>{const S=MW.S[CWK[src](a)];if(!S||!S.pick)return[];return S.pick.map(e=>{const s=MW.stats(e,data[data.length-1].c*k);return{src,e,s,i:idxOfT(e.ct),m:s.m.v/k,lo:s.lo.v/k,hi:s.hi.v/k}})})}
 const mwDraw=()=>mwVis().filter(q=>!q.s.m.lt&&!q.s.m.gt); // im Chart nur Termine, deren Stufen den aktuellen Bereich abdecken
+function mwSecCW(src,a){const S=MW.S[CWK[src](a)],nm=MW.SN[src],pc=v=>Math.round(v*100)+' %';
+ if(!S||!S.at){if(!S||!S.busy)cwLoad(src,a).then(()=>{mwUI();draw()});return'<div class="pgf" style="display:block">lädt…</div>'}
+ if(S.err)return`<div class="pgf" style="display:block;color:var(--dn)">${nm}: ${MW.errTxt(S)}</div>`;
+ const V=mwVis().filter(q=>q.src===src);
+ return V.length?'<div class="pgk" style="font-size:11px"><span>Termin</span><span>Mitte · höher als jetzt</span></div>'+V.map(({e,s,m,lo,hi})=>`<div class="pgk" style="border-top:1px solid var(--line);padding-top:4px"><span>${e.lab}<br><small>${MW.when(e.ct)}</small></span><b style="text-align:right">${(s.m.lt?'< ':s.m.gt?'> ':'')+fmt(m)} · <span class="${s.pa&&s.pa.p>.52?'up':s.pa&&s.pa.p<.48?'dn':''}">${s.pa?(s.pa.ge?'≥ ':s.pa.le?'≤ ':'')+pc(s.pa.p):'–'}</span><br><small style="color:var(--mute);font-weight:400">80 %: ${(s.lo.lt?'< ':s.lo.gt?'> ':'')+fmt(lo)} – ${(s.hi.lt?'< ':s.hi.gt?'> ':'')+fmt(hi)}</small></b></div>`).join('')
+  :`<div class="pgf" style="display:block">Für ${sym.name} gibt es auf ${nm} gerade keine passenden Kursmärkte.</div>`}
 function mwUI(){const el=$('#mwx'),a=mwA();$('#mwb').style.display=a?'':'none';$('#mwb').setAttribute('aria-pressed',showMW);
- if(!showMW||!a){el.hidden=true;return}el.hidden=false;const S=MW.S[a];
- if(!S||!S.at){$('#mwc').innerHTML='<div class="pgf">lädt…</div>';if(!S||!S.busy)MW.load(a).then(()=>{mwUI();draw()});return}
- const pr=`<input id="mwpx" placeholder="Umweg-Adresse, z. B. http://nas:8080/?url=" value="${(MW.prox()||'').replace(/"/g,'&quot;')}" style="width:100%;margin-top:6px;box-sizing:border-box;font-size:11px">`;
- if(S.err){$('#mwc').innerHTML=`<div class="pgf" style="display:block;color:var(--dn)">${MW.errTxt(S)}</div>${pr}`;mwPx();return}
- const V=mwVis(),pc=v=>Math.round(v*100)+' %';
- $('#mwc').innerHTML=(V.length?'<div class="pgk" style="font-size:11px"><span>Termin</span><span>Mitte · höher als jetzt</span></div>'+V.map(({e,s,m,lo,hi})=>`<div class="pgk" style="border-top:1px solid var(--line);padding-top:4px"><span>${e.lab}<br><small>${MW.when(e.ct)}</small></span><b style="text-align:right">${(s.m.lt?'< ':s.m.gt?'> ':'')+fmt(m)} · <span class="${s.pa&&s.pa.p>.52?'up':s.pa&&s.pa.p<.48?'dn':''}">${s.pa?(s.pa.ge?'≥ ':s.pa.le?'≤ ':'')+pc(s.pa.p):'–'}</span><br><small style="color:var(--mute);font-weight:400">80 %: ${(s.lo.lt?'< ':s.lo.gt?'> ':'')+fmt(lo)} – ${(s.hi.lt?'< ':s.hi.gt?'> ':'')+fmt(hi)}</small></b></div>`).join(''):`<div class="pgf" style="display:block">Für ${sym.name} gibt es auf Kalshi gerade keine passenden Kursmärkte.</div>`)+
-  `<div class="pgf" style="display:block">Kalshi (USD${curE()==='EUR'?', umgerechnet':''}) · Stand ${new Date(S.at).toLocaleTimeString('de-DE',{hour:'2-digit',minute:'2-digit'})}${MW.via()} · nur Anzeige</div>`;
- $('#mwt').textContent=sym.name}
-function mwPx(){const i=$('#mwpx');if(i)i.onchange=()=>{MW.setProx(i.value);const a=mwA();if(a)MW.load(a,true).then(()=>{mwUI();draw()})}}
+ if(!showMW||!a){el.hidden=true;return}el.hidden=false;const srcs=MW.srcs(),err=srcs.some(src=>{const S=MW.S[CWK[src](a)];return S&&S.err});
+ const pr=err?`<input id="mwpx" placeholder="Umweg-Adresse, z. B. http://nas:8080/?url=" value="${(MW.prox()||'').replace(/"/g,'&quot;')}" style="width:100%;margin-top:6px;box-sizing:border-box;font-size:11px">`:'';
+ const at=Math.max(...srcs.map(src=>(MW.S[CWK[src](a)]||{}).at||0));
+ $('#mwc').innerHTML=srcs.map(src=>cwHead(src)+mwSecCW(src,a)).join('')+
+  `<div class="pgf" style="display:block">${srcs.map(x=>MW.SN[x]).join(' + ')} (USD${curE()==='EUR'?', umgerechnet':''})${at?' · Stand '+new Date(at).toLocaleTimeString('de-DE',{hour:'2-digit',minute:'2-digit'}):''}${MW.via()} · nur Anzeige</div>${cwSel()}${pr}`;
+ mwPx();$('#mwt').textContent=sym.name}
+function mwPx(){const i=$('#mwpx');if(i)i.onchange=()=>{MW.setProx(i.value);const a=mwA();if(a)Promise.all(MW.srcs().map(src=>cwLoad(src,a,true))).then(()=>{mwUI();draw()})}}
 $('#mwb').onclick=()=>{showMW=!showMW;try{localStorage.setItem('chartwerk:mw',showMW?'1':'0')}catch(e){}ui();draw()};
 if(innerWidth<700)$('#mwx').classList.add('mini');
-$('#mwx').addEventListener('click',e=>{if(e.target.closest('input'))return;$('#mwx').classList.toggle('mini')});
-setInterval(()=>{const a=mwA();if(showMW&&a&&document.visibilityState==='visible')MW.load(a).then(()=>{mwUI();draw()})},20000);
-// Hoch/Tief-Wetten im Chart: gepunktete Linie vom letzten Kurs bis zum Termin auf der 50:50-Marke (grün = Hoch, rot = Tief) + Infokasten
-function htVis(){const a=mwA(),S=a&&MW.S['T:'+a];if(!showHT||!S||!S.rows||!data.length)return[];const k=fxNow();
- return S.rows.map(e=>{const s=MW.tstats(e);return{e,s,i:idxOfT(e.ct),v50:s.p50.v/k,ok:!s.p50.lt&&!s.p50.gt}})}
-function htUI(){const el=$('#htx'),a=mwA();$('#htb').setAttribute('aria-pressed',showHT);if(!showHT||!a){el.hidden=true;return}el.hidden=false;
- const S=MW.S['T:'+a];if(!S||!S.at){$('#htc').innerHTML='<div class="pgf" style="display:block">lädt…</div>';if(!S||!S.busy)MW.loadTouch(a).then(()=>{htUI();draw()});return}
- if(S.err){$('#htc').innerHTML=`<div class="pgf" style="display:block;color:var(--dn)">${MW.errTxt(S)}</div>`;return}
- const k=fxNow(),f=o=>(o.lt?'< ':o.gt?'> ':'')+fmt(o.v/k),V=htVis();
- $('#htc').innerHTML=(V.length?'<div class="pgk" style="font-size:11px"><span>Bis</span><span>90 % · 50 % · 10 %</span></div>'+['max','min'].map(kd=>{const R=V.filter(q=>q.e.kind===kd);if(!R.length)return'';
+$('#mwx').addEventListener('click',e=>{if(e.target.closest('input,select'))return;$('#mwx').classList.toggle('mini')});
+document.addEventListener('change',e=>{if(e.target.matches&&e.target.matches('select[data-src]')){MW.setSrc(e.target.value);mwUI();htUI();draw()}});
+setInterval(()=>{const a=mwA();if(showMW&&a&&document.visibilityState==='visible')Promise.all(MW.srcs().map(src=>cwLoad(src,a))).then(()=>{mwUI();draw()})},20000);
+// Hoch/Tief-Wetten im Chart: gepunktete Linie vom letzten Kurs bis zum Termin auf der 50:50-Marke (grün = Hoch, rot = Tief; Polymarket gestrichelt) + Infokasten
+function htVis(){const a=mwA();if(!showHT||!a||!data.length)return[];const k=fxNow();
+ return MW.srcs().flatMap(src=>{const S=MW.S[CWT[src](a)];if(!S||!S.rows)return[];return S.rows.map(e=>{const s=MW.tstats(e);return{src,e,s,i:idxOfT(e.ct),v50:s.p50.v/k,ok:!s.p50.lt&&!s.p50.gt}})})}
+function htSecCW(src,a){const S=MW.S[CWT[src](a)],nm=MW.SN[src],k=fxNow(),f=o=>(o.lt?'< ':o.gt?'> ':'')+fmt(o.v/k);
+ if(!S||!S.at){if(!S||!S.busy)cwLoadT(src,a).then(()=>{htUI();draw()});return'<div class="pgf" style="display:block">lädt…</div>'}
+ if(S.err)return`<div class="pgf" style="display:block;color:var(--dn)">${nm}: ${MW.errTxt(S)}</div>`;
+ const V=htVis().filter(q=>q.src===src);
+ return V.length?'<div class="pgk" style="font-size:11px"><span>Bis</span><span>90 % · 50 % · 10 %</span></div>'+['max','min'].map(kd=>{const R=V.filter(q=>q.e.kind===kd);if(!R.length)return'';
   return`<div class="pgs" style="margin-top:6px"><span class="${kd==='max'?'up':'dn'}">${kd==='max'?'▲ Höchststand':'▼ Tiefststand'}</span><span></span></div>`+R.map(({e,s})=>`<div class="pgk" style="border-top:1px solid var(--line);padding-top:3px"><span>${e.lab}<br><small>${MW.when(e.ct)}</small></span><b style="text-align:right;font-weight:500">${s.out?`${fmt(s.edge.k/k)} erreicht:<br><span class="${kd==='max'?'up':'dn'}" style="font-weight:700">${s.edge.p<.01?'< 1':Math.round(s.edge.p*100)} %</span>`:`${f(s.p90)}<br><span class="${kd==='max'?'up':'dn'}" style="font-weight:700">${f(s.p50)}</span> · <small>${f(s.p10)}</small>`}</b></div>`).join('')}).join('')
-  :`<div class="pgf" style="display:block">Für ${sym.name} gibt es auf Kalshi gerade keine Hoch/Tief-Wetten.</div>`)+
-  `<div class="pgf" style="display:block">Wird der Kurs bis zum Termin irgendwann erreicht? 90 % = fast sicher, 50 % = 50:50, 10 % = kaum. Kalshi${MW.via()} · Stand ${new Date(S.at).toLocaleTimeString('de-DE',{hour:'2-digit',minute:'2-digit'})}</div>`;
+  :`<div class="pgf" style="display:block">Für ${sym.name} gibt es auf ${nm} gerade keine Hoch/Tief-Wetten.</div>`}
+function htUI(){const el=$('#htx'),a=mwA();$('#htb').setAttribute('aria-pressed',showHT);if(!showHT||!a){el.hidden=true;return}el.hidden=false;
+ const srcs=MW.srcs(),at=Math.max(...srcs.map(src=>(MW.S[CWT[src](a)]||{}).at||0));
+ $('#htc').innerHTML=srcs.map(src=>cwHead(src)+htSecCW(src,a)).join('')+
+  `<div class="pgf" style="display:block">Wird der Kurs bis zum Termin irgendwann erreicht? 90 % = fast sicher, 50 % = 50:50, 10 % = kaum. ${srcs.map(x=>MW.SN[x]).join(' + ')}${MW.via()}${at?' · Stand '+new Date(at).toLocaleTimeString('de-DE',{hour:'2-digit',minute:'2-digit'}):''}</div>${cwSel()}`;
  $('#htt').textContent=sym.name}
 $('#htb').onclick=()=>{showHT=!showHT;try{localStorage.setItem('chartwerk:ht',showHT?'1':'0')}catch(e){}ui();draw()};
-$('#htx').addEventListener('click',()=>$('#htx').classList.toggle('mini'));if(innerWidth<700)$('#htx').classList.add('mini');
-setInterval(()=>{const a=mwA();if(showHT&&a&&document.visibilityState==='visible')MW.loadTouch(a).then(()=>{htUI();draw()})},60000);
+$('#htx').addEventListener('click',e=>{if(e.target.closest('input,select'))return;$('#htx').classList.toggle('mini')});if(innerWidth<700)$('#htx').classList.add('mini');
+setInterval(()=>{const a=mwA();if(showHT&&a&&document.visibilityState==='visible')Promise.all(MW.srcs().map(src=>cwLoadT(src,a))).then(()=>{htUI();draw()})},60000);
 // ===== Gaps: Lücke = Eröffnung weicht vom vorigen Schlusskurs ab (mind. 0,2 × Tagesschwankung). Geschlossen, sobald der Kurs den Schlusskurs vor der Lücke wieder erreicht.
 let GPK='',GPS=null;
 const GPH=[['1 W',7*DAY],['4 W',28*DAY],['3 M',91*DAY]];
