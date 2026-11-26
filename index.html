@@ -157,6 +157,7 @@ canvas{position:absolute;inset:0;width:100%;height:100%;touch-action:none;cursor
   <button class="chip" id="mcf" title="MACD-Zeitrahmen: wie Chart oder nächsthöherer (MTF)" style="padding:0 10px">TF: Chart</button>
   <button class="chip" id="msb" aria-pressed="true" title="BUY/SELL bei MACD-Kreuzung, Position mit Ziel und Stop (2×/3× ATR) und Check">MACD-Signale</button>
   <button class="chip" id="msf" title="Welche MACD-Signale: alle Kreuzungen / mit Trend (BUY nur bei MACD über null, SELL nur unter null, ohne Wackler) / nur Nulllinien-Durchgänge" style="padding:0 10px">Signale: alle</button>
+  <button class="chip" id="msx" title="Ausstieg: bei Ziel oder Stop / erst beim Gegensignal (Stop bleibt als Notbremse)" style="padding:0 10px">Ausstieg: Ziel/Stop</button>
   <button class="chip" id="gpb" aria-pressed="false" title="Kurslücken übers Wochenende (wie an der Börse): offene Lücken als Zonen und wie oft sie geschlossen werden">Gaps</button>
   <button class="chip" id="fit">Ansicht zurücksetzen</button></div>
  </div>
@@ -1005,9 +1006,9 @@ function emaOpt(){const n=data.length,st=61,last=n-2;if(last-st<120)return null;
  const d=ev(EPD),c=ev(EP);return{best,def:d,cur:c,trainN:sp-st,testN:last-sp}}
 /* Indikatoren-Fenster unter dem Chart: Ultimate RSI, MACD (wahlweise nächsthöherer Zeitrahmen), MACD-Signale. Nachgerechnet nach den bekannten Formeln. */
 let showRSI=true,showMC=true,showMS=true,mcUp=false,IN=null,msF=0;try{msF=[0,1,2].includes(+localStorage.getItem('chartwerk:msf'))?+localStorage.getItem('chartwerk:msf'):0}catch(e){}
-const MSF=['alle','mit Trend','Nulllinie'];
+const MSF=['alle','mit Trend','Nulllinie'];let msX=0;try{msX=localStorage.getItem('chartwerk:msx')==='1'?1:0}catch(e){}
 try{showRSI=localStorage.getItem('chartwerk:rsi')!=='0';showMC=localStorage.getItem('chartwerk:mc')!=='0';showMS=localStorage.getItem('chartwerk:ms')!=='0';mcUp=localStorage.getItem('chartwerk:mcf')==='1'}catch(e){}
-function indSave(){try{localStorage.setItem('chartwerk:rsi',showRSI?'1':'0');localStorage.setItem('chartwerk:mc',showMC?'1':'0');localStorage.setItem('chartwerk:ms',showMS?'1':'0');localStorage.setItem('chartwerk:mcf',mcUp?'1':'0');localStorage.setItem('chartwerk:msf',String(msF))}catch(e){}}
+function indSave(){try{localStorage.setItem('chartwerk:rsi',showRSI?'1':'0');localStorage.setItem('chartwerk:mc',showMC?'1':'0');localStorage.setItem('chartwerk:ms',showMS?'1':'0');localStorage.setItem('chartwerk:mcf',mcUp?'1':'0');localStorage.setItem('chartwerk:msf',String(msF));localStorage.setItem('chartwerk:msx',String(msX))}catch(e){}}
 const RSI_N=14,RSI_S=14,MC_F=12,MC_S=26,MC_G=9,MS_SL=2,MS_TP=3;
 function paneN(){return(showRSI?1:0)+(showMC?1:0)}
 function paneH(){const k=paneN();if(!k)return 0;const want=W<520?72:92,room=H-BX-TOP-170;return Math.max(44,Math.min(want,Math.floor(room/k)))}
@@ -1041,32 +1042,38 @@ function atrUp(T,N){const n=data.length,o=new Array(n).fill(null),tr=[];let key=
  for(let i=0;i<n;i++){const b=data[i],k=grpKey(b.t,T);if(k!==key){if(g){tr.push(Math.max(g.h-g.l,pc==null?0:Math.abs(g.h-pc),pc==null?0:Math.abs(g.l-pc)));pc=g.c;
    if(tr.length>=N){let s2=0;for(let j=tr.length-N;j<tr.length;j++)s2+=tr[j];cur=s2/N}}g={h:b.h,l:b.l,c:b.c};key=k}else{g.h=Math.max(g.h,b.h);g.l=Math.min(g.l,b.l);g.c=b.c}o[i]=cur}
  return o}
-function msSignals(M,T){const n=data.length,A=T?atrUp(T,14):atr(14),sg=[];let pos=0,cur=null,stat={w:0,l:0,o:0},phMax=0,prevMax=0,sgn=0;const am=[],ah=[];
+function msSignals(M,T){const n=data.length,A=T?atrUp(T,14):atr(14),sg=[],tr=[];let pos=0,cur=null,stat={w:0,l:0,o:0},phMax=0,prevMax=0,sgn=0;const am=[],ah=[];
  for(let i=1;i<n;i++){const hv=M.h[i];let avM=0,avH=0;if(am.length){avM=am.reduce((x,y)=>x+y,0)/am.length;avH=ah.reduce((x,y)=>x+y,0)/ah.length}
   if(hv!=null){const sg2=hv>0?1:hv<0?-1:0;if(sg2&&sg2!==sgn){prevMax=phMax;phMax=0;sgn=sg2}phMax=Math.max(phMax,Math.abs(hv));if(M.m[i]!=null){am.push(Math.abs(M.m[i]));ah.push(Math.abs(hv));if(am.length>50){am.shift();ah.shift()}}}
   const a=M.m[i-1]!=null&&M.g[i-1]!=null?M.m[i-1]-M.g[i-1]:null,b=M.m[i]!=null&&M.g[i]!=null?M.m[i]-M.g[i]:null;if(a==null||b==null)continue;
-  if(cur&&!cur.done){const bb=data[i];const hitTP=cur.d>0?bb.h>=cur.tp:bb.l<=cur.tp,hitSL=cur.d>0?bb.l<=cur.sl:bb.h>=cur.sl;if(hitSL){cur.done='sl';stat.l++}else if(hitTP){cur.done='tp';stat.w++}}
+  if(cur&&!cur.done){const bb=data[i];const hitTP=!msX&&(cur.d>0?bb.h>=cur.tp:bb.l<=cur.tp),hitSL=cur.d>0?bb.l<=cur.sl:bb.h>=cur.sl;if(hitSL){cur.done='sl';stat.l++;cur.r=cur.d*(cur.sl/cur.e-1);tr.push(cur.r)}else if(hitTP){cur.done='tp';stat.w++}}
   let d=0;if(msF===2){const p=M.m[i-1],c=M.m[i];if(p<=0&&c>0)d=1;else if(p>=0&&c<0)d=-1}else{if(a<=0&&b>0)d=1;else if(a>=0&&b<0)d=-1;if(msF===1&&d){if((d>0?M.m[i]<=0:M.m[i]>=0)||prevMax<avH*.5)d=0}}if(!d)continue;
-  if(cur&&!cur.done){cur.done='kreuz';stat.o++}
+  if(msX&&cur&&!cur.done&&cur.d===d)continue;
+  if(cur&&!cur.done){cur.done='kreuz';stat.o++;if(msX){cur.r=cur.d*(data[i].c/cur.e-1);tr.push(cur.r)}}
   const e=data[i].c,at=A[i]||Math.abs(e)*.01;cur={i,d,e,sl:e-d*MS_SL*at,tp:e+d*MS_TP*at,done:null};sg.push(cur);pos=d}
- return{sg,cur,pos,stat}}
+ if(cur&&!cur.done)cur.r=cur.d*(data[n-1].c/cur.e-1);
+ return{sg,cur,pos,stat,tr}}
 function indCalc(){if(!data.length){IN=null;return}const R=uRsi(),T=mcUp&&showMC?upTf():null,M=T?macdUp(T):macdOf(data.map(b=>b.c)),MS=msSignals(M,T);IN={rsi:R.r,rsig:R.s,m:M.m,g:M.g,h:M.h,T,ms:MS}}
-function indUI(){$('#rsib').setAttribute('aria-pressed',showRSI);$('#mcb').setAttribute('aria-pressed',showMC);$('#msb').setAttribute('aria-pressed',showMS);$('#msf').style.display=showMS?'':'none';$('#msf').textContent='Signale: '+MSF[msF];
+function indUI(){$('#rsib').setAttribute('aria-pressed',showRSI);$('#mcb').setAttribute('aria-pressed',showMC);$('#msb').setAttribute('aria-pressed',showMS);$('#msf').style.display=showMS?'':'none';$('#msf').textContent='Signale: '+MSF[msF];$('#msx').style.display=showMS?'':'none';$('#msx').textContent='Ausstieg: '+(msX?'Gegensignal':'Ziel/Stop');
  const T=upTf();$('#mcf').style.display=showMC&&T?'':'none';$('#mcf').textContent='TF: '+(mcUp&&T?T.l:'Chart');$('#mcf').setAttribute('aria-pressed',mcUp&&!!T)}
-function indTog(k){if(k==='rsi')showRSI=!showRSI;else if(k==='mc')showMC=!showMC;else if(k==='ms')showMS=!showMS;else if(k==='mcf')mcUp=!mcUp;else if(k==='msf')msF=(msF+1)%3;indSave();if(k==='mcf'||k==='msf'||k==='mc')indCalc();clampView();ui();draw()}
-$('#rsib').onclick=()=>indTog('rsi');$('#mcb').onclick=()=>indTog('mc');$('#msb').onclick=()=>indTog('ms');$('#mcf').onclick=()=>indTog('mcf');$('#msf').onclick=()=>indTog('msf');
+function indTog(k){if(k==='rsi')showRSI=!showRSI;else if(k==='mc')showMC=!showMC;else if(k==='ms')showMS=!showMS;else if(k==='mcf')mcUp=!mcUp;else if(k==='msf')msF=(msF+1)%3;else if(k==='msx')msX=1-msX;indSave();if(k==='mcf'||k==='msf'||k==='mc'||k==='msx')indCalc();clampView();ui();draw()}
+$('#rsib').onclick=()=>indTog('rsi');$('#mcb').onclick=()=>indTog('mc');$('#msb').onclick=()=>indTog('ms');$('#mcf').onclick=()=>indTog('mcf');$('#msf').onclick=()=>indTog('msf');$('#msx').onclick=()=>indTog('msx');
 function msDraw(w,i0,i1){if(!showMS||!IN)return;const MS=IN.ms;ctx.font='600 10px "IBM Plex Sans",system-ui';ctx.textAlign='center';let lastX=-1e9;
  MS.sg.forEach(q=>{if(q.i<i0||q.i>i1)return;const xx=x(q.i);if(xx-lastX<26)return;lastX=xx;const b=data[q.i],L=q.d>0,t=L?'BUY':'SELL',tw=ctx.measureText(t).width+8,yy=L?y(b.l)+16:y(b.h)-16;
   ctx.fillStyle=L?'rgba(38,166,154,.92)':'rgba(239,83,80,.92)';ctx.fillRect(xx-tw/2,yy-8,tw,16);ctx.fillStyle='#fff';ctx.textBaseline='middle';ctx.fillText(t,xx,yy);
   ctx.beginPath();ctx.fillStyle=L?UP:DN;if(L){ctx.moveTo(xx,y(b.l)+3);ctx.lineTo(xx-4,yy-8);ctx.lineTo(xx+4,yy-8)}else{ctx.moveTo(xx,y(b.h)-3);ctx.lineTo(xx-4,yy+8);ctx.lineTo(xx+4,yy+8)}ctx.fill()});
  const c=MS.cur;if(c&&!c.done){const x0=Math.max(0,x(c.i));if(x0<w){ctx.font='11px "IBM Plex Sans",system-ui';ctx.textAlign='right';ctx.textBaseline='bottom';ctx.lineWidth=1.2;ctx.setLineDash([6,4]);
-  [[c.tp,UP,'Ziel '],[c.sl,DN,'Stop '],[c.e,'#8d98a1','Einstieg ']].forEach(([v,col,lb])=>{const yy=Math.round(y(v))+.5;ctx.strokeStyle=col;seg(x0,yy,w,yy);ctx.fillStyle=col;ctx.fillText(lb+fmt(v),w-4,yy-2)});ctx.setLineDash([])}}
+  (msX?[]:[[c.tp,UP,'Ziel ']]).concat([[c.sl,DN,'Stop '],[c.e,'#8d98a1','Einstieg ']]).forEach(([v,col,lb])=>{const yy=Math.round(y(v))+.5;ctx.strokeStyle=col;seg(x0,yy,w,yy);ctx.fillStyle=col;ctx.fillText(lb+fmt(v),w-4,yy-2)});ctx.setLineDash([])}}
  ctx.textAlign='left';ctx.textBaseline='middle'}
 function msText(i){if(!showMS||!IN)return'';const MS=IN.ms,m=IN.m[i],g=IN.g[i];const c=MS.sg.filter(q=>q.i<=i).pop();const st=MS.stat,tot=st.w+st.l;
- const pc=v=>{const r=(v/c.e-1)*100;return(r>0?'+':'')+r.toLocaleString('de-DE',{maximumFractionDigits:1})+' %'};
+ const p1=r=>(r>0?'+':'')+(r*100).toLocaleString('de-DE',{maximumFractionDigits:1})+' %',pc=v=>p1(v/c.e-1);
  const head=`<b style="color:${c?c.d>0?UP:DN:MUTE}">MACD-Signal</b>${IN.T?' ('+IN.T.l+')':''} · ${MSF[msF]} · MACD ${m==null?'–':m>=0?'über 0':'unter 0'} · Schwung ${m!=null&&g!=null&&m>=g?'steigt':'fällt'}`;
  if(!c)return`<span>${head} · noch kein Signal</span>`;
- const done=c.done&&c===MS.cur?(c.done==='tp'?' · Ziel erreicht':c.done==='sl'?' · Stop erreicht':''):'';
+ const last=c===MS.cur;
+ if(msX){const R=MS.tr.concat(last&&!c.done&&c.r!=null?[c.r]:[]),avg=R.length?R.reduce((a,b)=>a+b,0)/R.length:0;
+  const now=last?(c.done==='sl'?' · Stop erreicht ('+p1(c.r)+')':c.r!=null?` · jetzt <b class="${c.r>=0?'up':'dn'}">${p1(c.r)}</b> (offen)`:''):'';
+  return`<span>${head} · letztes Signal <b class="${c.d>0?'up':'dn'}">${c.d>0?'LONG':'SHORT'}</b> seit ${tfull(data[c.i].t)} bei ${fmt(c.e)} · halten bis Gegensignal, Notbremse ${fmt(c.sl)} (${pc(c.sl)})${now}${R.length?` <span class="m">· Check: ${R.length} Signale · Ø ${p1(avg)} je Signal · bestes ${p1(Math.max(...R))} · schlechtestes ${p1(Math.min(...R))}${last&&!c.done?' (inkl. offener Position)':''}</span>`:''}</span>`}
+ const done=c.done&&last?(c.done==='tp'?' · Ziel erreicht':c.done==='sl'?' · Stop erreicht':''):'';
  return`<span>${head} · letztes Signal <b class="${c.d>0?'up':'dn'}">${c.d>0?'LONG':'SHORT'}</b> seit ${tfull(data[c.i].t)} bei ${fmt(c.e)} · Ziel ${fmt(c.tp)} (${pc(c.tp)}) / Stop ${fmt(c.sl)} (${pc(c.sl)})${done}${tot?` <span class="m">· Check: ${st.w} Ziel / ${st.l} Stop (${Math.round(st.w/tot*100)} %)</span>`:''}</span>`}
 function paneDraw(w,i0,i1,ch){const k=paneN();if(!k||!IN)return;const pH=paneH(),y0=TOP+ph();let hi=data.length-1;if(ch){const j=Math.round(ch[2]);if(j>=0&&j<data.length)hi=j}
  const panes=[];if(showRSI)panes.push('rsi');if(showMC)panes.push('mc');

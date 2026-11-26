@@ -44,6 +44,8 @@ Drei Knöpfe, jeder einzeln abschaltbar (auch im Objektbaum, in „Indikatoren �
   Knopf „TF“: wie Chart oder **nächsthöherer Zeitrahmen** (z. B. Woche auf dem Tageschart); der laufende Abschnitt wird mit dem aktuellen Kurs gerechnet.
 - **MACD-Signale** – BUY/SELL im Chart bei MACD-Kreuzung (aus demselben MACD wie im Fenster, also auch im höheren Zeitrahmen, wenn „TF“ umgestellt ist), aktuelle Position mit Einstieg,
   Ziel (3× ATR 14) und Stop (2× ATR 14, ATR im Zeitrahmen des Signals) als Linien, in der Kopfzeile MACD über/unter 0, Schwung steigt/fällt, letztes Signal mit Ziel/Stop in % und ein Check (wie oft Ziel vor Stop).
+  Knopf „Ausstieg“: Ziel/Stop (wie oben) oder **Gegensignal** – Position halten bis zum Signal in die andere Richtung, Stop bleibt als Notbremse;
+  der Check zeigt dann Anzahl, Ø Gewinn/Verlust je Signal in %, bestes und schlechtestes (offene Position zum aktuellen Kurs mitgezählt, ohne Gebühren).
   Knopf „Signale“: alle Kreuzungen / mit Trend (BUY nur bei MACD über null, SELL nur unter null; Wackler mit kleinem Histogramm davor zählen nicht) / nur Nulllinien-Durchgänge (wenigste Signale).
 Nachgerechnet nach den bekannten Formeln, angelehnt an die TradingView-Indikatoren von LuxAlgo, ChrisMoody und blackcat (kein Originalcode).
 
