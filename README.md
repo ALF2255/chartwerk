@@ -36,6 +36,16 @@ Schalter „Wende nach dem Schließen“ im Gaps-Kasten: wie oft der Kurs 1 W / 
 liegt, von der er in die Lücke kam (also an der Lücke gedreht hat) – im Vergleich zum Zufall (wie oft der Kurs nach derselben
 Zeit überhaupt höher bzw. tiefer liegt). Im Chart ein Punkt am Schließ-Niveau: grün = nach 4 Wochen gewendet, rot = weitergelaufen.
 
+## RSI, MACD und MACD-Signale (Fenster unter dem Chart)
+
+Drei Knöpfe, jeder einzeln abschaltbar (auch im Objektbaum, in „Indikatoren ▾“ und in Layouts gespeichert):
+- **RSI** – Ultimate RSI (Länge 14, Glättung TMA, Signal EMA 14) mit Zonen 80 / 50 / 20, über 50 grün, unter 50 rot gefüllt.
+- **MACD** – 12/26/9, Linie grün über / rot unter der Signallinie, Histogramm 4-farbig (steigend/fallend über/unter null).
+  Knopf „TF“: wie Chart oder **nächsthöherer Zeitrahmen** (z. B. Woche auf dem Tageschart); der laufende Abschnitt wird mit dem aktuellen Kurs gerechnet.
+- **MACD-Signale** – BUY/SELL im Chart bei MACD-Kreuzung (immer im Chart-Zeitrahmen), aktuelle Position mit Einstieg,
+  Ziel (3× ATR 14) und Stop (2× ATR 14) als Linien, in der Kopfzeile BULL/BEAR, Trend und ein Check (wie oft Ziel vor Stop).
+Nachgerechnet nach den bekannten Formeln, angelehnt an die TradingView-Indikatoren von LuxAlgo, ChrisMoody und blackcat (kein Originalcode).
+
 ## Vollbild
 
 Im Vollbild ist die Knopfleiste ausgeblendet. Oben im Chart neben Instrument und Zeitrahmen gibt es dann „Indikatoren ▾“: eine Liste aller Indikatoren zum An- und Ausschalten (Häkchen = an). Die Liste bleibt offen, bis man daneben tippt.
