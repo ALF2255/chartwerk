@@ -42,9 +42,9 @@ Drei Knöpfe, jeder einzeln abschaltbar (auch im Objektbaum, in „Indikatoren �
 - **RSI** – Ultimate RSI (Länge 14, Glättung TMA, Signal EMA 14) mit Zonen 80 / 50 / 20, über 50 grün, unter 50 rot gefüllt.
 - **MACD** – 12/26/9, Linie grün über / rot unter der Signallinie, Histogramm 4-farbig (steigend/fallend über/unter null).
   Knopf „TF“: wie Chart oder **nächsthöherer Zeitrahmen** (z. B. Woche auf dem Tageschart); der laufende Abschnitt wird mit dem aktuellen Kurs gerechnet.
-- **MACD-Signale** – BUY/SELL im Chart bei MACD-Kreuzung (immer im Chart-Zeitrahmen), aktuelle Position mit Einstieg,
+- **MACD-Signale** – BUY/SELL im Chart bei MACD-Kreuzung (aus demselben MACD wie im Fenster, also auch im höheren Zeitrahmen, wenn „TF“ umgestellt ist), aktuelle Position mit Einstieg,
   Ziel (3× ATR 14) und Stop (2× ATR 14) als Linien, in der Kopfzeile MACD über/unter 0, Schwung steigt/fällt, letztes Signal mit Ziel/Stop in % und ein Check (wie oft Ziel vor Stop).
-  Knopf „Signale“: alle Kreuzungen / gefiltert (BUY unter oder nahe, SELL über oder nahe der Nulllinie – Spielraum ¼ des üblichen MACD-Ausschlags; Wackler mit kleinem Histogramm davor zählen nicht) / nur Nulllinien-Durchgänge (wenigste Signale).
+  Knopf „Signale“: alle Kreuzungen / mit Trend (BUY nur bei MACD über null, SELL nur unter null; Wackler mit kleinem Histogramm davor zählen nicht) / nur Nulllinien-Durchgänge (wenigste Signale).
 Nachgerechnet nach den bekannten Formeln, angelehnt an die TradingView-Indikatoren von LuxAlgo, ChrisMoody und blackcat (kein Originalcode).
 
 ## Vollbild
