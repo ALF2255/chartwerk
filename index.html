@@ -1046,7 +1046,9 @@ function msSignals(M,T){const n=data.length,A=T?atrUp(T,14):atr(14),sg=[],tr=[];
  for(let i=1;i<n;i++){const hv=M.h[i];let avM=0,avH=0;if(am.length){avM=am.reduce((x,y)=>x+y,0)/am.length;avH=ah.reduce((x,y)=>x+y,0)/ah.length}
   if(hv!=null){const sg2=hv>0?1:hv<0?-1:0;if(sg2&&sg2!==sgn){prevMax=phMax;phMax=0;sgn=sg2}phMax=Math.max(phMax,Math.abs(hv));if(M.m[i]!=null){am.push(Math.abs(M.m[i]));ah.push(Math.abs(hv));if(am.length>50){am.shift();ah.shift()}}}
   const a=M.m[i-1]!=null&&M.g[i-1]!=null?M.m[i-1]-M.g[i-1]:null,b=M.m[i]!=null&&M.g[i]!=null?M.m[i]-M.g[i]:null;if(a==null||b==null)continue;
-  if(cur&&!cur.done){const bb=data[i];const hitTP=!msX&&(cur.d>0?bb.h>=cur.tp:bb.l<=cur.tp),hitSL=cur.d>0?bb.l<=cur.sl:bb.h>=cur.sl;if(hitSL){cur.done='sl';stat.l++;cur.r=cur.d*(cur.sl/cur.e-1);tr.push(cur.r)}else if(hitTP){cur.done='tp';stat.w++}}
+  if(cur&&!cur.done){const bb=data[i];const hitTP=!msX&&(cur.d>0?bb.h>=cur.tp:bb.l<=cur.tp),hitSL=cur.d>0?bb.l<=cur.sl:bb.h>=cur.sl;if(hitSL){cur.done='sl';stat.l++;cur.r=cur.d*(cur.sl/cur.e-1);tr.push(cur.r);cur.xi=i}else if(hitTP){cur.done='tp';stat.w++}}
+  const raw=msF===2?(M.m[i-1]<=0&&M.m[i]>0?1:M.m[i-1]>=0&&M.m[i]<0?-1:0):(a<=0&&b>0?1:a>=0&&b<0?-1:0);
+  if(msX&&cur&&!cur.done&&raw===-cur.d){cur.done='kreuz';stat.o++;cur.r=cur.d*(data[i].c/cur.e-1);tr.push(cur.r);cur.xi=i}
   let d=0;if(msF===2){const p=M.m[i-1],c=M.m[i];if(p<=0&&c>0)d=1;else if(p>=0&&c<0)d=-1}else{if(a<=0&&b>0)d=1;else if(a>=0&&b<0)d=-1;if(msF===1&&d){if((d>0?M.m[i]<=0:M.m[i]>=0)||prevMax<avH*.5)d=0}}if(!d)continue;
   if(msX&&cur&&!cur.done&&cur.d===d)continue;
   if(cur&&!cur.done){cur.done='kreuz';stat.o++;if(msX){cur.r=cur.d*(data[i].c/cur.e-1);tr.push(cur.r)}}
@@ -1062,6 +1064,8 @@ function msDraw(w,i0,i1){if(!showMS||!IN)return;const MS=IN.ms;ctx.font='600 10p
  MS.sg.forEach(q=>{if(q.i<i0||q.i>i1)return;const xx=x(q.i);if(xx-lastX<26)return;lastX=xx;const b=data[q.i],L=q.d>0,t=L?'BUY':'SELL',tw=ctx.measureText(t).width+8,yy=L?y(b.l)+16:y(b.h)-16;
   ctx.fillStyle=L?'rgba(38,166,154,.92)':'rgba(239,83,80,.92)';ctx.fillRect(xx-tw/2,yy-8,tw,16);ctx.fillStyle='#fff';ctx.textBaseline='middle';ctx.fillText(t,xx,yy);
   ctx.beginPath();ctx.fillStyle=L?UP:DN;if(L){ctx.moveTo(xx,y(b.l)+3);ctx.lineTo(xx-4,yy-8);ctx.lineTo(xx+4,yy-8)}else{ctx.moveTo(xx,y(b.h)-3);ctx.lineTo(xx-4,yy+8);ctx.lineTo(xx+4,yy+8)}ctx.fill()});
+ if(msX){ctx.font='600 9px "IBM Plex Sans",system-ui';MS.sg.forEach(q=>{if(q.xi==null||q.xi<i0||q.xi>i1)return;const b=data[q.xi],xx=x(q.xi),t=(q.done==='sl'?'STOP ':'EXIT ')+(q.r>=0?'+':'')+Math.round(q.r*100)+'%',tw=ctx.measureText(t).width+8,yy=q.d>0?y(b.h)-14:y(b.l)+14;
+  ctx.fillStyle='rgba(141,152,161,.9)';ctx.fillRect(xx-tw/2,yy-7,tw,14);ctx.fillStyle='#fff';ctx.textBaseline='middle';ctx.fillText(t,xx,yy)})}
  const c=MS.cur;if(c&&!c.done){const x0=Math.max(0,x(c.i));if(x0<w){ctx.font='11px "IBM Plex Sans",system-ui';ctx.textAlign='right';ctx.textBaseline='bottom';ctx.lineWidth=1.2;ctx.setLineDash([6,4]);
   (msX?[]:[[c.tp,UP,'Ziel ']]).concat([[c.sl,DN,'Stop '],[c.e,'#8d98a1','Einstieg ']]).forEach(([v,col,lb])=>{const yy=Math.round(y(v))+.5;ctx.strokeStyle=col;seg(x0,yy,w,yy);ctx.fillStyle=col;ctx.fillText(lb+fmt(v),w-4,yy-2)});ctx.setLineDash([])}}
  ctx.textAlign='left';ctx.textBaseline='middle'}
