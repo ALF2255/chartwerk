@@ -1036,7 +1036,12 @@ function uRsi(){const n=data.length,c=data.map(b=>b.c),up=new Array(n).fill(null
  const r=num.map((v,i)=>v==null||den[i]==null?null:den[i]?v/den[i]*50+50:50);return{r,s:emaA(r,RSI_S)}}
 // Filter „mit Trend“: BUY nur, wenn der MACD über null liegt (Aufwärtstrend), SELL nur unter null (Abwärtstrend),
 // und nur wenn die Gegenphase davor nicht bloß ein Wackler war (Histogramm mind. ½ des üblichen Ausschlags der letzten 50 Kerzen).
-function msSignals(M){const n=data.length,A=atr(14),sg=[];let pos=0,cur=null,stat={w:0,l:0,o:0},phMax=0,prevMax=0,sgn=0;const am=[],ah=[];
+// ATR (14) im höheren Zeitrahmen: aus den abgeschlossenen Gruppen bis vor der laufenden (ohne Blick in die Zukunft)
+function atrUp(T,N){const n=data.length,o=new Array(n).fill(null),tr=[];let key=null,g=null,pc=null,cur=null;
+ for(let i=0;i<n;i++){const b=data[i],k=grpKey(b.t,T);if(k!==key){if(g){tr.push(Math.max(g.h-g.l,pc==null?0:Math.abs(g.h-pc),pc==null?0:Math.abs(g.l-pc)));pc=g.c;
+   if(tr.length>=N){let s2=0;for(let j=tr.length-N;j<tr.length;j++)s2+=tr[j];cur=s2/N}}g={h:b.h,l:b.l,c:b.c};key=k}else{g.h=Math.max(g.h,b.h);g.l=Math.min(g.l,b.l);g.c=b.c}o[i]=cur}
+ return o}
+function msSignals(M,T){const n=data.length,A=T?atrUp(T,14):atr(14),sg=[];let pos=0,cur=null,stat={w:0,l:0,o:0},phMax=0,prevMax=0,sgn=0;const am=[],ah=[];
  for(let i=1;i<n;i++){const hv=M.h[i];let avM=0,avH=0;if(am.length){avM=am.reduce((x,y)=>x+y,0)/am.length;avH=ah.reduce((x,y)=>x+y,0)/ah.length}
   if(hv!=null){const sg2=hv>0?1:hv<0?-1:0;if(sg2&&sg2!==sgn){prevMax=phMax;phMax=0;sgn=sg2}phMax=Math.max(phMax,Math.abs(hv));if(M.m[i]!=null){am.push(Math.abs(M.m[i]));ah.push(Math.abs(hv));if(am.length>50){am.shift();ah.shift()}}}
   const a=M.m[i-1]!=null&&M.g[i-1]!=null?M.m[i-1]-M.g[i-1]:null,b=M.m[i]!=null&&M.g[i]!=null?M.m[i]-M.g[i]:null;if(a==null||b==null)continue;
@@ -1045,7 +1050,7 @@ function msSignals(M){const n=data.length,A=atr(14),sg=[];let pos=0,cur=null,sta
   if(cur&&!cur.done){cur.done='kreuz';stat.o++}
   const e=data[i].c,at=A[i]||Math.abs(e)*.01;cur={i,d,e,sl:e-d*MS_SL*at,tp:e+d*MS_TP*at,done:null};sg.push(cur);pos=d}
  return{sg,cur,pos,stat}}
-function indCalc(){if(!data.length){IN=null;return}const R=uRsi(),T=mcUp&&showMC?upTf():null,M=T?macdUp(T):macdOf(data.map(b=>b.c)),MS=msSignals(M);IN={rsi:R.r,rsig:R.s,m:M.m,g:M.g,h:M.h,T,ms:MS}}
+function indCalc(){if(!data.length){IN=null;return}const R=uRsi(),T=mcUp&&showMC?upTf():null,M=T?macdUp(T):macdOf(data.map(b=>b.c)),MS=msSignals(M,T);IN={rsi:R.r,rsig:R.s,m:M.m,g:M.g,h:M.h,T,ms:MS}}
 function indUI(){$('#rsib').setAttribute('aria-pressed',showRSI);$('#mcb').setAttribute('aria-pressed',showMC);$('#msb').setAttribute('aria-pressed',showMS);$('#msf').style.display=showMS?'':'none';$('#msf').textContent='Signale: '+MSF[msF];
  const T=upTf();$('#mcf').style.display=showMC&&T?'':'none';$('#mcf').textContent='TF: '+(mcUp&&T?T.l:'Chart');$('#mcf').setAttribute('aria-pressed',mcUp&&!!T)}
 function indTog(k){if(k==='rsi')showRSI=!showRSI;else if(k==='mc')showMC=!showMC;else if(k==='ms')showMS=!showMS;else if(k==='mcf')mcUp=!mcUp;else if(k==='msf')msF=(msF+1)%3;indSave();if(k==='mcf'||k==='msf'||k==='mc')indCalc();clampView();ui();draw()}
