@@ -5420,6 +5420,7 @@ canvas {
   }
   /* Vergleich alle Märkte: aktuelle Einstellung (Zeiteinheit, MACD-TF, Signale, Ausstieg, Divergenzen) für jeden Markt durchrechnen. Nur Anzeige. */
   const cmpC = {};
+  const cmpSrc = {}; // Datenquelle je Markt und Zeitrahmen, für die Anzeige im Vergleich
   async function cmpFetch(s) {
     const k = s.id + tf.id,
       c = cmpC[k] || (s.td && tdC[k]);
@@ -5445,16 +5446,21 @@ canvas {
               };
             })
             .reverse();
+        if (a) cmpSrc[k] = "Twelve Data";
       } catch (e) {}
     }
-    if (!a && s.bn)
+    if (!a && s.bn) {
+      cmpSrc[k] = "Binance";
       a = mk(
         await getJSON(
           `${bnHost || "https://data-api.binance.vision"}/api/v3/klines?symbol=${s.bn}&interval=${BNI[tf.id]}&limit=1000`,
         ),
       );
-    if (!a && s.fb)
+    }
+    if (!a && s.fb) {
+      cmpSrc[k] = "Binance-Futures";
       a = mk(await getJSON(`https://fapi.binance.com/fapi/v1/klines?symbol=${s.fb}&interval=${BNI[tf.id]}&limit=1000`));
+    }
     if (!a || !a.length) throw new Error("keine Daten");
     cmpC[k] = { t: Date.now(), d: a.map((o) => ({ ...o })) };
     return a;
@@ -5512,7 +5518,10 @@ canvas {
     for (const s of SYMS) {
       let o;
       try {
-        o = cmpCalc(await cmpFetch(s));
+        const d = await cmpFetch(s);
+        o = cmpCalc(d);
+        o.nb = d.length;
+        o.src = cmpSrc[s.id + tf.id] || "";
       } catch (e) {
         o = { err: String(e.message || e).slice(0, 40) };
       }
@@ -5576,7 +5585,9 @@ canvas {
               };
             dv = `<td>${f(-1)}</td><td>${f(1)}</td>`;
           }
-          return `<tr><td>${s.name}</td>${ms}${dv}</tr>`;
+          // kurze Historie (z. B. junge Futures-Kontrakte) erklärt fehlende Signale
+          const few = o.nb != null && o.nb < 300 ? `<br><span class="m">nur ${o.nb} Kerzen · ${o.src}</span>` : "";
+          return `<tr><td title="${o.nb || 0} Kerzen von ${o.src || "?"}">${s.name}${few}</td>${ms}${dv}</tr>`;
         })
         .join("") +
       (done ? cmpPooled(rows, msX ? 6 : 4) : "") +
