@@ -7895,7 +7895,7 @@ canvas {
         { id: "shape", t: ["rect", "brush", "goal"] },
         {
           id: "more",
-          b: ["lock", "lockall", "obt", "bk", "fibset", "clear"],
+          b: ["lock", "obt", "bk", "fibset", "clear"],
           n: "Weitere Werkzeuge",
           icon: '<svg viewBox="0 0 22 22"><circle cx="5" cy="11" r="1.3"/><circle cx="11" cy="11" r="1.3"/><circle cx="17" cy="11" r="1.3"/></svg>',
         },
@@ -8019,6 +8019,8 @@ canvas {
     // Reihenfolge der Werkzeug-Gruppen wie oben festgelegt (Zeiger, Linien, Fibonacci, Formen)
     const sep0 = nav.querySelector(".sep");
     G.filter((g) => g.t && g.head).forEach((g) => sep0.before(g.head.parentNode));
+    // „Alle Zeichnungen sperren“ direkt unter dem Magneten (Wunsch 27.11.)
+    if ($("#mag") && $("#lockall")) $("#mag").after($("#lockall"));
     new MutationObserver(sync).observe(nav, { subtree: true, attributes: true, attributeFilter: ["aria-pressed"] });
     sync();
     document.addEventListener("pointerdown", (e) => {
