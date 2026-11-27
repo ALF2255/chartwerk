@@ -5421,16 +5421,33 @@ canvas {
   /* Vergleich alle Märkte: aktuelle Einstellung (Zeiteinheit, MACD-TF, Signale, Ausstieg, Divergenzen) für jeden Markt durchrechnen. Nur Anzeige. */
   const cmpC = {};
   const cmpSrc = {}; // Datenquelle je Markt und Zeitrahmen, für die Anzeige im Vergleich
+  // Vergleich lädt mehr Historie als der Chart (mehr Trades für die Edge-Prüfung). Kostenlos:
+  // Twelve Data liefert bis 5000 Kerzen für 1 Credit, Binance in Seiten zu 1000 (öffentliche API).
+  const CMP_N = 5000;
+  async function bnPages(base) {
+    let all = [],
+      end = null;
+    while (all.length < CMP_N) {
+      const lim = Math.min(1000, CMP_N - all.length),
+        a = await getJSON(`${base}&limit=${lim}${end ? `&endTime=${end}` : ""}`, 12000);
+      if (!Array.isArray(a) || !a.length) break;
+      all = a.concat(all);
+      if (a.length < lim) break; // Anfang der Historie erreicht
+      end = a[0][0] - 1;
+    }
+    return all;
+  }
   async function cmpFetch(s) {
     const k = s.id + tf.id,
-      c = cmpC[k] || (s.td && tdC[k]);
+      c = cmpC[k];
     if (c && Date.now() - c.t < 15 * 60000) return c.d.map((o) => ({ ...o }));
     const mk = (a) => a.map((q) => ({ t: q[0], o: +q[1], h: +q[2], l: +q[3], c: +q[4], v: +q[5] }));
     let a = null;
     if (s.td && tdKey && !(tdNo[s.id] && Date.now() - tdNo[s.id] < 6 * 36e5)) {
       try {
         const j = await getJSON(
-          `https://api.twelvedata.com/time_series?symbol=${encodeURIComponent(s.td)}&interval=${TDI[tf.id]}&outputsize=1000&timezone=UTC&apikey=${encodeURIComponent(tdKey)}`,
+          `https://api.twelvedata.com/time_series?symbol=${encodeURIComponent(s.td)}&interval=${TDI[tf.id]}&outputsize=${CMP_N}&timezone=UTC&apikey=${encodeURIComponent(tdKey)}`,
+          15000,
         );
         if (j.status === "ok" && j.values)
           a = j.values
@@ -5451,15 +5468,11 @@ canvas {
     }
     if (!a && s.bn) {
       cmpSrc[k] = "Binance";
-      a = mk(
-        await getJSON(
-          `${bnHost || "https://data-api.binance.vision"}/api/v3/klines?symbol=${s.bn}&interval=${BNI[tf.id]}&limit=1000`,
-        ),
-      );
+      a = mk(await bnPages(`${bnHost || "https://data-api.binance.vision"}/api/v3/klines?symbol=${s.bn}&interval=${BNI[tf.id]}`));
     }
     if (!a && s.fb) {
       cmpSrc[k] = "Binance-Futures";
-      a = mk(await getJSON(`https://fapi.binance.com/fapi/v1/klines?symbol=${s.fb}&interval=${BNI[tf.id]}&limit=1000`));
+      a = mk(await bnPages(`https://fapi.binance.com/fapi/v1/klines?symbol=${s.fb}&interval=${BNI[tf.id]}`));
     }
     if (!a || !a.length) throw new Error("keine Daten");
     cmpC[k] = { t: Date.now(), d: a.map((o) => ({ ...o })) };
