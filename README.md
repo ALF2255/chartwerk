@@ -75,6 +75,12 @@ zu scrollen). Auf niedrigen Bildschirmen (z. B. 1366 × 768) ist die Werkzeuglei
 Tastenkürzel: **1–5** Zeitrahmen (1 Std bis Monat), **← →** verschieben (mit Umschalt größere Schritte), **+ −** bzw. **↑ ↓** zoomen,
 **R** Ansicht zurücksetzen, **F** Vollbild, **D** Legende mit/ohne Details, **Entf** Auswahl löschen, **Strg+Z** rückgängig.
 
+## Zeichenleiste
+
+Die Werkzeuge stecken in Gruppen (Zeiger, Linien, Fibonacci, Formen, „⋯“ Weitere): antippen wählt das zuletzt benutzte
+Werkzeug der Gruppe, nochmal antippen oder lange drücken klappt die Gruppe aus. Am PC und Tablet nur noch eine schmale
+Spalte, am Handy eine kurze Leiste unten. Beim Fib-Fächer lassen sich die Werte der Ebenen frei eintragen (z. B. 0,786).
+
 ## Einstellungen für alle Märkte
 
 Im Layout-Fenster („Standard“ oben rechts): Häkchen **„Indikatoren & Zeiteinheit für alle Märkte gleich“** – beim Marktwechsel werden die aktuellen Indikatoren (RSI, MACD, Signale, Zickzack, MA …) und die Zeiteinheit mitgenommen; Zeichnungen bleiben je Markt. Knopf **„Jetzt auf alle Märkte übertragen“** für eine einmalige Übernahme. Einstellung gilt je Gerät.
