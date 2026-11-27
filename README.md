@@ -57,7 +57,9 @@ Durchschnitt über null liegt). Anzeige: **Edge ✓** (belegt), **kein Beleg** b
 - MACD-Signale: bei „Ziel/Stop“ zählen auch Trades, die vor Ziel oder Stop durch ein neues Signal beendet wurden (Ausstieg zum
   Schlusskurs) – die Trefferquote „Ziel / Stop“ allein wäre geschönt. Gewinnschwelle bei Ziel 3 / Stop 2 ATR: 40 %.
 - Divergenzen: als Trade gelesen (Einstieg bei Bestätigung, Ausstieg 10 Kerzen später), dazu Ø-Veränderung im Vergleich zur Grundrate.
-- Vergleich alle Märkte: Spalte „Edge“.
+- Vergleich alle Märkte: Spalte „Edge“, Spalte „1. | 2. Hälfte“ (t-Wert getrennt für die ältere und die neuere Hälfte der
+  Kerzen – eine echte Edge sollte in beiden bestehen) und Zeile „Alle zusammen“ (Trades aller Märkte gemeinsam geprüft).
+  Der Vergleich lädt je Markt bis zu 5000 Kerzen.
 
 ## Handy
 

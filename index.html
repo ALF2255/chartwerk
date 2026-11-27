@@ -5175,7 +5175,12 @@ canvas {
       A = T ? atrUp(T, 14) : atr(14),
       sg = [],
       tr = [],
-      all = []; // all = Ergebnis jedes abgeschlossenen Trades (beide Ausstiegsarten), für die Edge-Prüfung
+      all = [], // all = Ergebnis jedes abgeschlossenen Trades (beide Ausstiegsarten), für die Edge-Prüfung
+      allI = [], // Kerze des Ausstiegs je Trade (für die Prüfung nach Hälften)
+      addT = (i, r) => {
+        all.push(r);
+        allI.push(i);
+      };
     let pos = 0,
       cur = null,
       stat = { w: 0, l: 0, o: 0 },
@@ -5216,12 +5221,12 @@ canvas {
           stat.l++;
           cur.r = cur.d * (cur.sl / cur.e - 1);
           tr.push(cur.r);
-          all.push(cur.r);
+          addT(i, cur.r);
           cur.xi = i;
         } else if (hitTP) {
           cur.done = "tp";
           stat.w++;
-          all.push(cur.d * (cur.tp / cur.e - 1));
+          addT(i, cur.d * (cur.tp / cur.e - 1));
         }
       }
       const raw =
@@ -5241,7 +5246,7 @@ canvas {
         stat.o++;
         cur.r = cur.d * (data[i].c / cur.e - 1);
         tr.push(cur.r);
-        all.push(cur.r);
+        addT(i, cur.r);
         cur.xi = i;
       }
       let d = 0;
@@ -5267,7 +5272,7 @@ canvas {
           tr.push(cur.r);
         }
         // neues Signal vor Ziel/Stop: Trade wird zum Schlusskurs beendet und zählt mit
-        all.push(cur.d * (data[i].c / cur.e - 1));
+        addT(i, cur.d * (data[i].c / cur.e - 1));
       }
       const e = data[i].c,
         at = A[i] || Math.abs(e) * 0.01;
@@ -5276,8 +5281,19 @@ canvas {
       pos = d;
     }
     if (cur && !cur.done) cur.r = cur.d * (data[n - 1].c / cur.e - 1);
-    // Edge nur aus abgeschlossenen Trades, je Trade 2 × Gebühr (Ein- und Ausstieg)
-    return { sg, cur, pos, stat, tr, edge: edgeOf(all.map((r) => r - 2 * FEE)) };
+    // Edge nur aus abgeschlossenen Trades, dazu getrennt für 1. und 2. Hälfte der Kerzen (hält das Ergebnis in beiden Zeiträumen?)
+    const net = all.map((r) => r - 2 * FEE),
+      mid = Math.floor(n / 2);
+    return {
+      sg,
+      cur,
+      pos,
+      stat,
+      tr,
+      edge: edgeOf(net),
+      h1: edgeOf(net.filter((r, k) => allI[k] < mid)),
+      h2: edgeOf(net.filter((r, k) => allI[k] >= mid)),
+    };
   }
   /* Divergenzen: Kurs macht höheres Hoch / tieferes Tief, RSI bzw. MACD nicht. Wendepunkte mit 5 Kerzen links/rechts (erst nach 5 Kerzen bestätigt, kein Blick in die Zukunft).
    Check: wie oft lag der Kurs 10 Kerzen nach der Bestätigung in Richtung der Divergenz – verglichen mit allen Kerzen (Grundrate). */
@@ -5499,6 +5515,8 @@ canvas {
         since: f ? a[f.i].t : null,
         pos: MS.cur && !MS.cur.done ? MS.cur.d : 0,
         E: MS.edge,
+        H1: MS.h1,
+        H2: MS.h2,
         D,
       };
     } finally {
@@ -5544,8 +5562,18 @@ canvas {
     }
     el.innerHTML = cmpTable(rows, p1, pc, cls, true);
     $("#cmpn").innerHTML =
-      `<p class="m" style="margin-top:8px">„Alle zusammen“ = Trades aller Märkte gemeinsam geprüft – reicht ein Markt allein nicht für ${EDGE_N} Trades, gibt es hier trotzdem ein Urteil über die Einstellung als Ganzes. ${msX ? "„Zusammen“ = alle Trades hintereinander (Gewinne wieder eingesetzt), „Halten“ = einfach kaufen ab dem ersten Signal. " : "Ziel = 3× ATR, Stop = 2× ATR; „vorher beendet“ = neues Signal kam vor Ziel oder Stop (Ausstieg zum Schlusskurs, zählt bei Edge mit). "}Divergenzen: Anteil, bei dem der Kurs 10 Kerzen später in Richtung der Divergenz lag, in Klammern die Grundrate. „Edge“ = Prüfung wie beim Bot: nach 0,1 % Gebühr je Ein- und Ausstieg, mindestens ${EDGE_N} abgeschlossene Trades und t ≥ ${tFmt(EDGE_T)} (✓ = Edge belegt, ✗ = kein Beleg, „zu wenige“ = unter ${EDGE_N} Trades). Die anderen Spalten ohne Gebühren. Nur Rückblick – kein Beleg für die Zukunft.</p>`;
+      `<p class="m" style="margin-top:8px">„Alle zusammen“ = Trades aller Märkte gemeinsam geprüft – reicht ein Markt allein nicht für ${EDGE_N} Trades, gibt es hier trotzdem ein Urteil über die Einstellung als Ganzes. „1. | 2. Hälfte“ = t-Wert getrennt für die ältere und die neuere Hälfte der Kerzen: Eine echte Edge sollte in beiden Hälften bestehen, nicht nur in einer (grau = unter ${EDGE_N / 2} Trades). ${msX ? "„Zusammen“ = alle Trades hintereinander (Gewinne wieder eingesetzt), „Halten“ = einfach kaufen ab dem ersten Signal. " : "Ziel = 3× ATR, Stop = 2× ATR; „vorher beendet“ = neues Signal kam vor Ziel oder Stop (Ausstieg zum Schlusskurs, zählt bei Edge mit). "}Divergenzen: Anteil, bei dem der Kurs 10 Kerzen später in Richtung der Divergenz lag, in Klammern die Grundrate. „Edge“ = Prüfung wie beim Bot: nach 0,1 % Gebühr je Ein- und Ausstieg, mindestens ${EDGE_N} abgeschlossene Trades und t ≥ ${tFmt(EDGE_T)} (✓ = Edge belegt, ✗ = kein Beleg, „zu wenige“ = unter ${EDGE_N} Trades). Die anderen Spalten ohne Gebühren. Nur Rückblick – kein Beleg für die Zukunft.</p>`;
     cmpBusy = false;
+  }
+  // Kurzform je Markt: t-Wert der 1. und 2. Hälfte (grün ab EDGE_T, grau bei unter EDGE_N/2 Trades je Hälfte)
+  function halfTxt(o) {
+    const f = (E) =>
+      !E || !E.n
+        ? "–"
+        : E.n < EDGE_N / 2
+          ? `<span style="color:var(--mute)">${tFmt(E.t)}</span>`
+          : `<span class="${E.t >= EDGE_T ? "up" : E.t < 0 ? "dn" : ""}">${tFmt(E.t)}</span>`;
+    return `${f(o.H1)} | ${f(o.H2)}`;
   }
   // Summenzeile: Trades aller Märkte zusammen durch die Edge-Prüfung
   function cmpPooled(rows, msCols) {
@@ -5554,7 +5582,8 @@ canvas {
       sig = ok.reduce((a, o) => a + (msX ? (o.R || []).length : o.n || 0), 0);
     let ms = "";
     // ausführlicher Text, damit sichtbar ist, wie viele abgeschlossene Trades fehlen (offene Positionen zählen nicht)
-    if (showMS) ms = `<td>${sig}</td><td colspan="${msCols - 1}" style="text-align:left">${edgeTxt(cat((o) => o.E))}</td>`;
+    if (showMS)
+      ms = `<td>${sig}</td><td colspan="${msCols - 1}" style="text-align:left;line-height:1.6">${edgeTxt(cat((o) => o.E))}<br><span class="m">1. Hälfte </span>${edgeTxt(cat((o) => o.H1))}<br><span class="m">2. Hälfte </span>${edgeTxt(cat((o) => o.H2))}</td>`;
     let dv = "";
     if (showDV) {
       const f = (d) => {
@@ -5567,8 +5596,8 @@ canvas {
   }
   function cmpTable(rows, p1, pc, cls, done) {
     const th = msX
-      ? "<th>Signale</th><th>Edge</th><th>Ø je Signal</th><th>Zusammen</th><th>Halten</th><th>Bestes / Schlechtestes</th>"
-      : "<th>Signale</th><th>Edge</th><th>Treffer</th><th>Ziel / Stop</th>";
+      ? "<th>Signale</th><th>Edge</th><th>1. | 2. Hälfte</th><th>Ø je Signal</th><th>Zusammen</th><th>Halten</th><th>Bestes / Schlechtestes</th>"
+      : "<th>Signale</th><th>Edge</th><th>1. | 2. Hälfte</th><th>Treffer</th><th>Ziel / Stop</th>";
     return (
       `<table class="cmpt"><tr><th>Markt</th>${showMS ? th : ""}${showDV ? "<th>Div ▼</th><th>Div ▲</th>" : ""}</tr>` +
       rows
@@ -5580,10 +5609,10 @@ canvas {
               const R = o.R || [],
                 av = R.length ? R.reduce((x, y) => x + y, 0) / R.length : null,
                 cp = R.length ? R.reduce((x, y) => x * (1 + y), 1) - 1 : null;
-              ms = `<td>${R.length}${o.pos ? (o.pos > 0 ? ' <span class="up">▲</span>' : ' <span class="dn">▼</span>') : ""}</td><td>${edgeTxt(o.E, 1)}</td><td class="${cls(av)}">${p1(av)}</td><td class="${cls(cp)}"><b>${p1(cp)}</b></td><td class="${cls(o.hold)}">${p1(o.hold)}</td><td>${R.length ? p1(Math.max(...R)) + " / " + p1(Math.min(...R)) : "–"}</td>`;
+              ms = `<td>${R.length}${o.pos ? (o.pos > 0 ? ' <span class="up">▲</span>' : ' <span class="dn">▼</span>') : ""}</td><td>${edgeTxt(o.E, 1)}</td><td>${halfTxt(o)}</td><td class="${cls(av)}">${p1(av)}</td><td class="${cls(cp)}"><b>${p1(cp)}</b></td><td class="${cls(o.hold)}">${p1(o.hold)}</td><td>${R.length ? p1(Math.max(...R)) + " / " + p1(Math.min(...R)) : "–"}</td>`;
             } else {
               const t = o.st.w + o.st.l;
-              ms = `<td>${o.n}</td><td>${edgeTxt(o.E, 1)}</td><td>${t ? pc(o.st.w / t) : "–"}</td><td>${o.st.w} / ${o.st.l}${o.st.o ? ` <span class="m">(+${o.st.o} vorher beendet)</span>` : ""}</td>`;
+              ms = `<td>${o.n}</td><td>${edgeTxt(o.E, 1)}</td><td>${halfTxt(o)}</td><td>${t ? pc(o.st.w / t) : "–"}</td><td>${o.st.w} / ${o.st.l}${o.st.o ? ` <span class="m">(+${o.st.o} vorher beendet)</span>` : ""}</td>`;
             }
           }
           let dv = "";
@@ -5603,7 +5632,7 @@ canvas {
           return `<tr><td title="${o.nb || 0} Kerzen von ${o.src || "?"}">${s.name}${few}</td>${ms}${dv}</tr>`;
         })
         .join("") +
-      (done ? cmpPooled(rows, msX ? 6 : 4) : "") +
+      (done ? cmpPooled(rows, msX ? 7 : 5) : "") +
       "</table>"
     );
   }
