@@ -1561,7 +1561,7 @@ canvas {
   <h2>Datenquelle</h2>
   <p id="pinfo"></p>
   <ul id="plist"></ul>
-  <label for="tdk">Twelve-Data-Schlüssel für Silber (kostenlos auf <a href="https://twelvedata.com" target="_blank" rel="noopener">twelvedata.com</a>)</label>
+  <label for="tdk">Twelve-Data-Schlüssel für Gold und EUR/USD (kostenlos auf <a href="https://twelvedata.com" target="_blank" rel="noopener">twelvedata.com</a>)</label>
   <input id="tdk" autocomplete="off" spellcheck="false" placeholder="API-Schlüssel einfügen">
   <div class="prow"><button class="chip pri" id="psave">Speichern</button><button class="chip" id="pclose">Schließen</button></div>
  </div></main>
@@ -1586,8 +1586,8 @@ canvas {
       lp: "Gold (PAXG/USDT)",
       td: "XAU/USD",
     },
-    { id: "XAG", name: "Silber", pair: "XAG/USD", p: 50, v: 0.02, m: 1, td: "XAG/USD", fb: "XAGUSDT" },
-    { id: "OIL", name: "Brent-Öl", pair: "XBR/USD", p: 87, v: 0.025, m: 1, td: "XBR/USD", fb: "BZUSDT" },
+    { id: "XAG", name: "Silber", pair: "XAG/USD", p: 50, v: 0.02, m: 1, fb: "XAGUSDT" }, // Binance-Futures (Entscheidung 27.11.: Binance statt Twelve Data)
+    { id: "OIL", name: "Brent-Öl", pair: "XBR/USD", p: 87, v: 0.025, m: 1, fb: "BZUSDT" }, // Binance-Futures
     {
       id: "EUR",
       name: "EUR/USD",
@@ -6366,7 +6366,7 @@ canvas {
     $("#plist").innerHTML =
       SYMS.map(
         (s) =>
-          `<li><span>${s.name}</span><span>${!net ? "simuliert" : s.td && tdKey ? "Twelve Data, alle " + tdMin() + " Min." + (s.fb ? " (sonst Binance Futures)" : "") : s.bn ? "Binance live" + (s.id === "XAU" ? " (PAXG)" : "") : "simuliert, Schlüssel fehlt"}</span></li>`,
+          `<li><span>${s.name}</span><span>${!net ? "simuliert" : s.td && tdKey ? "Twelve Data, alle " + tdMin() + " Min." + (s.fb ? " (sonst Binance Futures)" : "") : s.bn ? "Binance live" + (s.id === "XAU" ? " (PAXG)" : "") : s.fb ? "Binance Futures live" : "simuliert, Schlüssel fehlt"}</span></li>`,
       ).join("") +
       (err && err !== "Schlüssel fehlt"
         ? `<li><span>Letzter Fehler</span><span>${err.replace(/</g, "&lt;")}</span></li>`
