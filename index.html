@@ -248,6 +248,9 @@ canvas{position:absolute;inset:0;width:100%;height:100%;touch-action:none;cursor
   <h2 id="layh">Strategie-Layouts</h2>
   <p>Jedes Layout hat eigene Zeichnungen, eine eigene Zeiteinheit und eigene Indikatoren. Namen lassen sich direkt antippen und ändern.</p>
   <div class="obl" id="layl"></div>
+  <label style="display:flex;gap:8px;align-items:center;margin-top:10px"><input type="checkbox" id="lyall" style="width:auto"> Indikatoren &amp; Zeiteinheit für alle Märkte gleich</label>
+  <p style="margin-top:4px">Beim Wechsel des Marktes werden die aktuellen Einstellungen (RSI, MACD, Signale, Zickzack, MA … und die Zeiteinheit) mitgenommen. Zeichnungen bleiben je Markt.</p>
+  <div class="prow"><button class="chip" id="lyto">Jetzt auf alle Märkte übertragen</button></div>
   <label for="layn">Neues Layout</label>
   <input id="layn" maxlength="30" autocomplete="off" placeholder="z. B. Swing, Langfrist, Elliott">
   <div class="prow"><button class="chip" id="laynew">Leer anlegen</button><button class="chip" id="laycp">Aktuelles kopieren</button></div>
@@ -1186,7 +1189,15 @@ function applyLay(L){const i=L&&L.ind,g0=showGP;if(i){if('gpb'in i)showGP=!!i.gp
  const t=L&&L.tf&&TFS.find(x=>x.id===L.tf);if(t&&t!==tf){tf=t;return true}return showGP!==g0}
 function layInit(){let l='';try{l=localStorage.getItem('chartwerk:lay:'+sym.id)||''}catch(e){}return lays(sym.id).some(q=>q.id===l)?l:''}
 function setLay(lid){layCapture();lay=lid;try{localStorage.setItem('chartwerk:lay:'+sym.id,lid)}catch(e){}const tch=applyLay(curLay());load();sel=-1;undo=[];chanP=-1;if(tch)loadData(true);else{ui();draw()}}
-$('#syms').onclick=e=>{const b=e.target.closest('.chip');if(!b)return;layCapture();sym=SYMS.find(s=>s.id===b.dataset.id);lay=layInit();applyLay(curLay());load();sel=-1;undo=[];chanP=-1;loadData(true)};
+let allSame=false;try{allSame=localStorage.getItem('chartwerk:allsame')==='1'}catch(e){}
+const indNow=()=>({ma:showMA,zzb:showZZ,trb:showTR,znb:showZN,pgb:showPG,scb:showSC,mwb:showMW,htb:showHT,gpb:showGP,cyb:showCY,lqb:showLQ,emb:showEMA,rsib:showRSI,mcb:showMC,msb:showMS});
+// Aktuelle Indikatoren + Zeiteinheit ins aktive Layout eines Marktes schreiben (ohne Zeichnungen)
+function layPut(sid){const a=lays(sid);let l='';try{l=localStorage.getItem('chartwerk:lay:'+sid)||''}catch(e){}const L=a.find(q=>q.id===l)||a[0];if(!L)return false;const nw={tf:tf.id,ind:indNow()};
+ if(L.tf===nw.tf&&JSON.stringify(L.ind)===JSON.stringify(nw.ind))return false;Object.assign(L,nw);setLays(sid,a);return true}
+$('#lyall').checked=allSame;
+$('#lyall').onchange=e=>{allSame=e.target.checked;try{localStorage.setItem('chartwerk:allsame',allSame?'1':'0')}catch(x){}if(allSame){SYMS.forEach(q=>layPut(q.id));toast('Einstellungen gelten jetzt für alle Märkte')}else toast('Jeder Markt hat wieder eigene Einstellungen')};
+$('#lyto').onclick=()=>{layCapture();let k=0;SYMS.forEach(q=>{if(layPut(q.id))k++});toast(k?'Auf '+k+' weitere Märkte übertragen':'Alle Märkte haben schon diese Einstellungen')};
+$('#syms').onclick=e=>{const b=e.target.closest('.chip');if(!b)return;layCapture();sym=SYMS.find(s=>s.id===b.dataset.id);lay=layInit();if(allSame)layCapture();else applyLay(curLay());load();sel=-1;undo=[];chanP=-1;loadData(true)};
 document.querySelector('.bar').addEventListener('click',()=>setTimeout(layCapture,0));
 const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 let laySig='',rmArm='',rmT=0;

@@ -36,6 +36,10 @@ Schalter „Wende nach dem Schließen“ im Gaps-Kasten: wie oft der Kurs 1 W / 
 liegt, von der er in die Lücke kam (also an der Lücke gedreht hat) – im Vergleich zum Zufall (wie oft der Kurs nach derselben
 Zeit überhaupt höher bzw. tiefer liegt). Im Chart ein Punkt am Schließ-Niveau: grün = nach 4 Wochen gewendet, rot = weitergelaufen.
 
+## Einstellungen für alle Märkte
+
+Im Layout-Fenster („Standard“ oben rechts): Häkchen **„Indikatoren & Zeiteinheit für alle Märkte gleich“** – beim Marktwechsel werden die aktuellen Indikatoren (RSI, MACD, Signale, Zickzack, MA …) und die Zeiteinheit mitgenommen; Zeichnungen bleiben je Markt. Knopf **„Jetzt auf alle Märkte übertragen“** für eine einmalige Übernahme. Einstellung gilt je Gerät.
+
 ## RSI, MACD und MACD-Signale (Fenster unter dem Chart)
 
 Drei Knöpfe, jeder einzeln abschaltbar (auch im Objektbaum, in „Indikatoren ▾“ und in Layouts gespeichert):
