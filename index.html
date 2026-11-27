@@ -336,6 +336,9 @@ canvas {
   background: #182027;
   z-index: 1;
 }
+.cmpt tr.cmpk td {
+  border-top: 1px solid #2a333a;
+}
 .cmpt tr.cmpall td {
   border-top: 2px solid #3a4752;
   border-bottom: 0;
@@ -1557,7 +1560,7 @@ canvas {
   <div class="cmpwipe">Tabelle seitlich wischen für weitere Spalten →</div>
   <div id="cmpt" style="overflow-x:auto"></div>
   <div id="cmpn"></div>
-  <div class="prow"><button class="chip" id="ssb" title="Alle Kombinationen aus Zeitrahmen, MACD-Zeitrahmen, Signalen und Ausstieg auf allen Märkten prüfen">Alle Strategien durchspielen</button></div>
+  <div class="prow"><button class="chip" id="ssb" title="Alle Kombinationen aus Zeitrahmen, MACD-Zeitrahmen, Signalen und Ausstieg prüfen">Alle Strategien durchspielen</button><button class="chip" id="ssm" aria-pressed="false" title="Strategie-Suche nur mit Bitcoin, Ethereum, Solana und Zcash">Nur Krypto</button></div>
   <div class="prow"><button class="chip" id="cmpre">Neu rechnen</button><button class="chip pri" id="cmpok">Fertig</button></div>
  </div>
  <div class="panel" id="obp" role="dialog" aria-label="Objektbaum">
@@ -5639,7 +5642,7 @@ canvas {
     }
     el.innerHTML = cmpTable(rows, p1, pc, cls, true);
     $("#cmpn").innerHTML =
-      `<p class="m" style="margin-top:8px">„Alle zusammen“ = Trades aller Märkte gemeinsam geprüft – reicht ein Markt allein nicht für ${EDGE_N} Trades, gibt es hier trotzdem ein Urteil über die Einstellung als Ganzes. „1. | 2. Hälfte“ = t-Wert getrennt für die ältere und die neuere Hälfte der Kerzen: Eine echte Edge sollte in beiden Hälften bestehen, nicht nur in einer (grau = unter ${EDGE_N / 2} Trades). ${msX ? "„Zusammen“ = alle Trades hintereinander (Gewinne wieder eingesetzt), „Halten“ = einfach kaufen ab dem ersten Signal. " : "Ziel = 3× ATR, Stop = 2× ATR; „vorher beendet“ = neues Signal kam vor Ziel oder Stop (Ausstieg zum Schlusskurs, zählt bei Edge mit). "}Divergenzen: Anteil, bei dem der Kurs 10 Kerzen später in Richtung der Divergenz lag, in Klammern die Grundrate. „Edge“ = Prüfung wie beim Bot: nach 0,1 % Gebühr je Ein- und Ausstieg, mindestens ${EDGE_N} abgeschlossene Trades und t ≥ ${tFmt(EDGE_T)} (✓ = Edge belegt, ✗ = kein Beleg, „zu wenige“ = unter ${EDGE_N} Trades). Die anderen Spalten ohne Gebühren. Nur Rückblick – kein Beleg für die Zukunft.</p>`;
+      `<p class="m" style="margin-top:8px">„Alle zusammen“ = Trades aller Märkte gemeinsam geprüft – reicht ein Markt allein nicht für ${EDGE_N} Trades, gibt es hier trotzdem ein Urteil über die Einstellung als Ganzes; „Nur Krypto“ dasselbe nur für Bitcoin, Ethereum, Solana und Zcash. „1. | 2. Hälfte“ = t-Wert getrennt für die ältere und die neuere Hälfte der Kerzen: Eine echte Edge sollte in beiden Hälften bestehen, nicht nur in einer (grau = unter ${EDGE_N / 2} Trades). ${msX ? "„Zusammen“ = alle Trades hintereinander (Gewinne wieder eingesetzt), „Halten“ = einfach kaufen ab dem ersten Signal. " : "Ziel = 3× ATR, Stop = 2× ATR; „vorher beendet“ = neues Signal kam vor Ziel oder Stop (Ausstieg zum Schlusskurs, zählt bei Edge mit). "}Divergenzen: Anteil, bei dem der Kurs 10 Kerzen später in Richtung der Divergenz lag, in Klammern die Grundrate. „Edge“ = Prüfung wie beim Bot: nach 0,1 % Gebühr je Ein- und Ausstieg, mindestens ${EDGE_N} abgeschlossene Trades und t ≥ ${tFmt(EDGE_T)} (✓ = Edge belegt, ✗ = kein Beleg, „zu wenige“ = unter ${EDGE_N} Trades). Die anderen Spalten ohne Gebühren. Nur Rückblick – kein Beleg für die Zukunft.</p>`;
     cmpBusy = false;
   }
   // Kurzform je Markt: t-Wert der 1. und 2. Hälfte (grün ab EDGE_T, grau bei unter EDGE_N/2 Trades je Hälfte)
@@ -5653,8 +5656,8 @@ canvas {
     return `${f(o.H1)} | ${f(o.H2)}`;
   }
   // Summenzeile: Trades aller Märkte zusammen durch die Edge-Prüfung
-  function cmpPooled(rows, msCols) {
-    const ok = rows.map((r) => r[1]).filter((o) => o && !o.err),
+  function cmpPooled(rows, msCols, onlyCrypto) {
+    const ok = rows.filter((r) => !onlyCrypto || r[0].m === 0).map((r) => r[1]).filter((o) => o && !o.err),
       cat = (f) => edgeOf(ok.flatMap((o) => (f(o) && f(o).R) || [])),
       sig = ok.reduce((a, o) => a + (msX ? (o.R || []).length : o.n || 0), 0);
     let ms = "";
@@ -5669,7 +5672,7 @@ canvas {
       };
       dv = f(-1) + f(1);
     }
-    return `<tr class="cmpall"><td><b>Alle zusammen</b></td>${ms}${dv}</tr>`;
+    return `<tr class="cmpall${onlyCrypto ? " cmpk" : ""}"><td><b>${onlyCrypto ? "Nur Krypto" : "Alle zusammen"}</b></td>${ms}${dv}</tr>`;
   }
   function cmpTable(rows, p1, pc, cls, done) {
     const th = msX
@@ -5709,7 +5712,7 @@ canvas {
           return `<tr><td title="${o.nb || 0} Kerzen von ${o.src || "?"}">${s.name}${few}</td>${ms}${dv}</tr>`;
         })
         .join("") +
-      (done ? cmpPooled(rows, msX ? 7 : 5) : "") +
+      (done ? cmpPooled(rows, msX ? 7 : 5) + cmpPooled(rows, msX ? 7 : 5, true) : "") +
       "</table>"
     );
   }
@@ -5724,22 +5727,39 @@ canvas {
   // Sortiert nach t-Wert; „robust“ nur, wenn Gesamt und beide Hälften die Edge-Prüfung bestehen.
   const SS_TF = ["1h", "4h", "1D", "1W"];
   let ssBusy = false,
-    ssRes = [];
+    ssRes = [],
+    ssK = false; // Schalter „Nur Krypto“
+  try {
+    ssK = localStorage.getItem("chartwerk:ssk") === "1";
+  } catch (e) {}
+  const ssKUI = () => {
+    $("#ssm").setAttribute("aria-pressed", ssK ? "true" : "false");
+    $("#ssm").textContent = ssK ? "✓ Nur Krypto" : "Nur Krypto";
+  };
+  ssKUI();
+  $("#ssm").onclick = () => {
+    ssK = !ssK;
+    try {
+      localStorage.setItem("chartwerk:ssk", ssK ? "1" : "0");
+    } catch (e) {}
+    ssKUI();
+  };
   async function ssRun() {
     if (ssBusy || cmpBusy) return;
     ssBusy = true;
     const el = $("#cmpt"),
       note = $("#cmpn");
-    $("#cmph").textContent = "Strategie-Suche · alle Märkte";
+    const MK = ssK ? SYMS.filter((s) => s.m === 0) : SYMS;
+    $("#cmph").textContent = "Strategie-Suche · " + (ssK ? "nur Krypto (" + MK.map((s) => s.name).join(", ") + ")" : "alle Märkte");
     note.innerHTML = "";
     try {
       const tfs = SS_TF.map((id) => TFS.find((t) => t.id === id)).filter(Boolean),
         D = {},
-        total = tfs.length * SYMS.length;
+        total = tfs.length * MK.length;
       let done = 0,
         lastTd = 0;
       for (const T of tfs)
-        for (const s of SYMS) {
+        for (const s of MK) {
           el.innerHTML = `<p class="m">Lade Kurse … ${done} von ${total} (${s.name}, ${T.l})</p>`;
           // Twelve Data kostenlos: höchstens 8 Abfragen pro Minute – Abstand halten
           if (s.td && tdKey && !cmpC[s.id + T.id]) {
@@ -5779,7 +5799,7 @@ canvas {
           msX = c.x;
           U = c.up ? upTf() : null;
           if (c.up && !U) continue;
-          for (const s of SYMS) {
+          for (const s of MK) {
             const a = D[c.T.id + s.id];
             if (!a || a.length < 60) continue;
             data = a;
@@ -5801,7 +5821,7 @@ canvas {
       }
       ssRes.sort((p, q) => (q.E.t == null ? -99 : q.E.t) - (p.E.t == null ? -99 : p.E.t));
       el.innerHTML = ssTable(ssRes);
-      note.innerHTML = `<p class="m" style="margin-top:8px">${ssRes.length} Varianten, je Variante alle Märkte zusammen, nach Gebühren (0,1 % je Ein- und Ausstieg), sortiert nach t. „Treffer“ = Anteil der Trades mit Gewinn – allein nicht aussagekräftig: Bei Ziel/Stop (3 : 2 ATR) reichen 40 %, beim Gegensignal kann ein Drittel Treffer genügen, wenn die Gewinner groß sind. Entscheidend ist der t-Wert. „robust ✓“ = Gesamt <b>und</b> beide Hälften bestehen die Edge-Prüfung (t ≥ ${tFmt(EDGE_T)}, ≥ ${EDGE_N} Trades). Weil hier ${ssRes.length} Varianten gleichzeitig getestet werden, ist ein einzelnes ✓ ohne beide Hälften eher Zufall. Antippen einer Zeile stellt die Variante im Chart ein. Nur Rückblick – keine Anlageberatung.</p>`;
+      note.innerHTML = `<p class="m" style="margin-top:8px">${ssRes.length} Varianten, je Variante ${ssK ? "die vier Kryptos" : "alle Märkte"} zusammen, nach Gebühren (0,1 % je Ein- und Ausstieg), sortiert nach t. „Treffer“ = Anteil der Trades mit Gewinn – allein nicht aussagekräftig: Bei Ziel/Stop (3 : 2 ATR) reichen 40 %, beim Gegensignal kann ein Drittel Treffer genügen, wenn die Gewinner groß sind. Entscheidend ist der t-Wert. „robust ✓“ = Gesamt <b>und</b> beide Hälften bestehen die Edge-Prüfung (t ≥ ${tFmt(EDGE_T)}, ≥ ${EDGE_N} Trades). Weil hier ${ssRes.length} Varianten gleichzeitig getestet werden, ist ein einzelnes ✓ ohne beide Hälften eher Zufall. Antippen einer Zeile stellt die Variante im Chart ein. Nur Rückblick – keine Anlageberatung.</p>`;
     } finally {
       ssBusy = false;
     }
