@@ -1207,6 +1207,67 @@ canvas {
     width: 100%;
   }
 }
+/* Lesbarkeit der Legende über den Kerzen: leicht abgedunkelter Hintergrund */
+.legend {
+  background: rgba(15, 19, 22, 0.86);
+  border-radius: 8px;
+  padding: 3px 8px;
+  margin-left: -6px;
+}
+/* Kästen oben im Chart unter der Legende einreihen (Höhe der Legende setzt das Skript als --lgh) */
+.pg,
+.pg.htx,
+.pg.gpx {
+  top: calc(var(--lgh, 34px) + 12px);
+}
+.pg.htx {
+  max-height: calc(50% - var(--lgh, 34px) - 24px);
+}
+.pg.gpx {
+  max-height: calc(100% - var(--lgh, 34px) - 60px);
+}
+/* Prognose-Kasten links oben darf den EMA-Kasten links unten nicht überdecken – dann scrollt er */
+#pg {
+  max-height: calc(100% - var(--lgh, 34px) - 50px);
+  overflow: auto;
+}
+.stage:has(#embx:not([hidden])) #pg {
+  max-height: calc(100% - var(--lgh, 34px) - 275px);
+}
+#pkm button.sub {
+  min-height: 38px;
+  padding-left: 42px;
+  font-size: 14px;
+  color: var(--mute);
+}
+/* Handy: Indikator-Knöpfe stecken im Menü „Indikatoren ▾“ in der Legende, damit mehr Chart sichtbar bleibt */
+@media (max-width: 700px) {
+  .bar .ic,
+  .bar #tfs {
+    display: none;
+  }
+  .bar .chip {
+    height: 34px;
+    font-size: 13px;
+    padding: 0 11px;
+  }
+  .legend .pki {
+    display: inline;
+  }
+  .legend {
+    max-width: calc(100% - 66px);
+  }
+  .note {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+}
+@media (max-width: 480px) {
+  .brand {
+    display: none;
+  }
+}
 @media (prefers-reduced-motion: reduce) {
   .toast {
     transition: none;
@@ -1218,29 +1279,29 @@ canvas {
  <div class="bar">
   <div class="quote"><span id="pair">BTC/USD</span><b id="last">–</b><em id="chg"></em></div>
   <div class="row"><button class="chip src" id="src"><i></i><span>Prüfe Verbindung…</span></button><button class="chip" id="curb" title="Währung umschalten: Dollar / Euro">$ Dollar</button><div class="row" id="tfs"></div>
-  <button class="chip" id="ma" aria-pressed="true">MA 20/50</button>
-  <button class="chip" id="emb" aria-pressed="true" title="EMA mit Long-/Short-Signal und Check">EMA 12</button>
-  <button class="chip" id="ems" title="EMA-Strategie einstellen und optimieren" aria-label="EMA-Einstellungen" style="padding:0 10px"><svg viewBox="0 0 22 22" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M3 5h9M3 11h13M3 17h9"/><circle cx="15.5" cy="5" r="2"/><circle cx="15.5" cy="17" r="2"/></svg></button>
-  <button class="chip" id="zzb" aria-pressed="true">Zickzack</button>
-  <button class="chip" id="zzs" title="Zickzack-Einstellungen" aria-label="Zickzack-Einstellungen" style="padding:0 10px"><svg viewBox="0 0 22 22" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M3 5h9M3 11h13M3 17h9"/><circle cx="15.5" cy="5" r="2"/><circle cx="15.5" cy="17" r="2"/></svg></button>
-  <button class="chip" id="lqb" aria-pressed="true" title="Geschätzte Liquidations-Heatmap (Binance Futures)">Liquidationen</button>
-  <button class="chip" id="cyb" aria-pressed="true" title="Bitcoin-Halving-Zyklus">Zyklus</button>
-  <button class="chip" id="trb" aria-pressed="true">Trend</button>
-  <button class="chip" id="znb" aria-pressed="true">Zonen</button>
-  <button class="chip" id="pgb" aria-pressed="true">Prognose</button>
-  <button class="chip" id="scb" aria-pressed="true">Szenarien</button>
-  <button class="chip" id="mwb" aria-pressed="false" title="Kalshi/Polymarket: was der Markt für feste Termine einpreist">Marktwetten</button>
-  <button class="chip" id="htb" aria-pressed="false" title="Kalshi/Polymarket: Welche Hochs und Tiefs werden bis zum Termin erreicht?">Hoch/Tief-Wetten</button>
-  <button class="chip" id="rsib" aria-pressed="true" title="Ultimate RSI (14) mit Signallinie und 80/20-Zonen, eigenes Fenster unter dem Chart">RSI</button>
-  <button class="chip" id="mcb" aria-pressed="true" title="MACD 12/26/9 mit Farbwechsel, eigenes Fenster unter dem Chart">MACD</button>
-  <button class="chip" id="mcf" title="MACD-Zeitrahmen: wie Chart oder nächsthöherer (MTF)" style="padding:0 10px">TF: Chart</button>
-  <button class="chip" id="msb" aria-pressed="true" title="BUY/SELL bei MACD-Kreuzung, Position mit Ziel und Stop (2×/3× ATR) und Check">MACD-Signale</button>
-  <button class="chip" id="msf" title="Welche MACD-Signale: alle Kreuzungen / mit Trend (BUY nur bei MACD über null, SELL nur unter null, ohne Wackler) / nur Nulllinien-Durchgänge" style="padding:0 10px">Signale: alle</button>
-  <button class="chip" id="msx" title="Ausstieg: bei Ziel oder Stop / erst beim Gegensignal (Stop bleibt als Notbremse)" style="padding:0 10px">Ausstieg: Ziel/Stop</button>
-  <button class="chip" id="dvb" aria-pressed="true" title="Divergenzen: Kurs macht neues Hoch/Tief, RSI bzw. MACD nicht – mögliche Wende (mit Check)">Divergenzen</button>
-  <button class="chip" id="dvs" title="Divergenzen aus RSI oder MACD" style="padding:0 10px">Div: RSI</button>
-  <button class="chip" id="cmpb" title="Aktuelle Einstellung (MACD-Signale, Divergenzen) für alle Märkte durchrechnen" style="padding:0 10px">Vergleich alle Märkte</button>
-  <button class="chip" id="gpb" aria-pressed="false" title="Kurslücken übers Wochenende (wie an der Börse): offene Lücken als Zonen und wie oft sie geschlossen werden">Gaps</button>
+  <button class="chip ic" id="ma" aria-pressed="true">MA 20/50</button>
+  <button class="chip ic" id="emb" aria-pressed="true" title="EMA mit Long-/Short-Signal und Check">EMA 12</button>
+  <button class="chip ic" id="ems" title="EMA-Strategie einstellen und optimieren" aria-label="EMA-Einstellungen" style="padding:0 10px"><svg viewBox="0 0 22 22" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M3 5h9M3 11h13M3 17h9"/><circle cx="15.5" cy="5" r="2"/><circle cx="15.5" cy="17" r="2"/></svg></button>
+  <button class="chip ic" id="zzb" aria-pressed="true">Zickzack</button>
+  <button class="chip ic" id="zzs" title="Zickzack-Einstellungen" aria-label="Zickzack-Einstellungen" style="padding:0 10px"><svg viewBox="0 0 22 22" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M3 5h9M3 11h13M3 17h9"/><circle cx="15.5" cy="5" r="2"/><circle cx="15.5" cy="17" r="2"/></svg></button>
+  <button class="chip ic" id="lqb" aria-pressed="true" title="Geschätzte Liquidations-Heatmap (Binance Futures)">Liquidationen</button>
+  <button class="chip ic" id="cyb" aria-pressed="true" title="Bitcoin-Halving-Zyklus">Zyklus</button>
+  <button class="chip ic" id="trb" aria-pressed="true">Trend</button>
+  <button class="chip ic" id="znb" aria-pressed="true">Zonen</button>
+  <button class="chip ic" id="pgb" aria-pressed="true">Prognose</button>
+  <button class="chip ic" id="scb" aria-pressed="true">Szenarien</button>
+  <button class="chip ic" id="mwb" aria-pressed="false" title="Kalshi/Polymarket: was der Markt für feste Termine einpreist">Marktwetten</button>
+  <button class="chip ic" id="htb" aria-pressed="false" title="Kalshi/Polymarket: Welche Hochs und Tiefs werden bis zum Termin erreicht?">Hoch/Tief-Wetten</button>
+  <button class="chip ic" id="rsib" aria-pressed="true" title="Ultimate RSI (14) mit Signallinie und 80/20-Zonen, eigenes Fenster unter dem Chart">RSI</button>
+  <button class="chip ic" id="mcb" aria-pressed="true" title="MACD 12/26/9 mit Farbwechsel, eigenes Fenster unter dem Chart">MACD</button>
+  <button class="chip ic" id="mcf" title="MACD-Zeitrahmen: wie Chart oder nächsthöherer (MTF)" style="padding:0 10px">TF: Chart</button>
+  <button class="chip ic" id="msb" aria-pressed="true" title="BUY/SELL bei MACD-Kreuzung, Position mit Ziel und Stop (2×/3× ATR) und Check">MACD-Signale</button>
+  <button class="chip ic" id="msf" title="Welche MACD-Signale: alle Kreuzungen / mit Trend (BUY nur bei MACD über null, SELL nur unter null, ohne Wackler) / nur Nulllinien-Durchgänge" style="padding:0 10px">Signale: alle</button>
+  <button class="chip ic" id="msx" title="Ausstieg: bei Ziel oder Stop / erst beim Gegensignal (Stop bleibt als Notbremse)" style="padding:0 10px">Ausstieg: Ziel/Stop</button>
+  <button class="chip ic" id="dvb" aria-pressed="true" title="Divergenzen: Kurs macht neues Hoch/Tief, RSI bzw. MACD nicht – mögliche Wende (mit Check)">Divergenzen</button>
+  <button class="chip ic" id="dvs" title="Divergenzen aus RSI oder MACD" style="padding:0 10px">Div: RSI</button>
+  <button class="chip ic" id="cmpb" title="Aktuelle Einstellung (MACD-Signale, Divergenzen) für alle Märkte durchrechnen" style="padding:0 10px">Vergleich alle Märkte</button>
+  <button class="chip ic" id="gpb" aria-pressed="false" title="Kurslücken übers Wochenende (wie an der Börse): offene Lücken als Zonen und wie oft sie geschlossen werden">Gaps</button>
   <button class="chip" id="fit">Ansicht zurücksetzen</button></div>
  </div>
  <nav class="tools" aria-label="Zeichenwerkzeuge">
@@ -4273,6 +4334,34 @@ canvas {
     }
     legend();
   }
+  // Legende kompakt (nur Kurs und Kurzstatus der Signale) oder mit allen Details. Standard: kompakt auf dem Handy.
+  let lgMin = window.innerWidth < 700;
+  try {
+    const v = localStorage.getItem("chartwerk:lgmin");
+    if (v === "1" || v === "0") lgMin = v === "1";
+  } catch (e) {}
+  const dShort = (t) => {
+    const d = new Date(t),
+      o = tf.h < 24 ? { day: "numeric", month: "numeric", hour: "2-digit", minute: "2-digit" } : { day: "numeric", month: "numeric", year: "2-digit" };
+    return d.toLocaleString("de-DE", tf.h < 24 ? o : { ...o, timeZone: "UTC" });
+  };
+  // Kurzfassung MACD-Signal: Richtung, seit wann, offenes Ergebnis bzw. Status, Edge-Urteil
+  function msShort(i) {
+    if (!showMS || !IN) return "";
+    const MS = IN.ms,
+      c = MS.sg.filter((q) => q.i <= i).pop();
+    if (!c) return `<span><b style="color:${MUTE}">MACD</b> kein Signal</span>`;
+    const last = c === MS.cur,
+      st = last && c.done ? (c.done === "tp" ? " · Ziel ✓" : c.done === "sl" ? " · Stop" : " · raus") : "",
+      open = last && !c.done && c.r != null ? ` <b class="${c.r >= 0 ? "up" : "dn"}">${c.r >= 0 ? "+" : ""}${(c.r * 100).toLocaleString("de-DE", { maximumFractionDigits: 1 })} %</b>` : "";
+    return `<span><b style="color:${c.d > 0 ? UP : DN}">MACD</b> <b class="${c.d > 0 ? "up" : "dn"}">${c.d > 0 ? "LONG" : "SHORT"}</b> ${dShort(data[c.i].t)}${open}${st} · ${edgeTxt(MS.edge, 1)}</span>`;
+  }
+  function dvShort(i) {
+    if (!showDV || !IN || !IN.dv) return "";
+    const q = IN.dv.list.filter((z) => z.c <= i).pop();
+    return `<span><b style="color:${q ? (q.d < 0 ? DN : UP) : MUTE}">Div</b> ${q ? (q.d < 0 ? "▼ " : "▲ ") + dShort(data[q.c].t) : "keine"}</span>`;
+  }
+  let lgH = 0;
   function legend() {
     const n = data.length;
     let i = n - 1;
@@ -4284,7 +4373,22 @@ canvas {
     const b = data[i],
       c = b.c >= b.o ? "up" : "dn";
     $("#legend").innerHTML =
-      `<span><b class="pk${pkOpen === "sym" ? " on" : ""}" data-pk="sym">${pairName()}<i>▾</i></b> · <b class="pk${pkOpen === "tf" ? " on" : ""}" data-pk="tf">${tf.l}<i>▾</i></b><b class="pk pki${pkOpen === "ind" ? " on" : ""}" data-pk="ind"> · Indikatoren<i>▾</i></b></span><span>O <b class="${c}">${fmt(b.o)}</b> H <b class="${c}">${fmt(b.h)}</b> L <b class="${c}">${fmt(b.l)}</b> C <b class="${c}">${fmt(b.c)}</b></span>` +
+      `<span><b class="pk${pkOpen === "sym" ? " on" : ""}" data-pk="sym">${pairName()}<i>▾</i></b> · <b class="pk${pkOpen === "tf" ? " on" : ""}" data-pk="tf">${tf.l}<i>▾</i></b><b class="pk pki${pkOpen === "ind" ? " on" : ""}" data-pk="ind"> · Indikatoren<i>▾</i></b> · <b class="pk" data-pk="det" title="Legende mit allen Details ein- und ausklappen">${lgMin ? "Details<i>▸</i>" : "Details<i>▾</i>"}</b></span><span>O <b class="${c}">${fmt(b.o)}</b> H <b class="${c}">${fmt(b.h)}</b> L <b class="${c}">${fmt(b.l)}</b> C <b class="${c}">${fmt(b.c)}</b></span>` +
+      (lgMin
+        ? (showEMA && ema12[i] != null && emPos
+            ? `<span><b style="color:#00e5ff">EMA${EP.len}</b> <b class="${emPos[i] > 0 ? "up" : emPos[i] < 0 ? "dn" : ""}">${emPos[i] > 0 ? "Long" : emPos[i] < 0 ? "Short" : "Flat"}</b></span>`
+            : "") +
+          msShort(i) +
+          dvShort(i)
+        : legendFull(i));
+    const h = $("#legend").offsetHeight;
+    if (h !== lgH) {
+      lgH = h;
+      stage.style.setProperty("--lgh", h + "px");
+    }
+  }
+  function legendFull(i) {
+    return (
       (showEMA && ema12[i] != null && emPos
         ? `<span><b style="color:#00e5ff">EMA${EP.len}</b> ${fmt(ema12[i])} <b class="${emPos[i] > 0 ? "up" : emPos[i] < 0 ? "dn" : ""}">${emPos[i] > 0 ? "Long" : emPos[i] < 0 ? "Short" : "Flat"}</b></span>`
         : "") +
@@ -4304,7 +4408,8 @@ canvas {
         ? `<span class="m"><b style="color:${zzo.c}">Zickzack</b> ${zzo.dev.toLocaleString("de-DE")} ${zzo.depth}</span>`
         : "") +
       msText(i) +
-      dvText(i);
+      dvText(i)
+    );
   }
 
   function distSeg(px, py, ax, ay, bx, by) {
@@ -6458,6 +6563,14 @@ canvas {
     e.preventDefault();
     e.stopPropagation();
     const k = b.dataset.pk;
+    if (k === "det") {
+      lgMin = !lgMin;
+      try {
+        localStorage.setItem("chartwerk:lgmin", lgMin ? "1" : "0");
+      } catch (e) {}
+      pkClose();
+      return;
+    }
     if (pkOpen === k) {
       pkClose();
       return;
@@ -6481,21 +6594,33 @@ canvas {
     legend();
   });
   // Indikatoren-Auswahl (im Vollbild, wo die Knopfleiste ausgeblendet ist): schaltet dieselben Knöpfe, Menü bleibt offen
+  // Auch auf dem Handy (dort ist die Knopfleiste der Indikatoren ausgeblendet): Haupt-Schalter mit Häkchen,
+  // darunter eingerückt die zugehörigen Einstellungs-Knöpfe (Signale, Ausstieg, TF, Zahnrad, Vergleich …)
   function indMenu() {
-    return IND.map(([id, n]) => {
-      const c = $("#" + id);
-      if (!c || c.style.display === "none") return "";
-      const on = c.getAttribute("aria-pressed") === "true";
-      return `<button data-ind="${id}" aria-pressed="${on}"><u>${on ? "✓" : ""}</u>${esc(c.textContent.trim() || n)}</button>`;
-    }).join("");
+    const names = Object.fromEntries(IND);
+    return [...document.querySelectorAll(".bar .ic")]
+      .map((c) => {
+        if (c.style.display === "none") return "";
+        const id = c.id;
+        if (names[id]) {
+          const on = c.getAttribute("aria-pressed") === "true";
+          return `<button data-ind="${id}" aria-pressed="${on}"><u>${on ? "✓" : ""}</u>${esc(c.textContent.trim() || names[id])}</button>`;
+        }
+        const t = c.textContent.trim() || c.getAttribute("aria-label") || c.title;
+        return `<button class="sub" data-ind="${id}">${esc(t)}</button>`;
+      })
+      .join("");
   }
   $("#pkm").addEventListener("click", (e) => {
     const b = e.target.closest("button");
     if (!b) return;
     if (b.dataset.ind) {
-      const c = $("#" + b.dataset.ind);
+      const c = $("#" + b.dataset.ind),
+        open0 = document.querySelectorAll(".panel.on").length;
       if (c) c.click();
-      $("#pkm").innerHTML = indMenu();
+      // öffnet der Knopf ein Fenster (Einstellungen, Vergleich), Menü schließen, sonst offen lassen
+      if (document.querySelectorAll(".panel.on").length > open0) pkClose();
+      else $("#pkm").innerHTML = indMenu();
       return;
     }
     const s = b.dataset.s,
