@@ -5531,12 +5531,13 @@ canvas {
       cat = (f) => edgeOf(ok.flatMap((o) => (f(o) && f(o).R) || [])),
       sig = ok.reduce((a, o) => a + (msX ? (o.R || []).length : o.n || 0), 0);
     let ms = "";
-    if (showMS) ms = `<td>${sig}</td><td>${edgeTxt(cat((o) => o.E), 1)}</td>` + "<td></td>".repeat(msCols - 2);
+    // ausführlicher Text, damit sichtbar ist, wie viele abgeschlossene Trades fehlen (offene Positionen zählen nicht)
+    if (showMS) ms = `<td>${sig}</td><td colspan="${msCols - 1}" style="text-align:left">${edgeTxt(cat((o) => o.E))}</td>`;
     let dv = "";
     if (showDV) {
       const f = (d) => {
         const E = cat((o) => o.D && o.D.st && o.D.st[d] && o.D.st[d].E);
-        return `<td>${edgeTxt(E, 1)} <span class="m">· ${E.n}×</span></td>`;
+        return `<td>${edgeTxt(E)}</td>`;
       };
       dv = f(-1) + f(1);
     }
