@@ -53,6 +53,7 @@ canvas{position:absolute;inset:0;width:100%;height:100%;touch-action:none;cursor
 .src.live i{background:var(--up);box-shadow:0 0 0 3px rgba(38,166,154,.25)}.src.wait i{background:#f2c94c}
 .panel{position:absolute;right:12px;top:12px;width:min(380px,calc(100% - 24px));background:#182027;border:1px solid #2f3a43;border-radius:12px;padding:16px;z-index:5;box-shadow:0 14px 40px #000a;font-size:14px;display:none}
 .panel.on{display:block}.panel{max-height:calc(100% - 24px);overflow:auto}
+#cmpp{width:min(760px,calc(100% - 24px))}.cmpt{width:100%;border-collapse:collapse;font-size:12.5px;white-space:nowrap}.cmpt th,.cmpt td{padding:5px 6px;border-bottom:1px solid #2a333a;text-align:right}.cmpt th:first-child,.cmpt td:first-child{text-align:left}.cmpt th{color:#8d98a1;font-weight:500}
 .frow{display:flex;align-items:center;justify-content:space-between;gap:12px;min-height:50px}
 .panel .frow label{margin:0;color:var(--ink);font-size:14px}
 .panel .frow label{flex:1}
@@ -160,6 +161,7 @@ canvas{position:absolute;inset:0;width:100%;height:100%;touch-action:none;cursor
   <button class="chip" id="msx" title="Ausstieg: bei Ziel oder Stop / erst beim Gegensignal (Stop bleibt als Notbremse)" style="padding:0 10px">Ausstieg: Ziel/Stop</button>
   <button class="chip" id="dvb" aria-pressed="true" title="Divergenzen: Kurs macht neues Hoch/Tief, RSI bzw. MACD nicht – mögliche Wende (mit Check)">Divergenzen</button>
   <button class="chip" id="dvs" title="Divergenzen aus RSI oder MACD" style="padding:0 10px">Div: RSI</button>
+  <button class="chip" id="cmpb" title="Aktuelle Einstellung (MACD-Signale, Divergenzen) für alle Märkte durchrechnen" style="padding:0 10px">Vergleich alle Märkte</button>
   <button class="chip" id="gpb" aria-pressed="false" title="Kurslücken übers Wochenende (wie an der Börse): offene Lücken als Zonen und wie oft sie geschlossen werden">Gaps</button>
   <button class="chip" id="fit">Ansicht zurücksetzen</button></div>
  </div>
@@ -257,6 +259,11 @@ canvas{position:absolute;inset:0;width:100%;height:100%;touch-action:none;cursor
   <input id="layn" maxlength="30" autocomplete="off" placeholder="z. B. Swing, Langfrist, Elliott">
   <div class="prow"><button class="chip" id="laynew">Leer anlegen</button><button class="chip" id="laycp">Aktuelles kopieren</button></div>
   <div class="prow"><button class="chip pri" id="layok">Fertig</button></div>
+ </div>
+ <div class="panel" id="cmpp" role="dialog" aria-label="Vergleich alle Märkte">
+  <h2 id="cmph">Vergleich alle Märkte</h2>
+  <div id="cmpt" style="overflow-x:auto"></div>
+  <div class="prow"><button class="chip" id="cmpre">Neu rechnen</button><button class="chip pri" id="cmpok">Fertig</button></div>
  </div>
  <div class="panel" id="obp" role="dialog" aria-label="Objektbaum">
   <h2 id="obh">Objektbaum</h2>
@@ -1085,8 +1092,36 @@ function dvText(i){if(!showDV||!IN||!IN.dv)return'';const D=IN.dv,q=D.list.filte
  const one=(d,lb)=>{const s=st&&st[d];if(!s||!s.n)return'';const exp=d>0?st.base:1-st.base;return`${lb} ${s.n}× · danach ${DV_N} Kerzen ${d>0?'höher':'tiefer'}: <b>${pc(s.h/s.n)}</b> (sonst ${pc(exp)}) · Ø ${pr(s.r/s.n)}`};
  const a=one(-1,'▼'),b=one(1,'▲');
  return`<span><b style="color:${q?q.d<0?DN:UP:MUTE}">Divergenzen</b> (${dvSrc?'MACD':'RSI'})${q?` · letzte ${q.d<0?'bärisch ▼':'bullisch ▲'} bestätigt ${tfull(data[q.c].t)}`:' · keine'}${a||b?` <span class="m">· Check: ${[a,b].filter(Boolean).join(' · ')}</span>`:''}</span>`}
+/* Vergleich alle Märkte: aktuelle Einstellung (Zeiteinheit, MACD-TF, Signale, Ausstieg, Divergenzen) für jeden Markt durchrechnen. Nur Anzeige. */
+const cmpC={};
+async function cmpFetch(s){const k=s.id+tf.id,c=cmpC[k]||(s.td&&tdC[k]);if(c&&Date.now()-c.t<15*60000)return c.d.map(o=>({...o}));
+ const mk=a=>a.map(q=>({t:q[0],o:+q[1],h:+q[2],l:+q[3],c:+q[4],v:+q[5]}));let a=null;
+ if(s.td&&tdKey&&!(tdNo[s.id]&&Date.now()-tdNo[s.id]<6*36e5)){try{const j=await getJSON(`https://api.twelvedata.com/time_series?symbol=${encodeURIComponent(s.td)}&interval=${TDI[tf.id]}&outputsize=1000&timezone=UTC&apikey=${encodeURIComponent(tdKey)}`);
+   if(j.status==='ok'&&j.values)a=j.values.map(v=>{const d=v.datetime;return{t:Date.parse(d.length>10?d.replace(' ','T')+'Z':d+'T00:00:00Z'),o:+v.open,h:+v.high,l:+v.low,c:+v.close,v:+(v.volume||0)}}).reverse()}catch(e){}}
+ if(!a&&s.bn)a=mk(await getJSON(`${bnHost||'https://data-api.binance.vision'}/api/v3/klines?symbol=${s.bn}&interval=${BNI[tf.id]}&limit=1000`));
+ if(!a&&s.fb)a=mk(await getJSON(`https://fapi.binance.com/fapi/v1/klines?symbol=${s.fb}&interval=${BNI[tf.id]}&limit=1000`));
+ if(!a||!a.length)throw new Error('keine Daten');cmpC[k]={t:Date.now(),d:a.map(o=>({...o}))};return a}
+function cmpCalc(a){const keep=data;data=a;try{const cl=a.map(b=>b.c),T=mcUp&&showMC?upTf():null,M=T?macdUp(T):macdOf(cl),MS=msSignals(T?M.c:M,T),MC=T?macdOf(cl):M,R=uRsi(),D=dvCalc(R.r,MC);
+  const R2=msX?MS.tr.concat(MS.cur&&!MS.cur.done&&MS.cur.r!=null?[MS.cur.r]:[]):null,f=MS.sg[0];
+  return{n:MS.sg.length,R:R2,st:MS.stat,hold:f?cl[cl.length-1]/f.e-1:null,since:f?a[f.i].t:null,pos:MS.cur&&!MS.cur.done?MS.cur.d:0,D}}finally{data=keep}}
+let cmpBusy=false;
+async function cmpRun(){if(cmpBusy)return;cmpBusy=true;const el=$('#cmpt'),rows=[];
+ $('#cmph').textContent='Vergleich alle Märkte · '+tf.l+(mcUp&&showMC&&upTf()?' · MACD '+upTf().l:'')+' · '+MSF[msF]+' · Ausstieg '+(msX?'Gegensignal':'Ziel/Stop');
+ el.innerHTML='<p class="m">Lade Kurse …</p>';
+ const p1=r=>r==null?'–':(r>0?'+':'')+(r*100).toLocaleString('de-DE',{maximumFractionDigits:Math.abs(r)<1?1:0})+' %',pc=v=>Math.round(v*100)+' %',cls=r=>r==null?'':r>=0?'up':'dn';
+ for(const s of SYMS){let o;try{o=cmpCalc(await cmpFetch(s))}catch(e){o={err:String(e.message||e).slice(0,40)}}rows.push([s,o]);
+  el.innerHTML=cmpTable(rows,p1,pc,cls)+(rows.length<SYMS.length?'<p class="m">Lade weitere …</p>':'')}
+ el.innerHTML=cmpTable(rows,p1,pc,cls)+`<p class="m" style="margin-top:8px">${msX?'„Zusammen“ = alle Trades hintereinander (Gewinne wieder eingesetzt), „Halten“ = einfach kaufen ab dem ersten Signal. ':'Ziel = 3× ATR, Stop = 2× ATR. '}Divergenzen: Anteil, bei dem der Kurs 10 Kerzen später in Richtung der Divergenz lag, in Klammern die Grundrate. Ohne Gebühren, nur Rückblick – kein Beleg für die Zukunft.</p>`;cmpBusy=false}
+function cmpTable(rows,p1,pc,cls){const th=msX?'<th>Signale</th><th>Ø je Signal</th><th>Zusammen</th><th>Halten</th><th>Bestes / Schlechtestes</th>':'<th>Signale</th><th>Ziel / Stop</th><th>Treffer</th>';
+ return`<table class="cmpt"><tr><th>Markt</th>${showMS?th:''}${showDV?'<th>Div ▼</th><th>Div ▲</th>':''}</tr>`+rows.map(([s,o])=>{if(o.err)return`<tr><td>${s.name}</td><td colspan="8" class="m">${o.err}</td></tr>`;
+  let ms='';if(showMS){if(msX){const R=o.R||[],av=R.length?R.reduce((x,y)=>x+y,0)/R.length:null,cp=R.length?R.reduce((x,y)=>x*(1+y),1)-1:null;
+    ms=`<td>${R.length}${o.pos?(o.pos>0?' <span class="up">▲</span>':' <span class="dn">▼</span>'):''}</td><td class="${cls(av)}">${p1(av)}</td><td class="${cls(cp)}"><b>${p1(cp)}</b></td><td class="${cls(o.hold)}">${p1(o.hold)}</td><td>${R.length?p1(Math.max(...R))+' / '+p1(Math.min(...R)):'–'}</td>`}
+   else{const t=o.st.w+o.st.l;ms=`<td>${o.n}</td><td>${o.st.w} / ${o.st.l}</td><td>${t?pc(o.st.w/t):'–'}</td>`}}
+  let dv='';if(showDV){const S=o.D.st,f=d=>{const q=S&&S[d];if(!q||!q.n)return'–';const exp=d>0?S.base:1-S.base,h=q.h/q.n;return`<span class="${h>exp?'up':'dn'}">${pc(h)}</span> <span class="m">(${pc(exp)}) · ${q.n}×</span>`};dv=`<td>${f(-1)}</td><td>${f(1)}</td>`}
+  return`<tr><td>${s.name}</td>${ms}${dv}</tr>`}).join('')+'</table>'}
+$('#cmpb').onclick=()=>{if(openPanel('#cmpp'))cmpRun()};$('#cmpok').onclick=()=>$('#cmpp').classList.remove('on');$('#cmpre').onclick=()=>cmpRun();
 function indCalc(){if(!data.length){IN=null;return}const R=uRsi(),T=mcUp&&showMC?upTf():null,M=T?macdUp(T):macdOf(data.map(b=>b.c)),MS=msSignals(T?M.c:M,T),MC=T?macdOf(data.map(b=>b.c)):M;IN={rsi:R.r,rsig:R.s,m:M.m,g:M.g,h:M.h,T,ms:MS,dv:dvCalc(R.r,MC)}}
-function indUI(){$('#rsib').setAttribute('aria-pressed',showRSI);$('#mcb').setAttribute('aria-pressed',showMC);$('#msb').setAttribute('aria-pressed',showMS);$('#dvb').setAttribute('aria-pressed',showDV);$('#dvs').style.display=showDV?'':'none';$('#dvs').textContent='Div: '+(dvSrc?'MACD':'RSI');$('#msf').style.display=showMS?'':'none';$('#msf').textContent='Signale: '+MSF[msF];$('#msx').style.display=showMS?'':'none';$('#msx').textContent='Ausstieg: '+(msX?'Gegensignal':'Ziel/Stop');
+function indUI(){$('#rsib').setAttribute('aria-pressed',showRSI);$('#mcb').setAttribute('aria-pressed',showMC);$('#msb').setAttribute('aria-pressed',showMS);$('#dvb').setAttribute('aria-pressed',showDV);$('#dvs').style.display=showDV?'':'none';$('#dvs').textContent='Div: '+(dvSrc?'MACD':'RSI');$('#cmpb').style.display=showMS||showDV?'':'none';$('#msf').style.display=showMS?'':'none';$('#msf').textContent='Signale: '+MSF[msF];$('#msx').style.display=showMS?'':'none';$('#msx').textContent='Ausstieg: '+(msX?'Gegensignal':'Ziel/Stop');
  const T=upTf();$('#mcf').style.display=showMC&&T?'':'none';$('#mcf').textContent='TF: '+(mcUp&&T?T.l:'Chart');$('#mcf').setAttribute('aria-pressed',mcUp&&!!T)}
 function indTog(k){if(k==='rsi')showRSI=!showRSI;else if(k==='mc')showMC=!showMC;else if(k==='ms')showMS=!showMS;else if(k==='mcf')mcUp=!mcUp;else if(k==='msf')msF=(msF+1)%3;else if(k==='msx')msX=1-msX;else if(k==='dv')showDV=!showDV;else if(k==='dvs')dvSrc=1-dvSrc;indSave();if(k==='mcf'||k==='msf'||k==='mc'||k==='msx'||k==='dvs')indCalc();clampView();ui();draw()}
 $('#rsib').onclick=()=>indTog('rsi');$('#mcb').onclick=()=>indTog('mc');$('#msb').onclick=()=>indTog('ms');$('#mcf').onclick=()=>indTog('mcf');$('#msf').onclick=()=>indTog('msf');$('#msx').onclick=()=>indTog('msx');$('#dvb').onclick=()=>indTog('dv');$('#dvs').onclick=()=>indTog('dvs');
@@ -1336,7 +1371,7 @@ function setOpt(mut){const d=ftarget();
  if(d){if(locked(d)){toast('Gesperrt: erst entsperren');fibUI();return}undo.push(snap());d.o=d.o||JSON.parse(JSON.stringify(fib));mut(d.o);save()}
  else{mut(fib);try{lsSet('chartwerk:fib',JSON.stringify(fib))}catch(e){}}
  ui();draw()}
-function openPanel(id){['#fibp','#panel','#bkp','#zzp','#chp','#colp','#fnp','#obp','#layp','#emp'].forEach(p=>{if(p!==id)$(p).classList.remove('on')});return $(id).classList.toggle('on')}
+function openPanel(id){['#fibp','#panel','#bkp','#zzp','#chp','#colp','#fnp','#obp','#layp','#emp','#cmpp'].forEach(p=>{if(p!==id)$(p).classList.remove('on')});return $(id).classList.toggle('on')}
 $('#fibset').onclick=()=>{if(ctarget()||tool==='chan'){chUI();openPanel('#chp');return}if(fntarget()||tool==='fan'){fnUI(true);openPanel('#fnp');return}fibUI();openPanel('#fibp')};
 const fntarget=()=>sel>=0&&!hidden&&drawings[sel]&&drawings[sel].k==='fan'?drawings[sel]:null;let fnT;
 function fnUI(force){const d=fntarget();if(!force&&d===fnT)return;fnT=d;const o=d?fanOpt(d):fand;

@@ -42,6 +42,12 @@ Knopf **„Divergenzen“** (abschaltbar) und **„Div: RSI / MACD“**: Kurs ma
 Wendepunkte mit 5 Kerzen links/rechts, Abstand 5–60 Kerzen, erst 5 Kerzen nach dem zweiten Punkt bestätigt (kein Blick in die Zukunft). RSI: bärisch nur ab 50 aufwärts, bullisch nur bis 50; MACD: über bzw. unter null.
 Linien im Kurschart und im RSI- bzw. MACD-Fenster. Check in der Kopfzeile: wie oft der Kurs 10 Kerzen nach der Bestätigung in Richtung der Divergenz lag – verglichen mit der Grundrate aller Kerzen („sonst“) – und Ø Veränderung.
 
+## Vergleich alle Märkte
+
+Knopf **„Vergleich alle Märkte“** (sichtbar, wenn MACD-Signale oder Divergenzen an sind): rechnet die aktuelle Einstellung (Zeiteinheit, MACD-TF, Signale, Ausstieg, Divergenzen) für jeden Markt durch und zeigt eine Tabelle –
+bei „Gegensignal“ Anzahl, Ø je Signal, „Zusammen“ (alle Trades hintereinander), „Halten“ (einfach kaufen ab dem ersten Signal), bestes/schlechtestes; bei „Ziel/Stop“ Ziel/Stop und Trefferquote; Divergenzen mit Trefferquote gegen die Grundrate.
+Kurse: Twelve Data (falls Schlüssel) bzw. Binance, bis 1000 Kerzen, 15 Minuten zwischengespeichert. Ohne Gebühren, nur Rückblick.
+
 ## Einstellungen für alle Märkte
 
 Im Layout-Fenster („Standard“ oben rechts): Häkchen **„Indikatoren & Zeiteinheit für alle Märkte gleich“** – beim Marktwechsel werden die aktuellen Indikatoren (RSI, MACD, Signale, Zickzack, MA …) und die Zeiteinheit mitgenommen; Zeichnungen bleiben je Markt. Knopf **„Jetzt auf alle Märkte übertragen“** für eine einmalige Übernahme. Einstellung gilt je Gerät.
