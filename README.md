@@ -48,6 +48,24 @@ Knopf **„Vergleich alle Märkte“** (sichtbar, wenn MACD-Signale oder Diverge
 bei „Gegensignal“ Anzahl, Ø je Signal, „Zusammen“ (alle Trades hintereinander), „Halten“ (einfach kaufen ab dem ersten Signal), bestes/schlechtestes; bei „Ziel/Stop“ Ziel/Stop und Trefferquote; Divergenzen mit Trefferquote gegen die Grundrate.
 Kurse: Twelve Data (falls Schlüssel) bzw. Binance, bis 1000 Kerzen, 15 Minuten zwischengespeichert. Ohne Gebühren, nur Rückblick.
 
+## Edge-Prüfung (wie beim Bot)
+
+Alle Checks zeigen zusätzlich ein Urteil nach denselben Regeln wie beim Bot: jeder abgeschlossene Trade **nach 0,1 % Gebühr je
+Ein- und Ausstieg**, mindestens **30 Trades** und **t ≥ 2,5** (t = Ø je Trade geteilt durch Streuung/√Anzahl – wie deutlich der
+Durchschnitt über null liegt). Anzeige: **Edge ✓** (belegt), **kein Beleg** bzw. ✗, **zu wenige Trades**.
+- EMA-Kasten: Ø je Trade und Edge-Prüfung.
+- MACD-Signale: bei „Ziel/Stop“ zählen auch Trades, die vor Ziel oder Stop durch ein neues Signal beendet wurden (Ausstieg zum
+  Schlusskurs) – die Trefferquote „Ziel / Stop“ allein wäre geschönt. Gewinnschwelle bei Ziel 3 / Stop 2 ATR: 40 %.
+- Divergenzen: als Trade gelesen (Einstieg bei Bestätigung, Ausstieg 10 Kerzen später), dazu Ø-Veränderung im Vergleich zur Grundrate.
+- Vergleich alle Märkte: Spalte „Edge“.
+
+## Handy
+
+Die Legende oben im Chart ist auf dem Handy kompakt (Kurs, EMA, MACD-Signal mit Edge-Urteil, letzte Divergenz);
+„Details ▸“ klappt alle Angaben auf (Einstellung je Gerät). Indikatoren und ihre Einstellungen (Signale, Ausstieg, TF, Zahnräder,
+Vergleich) stecken auf dem Handy im Menü **„Indikatoren ▾“** in der Legende, der Zeitrahmen unter **„Tag ▾“** – so bleibt
+mehr Platz für den Chart.
+
 ## Einstellungen für alle Märkte
 
 Im Layout-Fenster („Standard“ oben rechts): Häkchen **„Indikatoren & Zeiteinheit für alle Märkte gleich“** – beim Marktwechsel werden die aktuellen Indikatoren (RSI, MACD, Signale, Zickzack, MA …) und die Zeiteinheit mitgenommen; Zeichnungen bleiben je Markt. Knopf **„Jetzt auf alle Märkte übertragen“** für eine einmalige Übernahme. Einstellung gilt je Gerät.

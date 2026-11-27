@@ -4772,7 +4772,10 @@ canvas {
       t = sd > 0 ? avg / (sd / Math.sqrt(n)) : null;
     return { n, avg, t, ok: n >= EDGE_N && t != null && t >= EDGE_T };
   }
-  const tFmt = (t) => (t == null ? "–" : t.toLocaleString("de-DE", { minimumFractionDigits: 1, maximumFractionDigits: 1 }));
+  const tFmt = (t) =>
+    t == null
+      ? "–"
+      : (Math.abs(t) < 0.05 ? 0 : t).toLocaleString("de-DE", { minimumFractionDigits: 1, maximumFractionDigits: 1 });
   // Kurzurteil als HTML: Edge ✓ / kein Beleg / zu wenige Trades
   function edgeTxt(E, short) {
     if (!E || !E.n) return '<span style="color:var(--mute)">' + (short ? "–" : "keine Trades") + "</span>";
@@ -5439,7 +5442,7 @@ canvas {
     }
     el.innerHTML =
       cmpTable(rows, p1, pc, cls) +
-      `<p class="m" style="margin-top:8px">${msX ? "„Zusammen“ = alle Trades hintereinander (Gewinne wieder eingesetzt), „Halten“ = einfach kaufen ab dem ersten Signal. " : "Ziel = 3× ATR, Stop = 2× ATR. "}Divergenzen: Anteil, bei dem der Kurs 10 Kerzen später in Richtung der Divergenz lag, in Klammern die Grundrate. „Edge“ = Prüfung wie beim Bot: nach 0,1 % Gebühr je Ein- und Ausstieg, mindestens ${EDGE_N} abgeschlossene Trades und t ≥ ${tFmt(EDGE_T)} (✓ = Edge belegt, ✗ = kein Beleg, „zu wenige“ = unter ${EDGE_N} Trades). Die anderen Spalten ohne Gebühren. Nur Rückblick – kein Beleg für die Zukunft.</p>`;
+      `<p class="m" style="margin-top:8px">${msX ? "„Zusammen“ = alle Trades hintereinander (Gewinne wieder eingesetzt), „Halten“ = einfach kaufen ab dem ersten Signal. " : "Ziel = 3× ATR, Stop = 2× ATR; „vorher beendet“ = neues Signal kam vor Ziel oder Stop (Ausstieg zum Schlusskurs, zählt bei Edge mit). "}Divergenzen: Anteil, bei dem der Kurs 10 Kerzen später in Richtung der Divergenz lag, in Klammern die Grundrate. „Edge“ = Prüfung wie beim Bot: nach 0,1 % Gebühr je Ein- und Ausstieg, mindestens ${EDGE_N} abgeschlossene Trades und t ≥ ${tFmt(EDGE_T)} (✓ = Edge belegt, ✗ = kein Beleg, „zu wenige“ = unter ${EDGE_N} Trades). Die anderen Spalten ohne Gebühren. Nur Rückblick – kein Beleg für die Zukunft.</p>`;
     cmpBusy = false;
   }
   function cmpTable(rows, p1, pc, cls) {
@@ -5460,7 +5463,7 @@ canvas {
               ms = `<td>${R.length}${o.pos ? (o.pos > 0 ? ' <span class="up">▲</span>' : ' <span class="dn">▼</span>') : ""}</td><td class="${cls(av)}">${p1(av)}</td><td class="${cls(cp)}"><b>${p1(cp)}</b></td><td class="${cls(o.hold)}">${p1(o.hold)}</td><td>${R.length ? p1(Math.max(...R)) + " / " + p1(Math.min(...R)) : "–"}</td><td>${edgeTxt(o.E, 1)}</td>`;
             } else {
               const t = o.st.w + o.st.l;
-              ms = `<td>${o.n}</td><td>${o.st.w} / ${o.st.l}</td><td>${t ? pc(o.st.w / t) : "–"}</td><td>${edgeTxt(o.E, 1)}</td>`;
+              ms = `<td>${o.n}</td><td>${o.st.w} / ${o.st.l}${o.st.o ? ` <span class="m">(+${o.st.o} vorher beendet)</span>` : ""}</td><td>${t ? pc(o.st.w / t) : "–"}</td><td>${edgeTxt(o.E, 1)}</td>`;
             }
           }
           let dv = "";
@@ -5644,7 +5647,7 @@ canvas {
     }
     const done =
       c.done && last ? (c.done === "tp" ? " · Ziel erreicht" : c.done === "sl" ? " · Stop erreicht" : "") : "";
-    return `<span>${head} · letztes Signal <b class="${c.d > 0 ? "up" : "dn"}">${c.d > 0 ? "LONG" : "SHORT"}</b> seit ${tfull(data[c.i].t)} bei ${fmt(c.e)} · Ziel ${fmt(c.tp)} (${pc(c.tp)}) / Stop ${fmt(c.sl)} (${pc(c.sl)})${done}${tot ? ` <span class="m">· Check: ${st.w} Ziel / ${st.l} Stop (${Math.round((st.w / tot) * 100)} %, Gewinnschwelle ${Math.round((MS_SL / (MS_SL + MS_TP)) * 100)} %) · nach Gebühren: ${edgeTxt(MS.edge)}</span>` : ""}</span>`;
+    return `<span>${head} · letztes Signal <b class="${c.d > 0 ? "up" : "dn"}">${c.d > 0 ? "LONG" : "SHORT"}</b> seit ${tfull(data[c.i].t)} bei ${fmt(c.e)} · Ziel ${fmt(c.tp)} (${pc(c.tp)}) / Stop ${fmt(c.sl)} (${pc(c.sl)})${done}${tot ? ` <span class="m">· Check: ${st.w} Ziel / ${st.l} Stop (${Math.round((st.w / tot) * 100)} %, Gewinnschwelle ${Math.round((MS_SL / (MS_SL + MS_TP)) * 100)} %)${st.o ? ` · ${st.o} vorher durch neues Signal beendet` : ""} · alle Trades nach Gebühren: ${edgeTxt(MS.edge)}</span>` : ""}</span>`;
   }
   function paneDraw(w, i0, i1, ch) {
     const k = paneN();
