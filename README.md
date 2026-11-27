@@ -66,6 +66,13 @@ Die Legende oben im Chart ist auf dem Handy kompakt (Kurs, EMA, MACD-Signal mit 
 Vergleich) stecken auf dem Handy im Menü **„Indikatoren ▾“** in der Legende, der Zeitrahmen unter **„Tag ▾“** – so bleibt
 mehr Platz für den Chart.
 
+## PC
+
+Der Kurs steht oben neben den Märkten, alle Indikator-Knöpfe sind sichtbar (sie brechen in eine zweite Zeile um, statt seitlich
+zu scrollen). Auf niedrigen Bildschirmen (z. B. 1366 × 768) ist die Werkzeugleiste etwas kleiner, damit alles ohne Scrollen passt.
+Tastenkürzel: **1–5** Zeitrahmen (1 Std bis Monat), **← →** verschieben (mit Umschalt größere Schritte), **+ −** bzw. **↑ ↓** zoomen,
+**R** Ansicht zurücksetzen, **F** Vollbild, **D** Legende mit/ohne Details, **Entf** Auswahl löschen, **Strg+Z** rückgängig.
+
 ## Einstellungen für alle Märkte
 
 Im Layout-Fenster („Standard“ oben rechts): Häkchen **„Indikatoren & Zeiteinheit für alle Märkte gleich“** – beim Marktwechsel werden die aktuellen Indikatoren (RSI, MACD, Signale, Zickzack, MA …) und die Zeiteinheit mitgenommen; Zeichnungen bleiben je Markt. Knopf **„Jetzt auf alle Märkte übertragen“** für eine einmalige Übernahme. Einstellung gilt je Gerät.

@@ -1268,6 +1268,63 @@ canvas {
     display: none;
   }
 }
+/* PC: Kurs in die Kopfzeile, alle Indikator-Knöpfe sichtbar (umbrechen statt seitlich scrollen) */
+@media (min-width: 701px) {
+  header .quote {
+    margin: 0 auto 0 6px;
+  }
+  header .quote b {
+    font-size: 21px;
+  }
+  .bar {
+    padding: 6px 14px;
+  }
+  .bar > .row {
+    flex: 1 1 0;
+    min-width: 0;
+    flex-wrap: wrap;
+    overflow: visible;
+    row-gap: 6px;
+  }
+  .bar .chip {
+    height: 32px;
+    font-size: 13px;
+    padding: 0 10px;
+    border-radius: 8px;
+  }
+  .bar .chip svg {
+    width: 16px;
+    height: 16px;
+  }
+  .bar #tfs {
+    gap: 4px;
+  }
+  .note {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  /* Einstellungs-Knöpfe direkt an ihren Indikator anlehnen */
+  .bar .chip.ic + .chip.ic:not([aria-pressed]) {
+    margin-left: -3px;
+  }
+}
+/* PC mit niedrigem Bildschirm: Werkzeugleiste etwas kleiner, damit alles ohne Scrollen passt */
+@media (min-width: 701px) and (max-height: 860px) {
+  .tools {
+    grid-template-columns: repeat(2, 36px);
+    gap: 2px;
+    padding: 6px 5px;
+  }
+  .tb {
+    width: 36px;
+    height: 36px;
+  }
+  .tb svg {
+    width: 20px;
+    height: 20px;
+  }
+}
 @media (prefers-reduced-motion: reduce) {
   .toast {
     transition: none;
@@ -1302,7 +1359,7 @@ canvas {
   <button class="chip ic" id="dvs" title="Divergenzen aus RSI oder MACD" style="padding:0 10px">Div: RSI</button>
   <button class="chip ic" id="cmpb" title="Aktuelle Einstellung (MACD-Signale, Divergenzen) für alle Märkte durchrechnen" style="padding:0 10px">Vergleich alle Märkte</button>
   <button class="chip ic" id="gpb" aria-pressed="false" title="Kurslücken übers Wochenende (wie an der Börse): offene Lücken als Zonen und wie oft sie geschlossen werden">Gaps</button>
-  <button class="chip" id="fit">Ansicht zurücksetzen</button></div>
+  <button class="chip" id="fit" title="Ansicht zurücksetzen (Taste R)">↺ Ansicht</button></div>
  </div>
  <nav class="tools" aria-label="Zeichenwerkzeuge">
   <button class="tb" data-tool="cursor" title="Auswählen und verschieben (Esc)" aria-label="Auswählen"><svg viewBox="0 0 22 22"><path d="M5 3l12 6.5-5.2 1.4L9.5 16z"/></svg></button>
@@ -1486,7 +1543,7 @@ canvas {
   <input id="tdk" autocomplete="off" spellcheck="false" placeholder="API-Schlüssel einfügen">
   <div class="prow"><button class="chip pri" id="psave">Speichern</button><button class="chip" id="pclose">Schließen</button></div>
  </div></main>
- <div class="note"><span id="ntxt">Simulierte Kurse zur Demonstration, keine echten Marktdaten.</span> Zeichnungen bleiben pro Markt in diesem Browser gespeichert.<span id="syn"></span><span class="k"> · Ziehen verschiebt, Mausrad oder zwei Finger zoomen, Entf löscht die Auswahl.</span></div>
+ <div class="note"><span id="ntxt">Simulierte Kurse zur Demonstration, keine echten Marktdaten.</span> Zeichnungen bleiben pro Markt in diesem Browser gespeichert.<span id="syn"></span><span class="k"> · Ziehen verschiebt, Mausrad oder zwei Finger zoomen, Entf löscht die Auswahl. Tasten: 1–5 Zeitrahmen, ← → schieben, + − zoomen, R Ansicht, F Vollbild, D Details.</span></div>
 </div>
 <script>
 {
@@ -7918,7 +7975,7 @@ canvas {
     setTimeout(() => b.classList.remove("warn"), 3000);
   };
   addEventListener("keydown", (e) => {
-    if (e.target.matches("input,textarea")) return;
+    if (e.target.matches("input,textarea,select,[contenteditable]")) return;
     if (e.key === "Escape") {
       if (chanP >= 0) save();
       chanP = -1;
@@ -7931,8 +7988,46 @@ canvas {
     } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "z") {
       e.preventDefault();
       doUndo();
+    } else if (!e.ctrlKey && !e.metaKey && !e.altKey && data.length) {
+      // Tastenkürzel für den PC
+      const k = e.key,
+        tfb = document.querySelectorAll("#tfs button");
+      if (k >= "1" && k <= "9" && tfb[+k - 1]) tfb[+k - 1].click();
+      else if (k === "ArrowLeft" || k === "ArrowRight") {
+        e.preventDefault();
+        view.end += (k === "ArrowLeft" ? -1 : 1) * Math.max(1, Math.round(pw() / view.bw / (e.shiftKey ? 2 : 10)));
+        clampView();
+        draw();
+      } else if (k === "+" || k === "=" || k === "-" || k === "ArrowUp" || k === "ArrowDown") {
+        e.preventDefault();
+        const i = view.end; // rechten Rand festhalten
+        view.bw *= k === "+" || k === "=" || k === "ArrowUp" ? 1.2 : 1 / 1.2;
+        clampView();
+        view.end = i;
+        clampView();
+        draw();
+      } else if (k === "r" || k === "R") $("#fit").click();
+      else if (k === "f" || k === "F") setFS(!document.querySelector(".app").classList.contains("fs"));
+      else if (k === "d" || k === "D") {
+        lgMin = !lgMin;
+        try {
+          localStorage.setItem("chartwerk:lgmin", lgMin ? "1" : "0");
+        } catch (e2) {}
+        draw();
+      }
     }
   });
+  // PC: Kurs neben die Märkte in die Kopfzeile, Handy: zurück in die Leiste
+  const quoteEl = document.querySelector(".quote"),
+    pcMQ = matchMedia("(min-width: 701px)");
+  function placeQuote() {
+    if (pcMQ.matches) $("header").insertBefore(quoteEl, $("#layb"));
+    else $(".bar").insertBefore(quoteEl, $(".bar").firstChild);
+  }
+  placeQuote();
+  pcMQ.addEventListener("change", placeQuote);
+  // Hinweiszeile ist einzeilig gekürzt: voller Text beim Darüberfahren
+  $(".note").addEventListener("mouseenter", (e) => (e.currentTarget.title = e.currentTarget.textContent.trim()));
 
   const ptrs = new Map();
   const pos = (e) => {
