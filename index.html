@@ -1329,6 +1329,12 @@ canvas {
     margin-left: -3px;
   }
 }
+/* Tablet hochkant / schmaler PC: Kurs bleibt in der Leiste, eigene Zeile über den Knöpfen */
+@media (min-width: 701px) and (max-width: 1179px) {
+  .bar > .quote {
+    width: 100%;
+  }
+}
 /* PC mit niedrigem Bildschirm: Werkzeugleiste etwas kleiner, damit alles ohne Scrollen passt */
 @media (min-width: 701px) and (max-height: 860px) {
   .tools {
@@ -8114,9 +8120,9 @@ canvas {
       }
     }
   });
-  // PC: Kurs neben die Märkte in die Kopfzeile, Handy: zurück in die Leiste
+  // Breiter Bildschirm: Kurs neben die Märkte in die Kopfzeile; schmaler (Handy, Tablet hochkant): in der Leiste
   const quoteEl = document.querySelector(".quote"),
-    pcMQ = matchMedia("(min-width: 701px)");
+    pcMQ = matchMedia("(min-width: 1180px)");
   function placeQuote() {
     if (pcMQ.matches) $("header").insertBefore(quoteEl, $("#layb"));
     else $(".bar").insertBefore(quoteEl, $(".bar").firstChild);
