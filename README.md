@@ -61,6 +61,14 @@ Durchschnitt über null liegt). Anzeige: **Edge ✓** (belegt), **kein Beleg** b
   Kerzen – eine echte Edge sollte in beiden bestehen) und Zeile „Alle zusammen“ (Trades aller Märkte gemeinsam geprüft).
   Der Vergleich lädt je Markt bis zu 5000 Kerzen.
 
+## Strategie-Suche
+
+Im Fenster „Vergleich alle Märkte“ spielt **„Alle Strategien durchspielen“** 48 Varianten durch: Chart 1 Std / 4 Std / Tag /
+Woche × MACD auf Chart- oder nächsthöherem Zeitrahmen × Signale alle / mit Trend / Nulllinie × Ausstieg Ziel/Stop / Gegensignal,
+jeweils mit den Trades aller Märkte zusammen, nach Gebühren, sortiert nach t. „robust ✓“ nur, wenn Gesamt und beide Hälften die
+Edge-Prüfung bestehen. Eine Zeile antippen stellt die Variante im Chart ein. Dauert etwa 1–2 Minuten (Twelve Data höchstens
+alle 10 Sekunden abgefragt, Gratis-Limit 8/Min.).
+
 ## Handy
 
 Die Legende oben im Chart ist auf dem Handy kompakt (Kurs, EMA, MACD-Signal mit Edge-Urteil, letzte Divergenz);

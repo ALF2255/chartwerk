@@ -1557,6 +1557,7 @@ canvas {
   <div class="cmpwipe">Tabelle seitlich wischen für weitere Spalten →</div>
   <div id="cmpt" style="overflow-x:auto"></div>
   <div id="cmpn"></div>
+  <div class="prow"><button class="chip" id="ssb" title="Alle Kombinationen aus Zeitrahmen, MACD-Zeitrahmen, Signalen und Ausstieg auf allen Märkten prüfen">Alle Strategien durchspielen</button></div>
   <div class="prow"><button class="chip" id="cmpre">Neu rechnen</button><button class="chip pri" id="cmpok">Fertig</button></div>
  </div>
  <div class="panel" id="obp" role="dialog" aria-label="Objektbaum">
@@ -5529,8 +5530,8 @@ canvas {
     }
     return all;
   }
-  async function cmpFetch(s) {
-    const k = s.id + tf.id,
+  async function cmpFetch(s, T = tf) {
+    const k = s.id + T.id,
       c = cmpC[k];
     if (c && Date.now() - c.t < 15 * 60000) return c.d.map((o) => ({ ...o }));
     const mk = (a) => a.map((q) => ({ t: q[0], o: +q[1], h: +q[2], l: +q[3], c: +q[4], v: +q[5] }));
@@ -5538,7 +5539,7 @@ canvas {
     if (s.td && tdKey && !(tdNo[s.id] && Date.now() - tdNo[s.id] < 6 * 36e5)) {
       try {
         const j = await getJSON(
-          `https://api.twelvedata.com/time_series?symbol=${encodeURIComponent(s.td)}&interval=${TDI[tf.id]}&outputsize=${CMP_N}&timezone=UTC&apikey=${encodeURIComponent(tdKey)}`,
+          `https://api.twelvedata.com/time_series?symbol=${encodeURIComponent(s.td)}&interval=${TDI[T.id]}&outputsize=${CMP_N}&timezone=UTC&apikey=${encodeURIComponent(tdKey)}`,
           15000,
         );
         if (j.status === "ok" && j.values)
@@ -5560,11 +5561,11 @@ canvas {
     }
     if (!a && s.bn) {
       cmpSrc[k] = "Binance";
-      a = mk(await bnPages(`${bnHost || "https://data-api.binance.vision"}/api/v3/klines?symbol=${s.bn}&interval=${BNI[tf.id]}`));
+      a = mk(await bnPages(`${bnHost || "https://data-api.binance.vision"}/api/v3/klines?symbol=${s.bn}&interval=${BNI[T.id]}`));
     }
     if (!a && s.fb) {
       cmpSrc[k] = "Binance-Futures";
-      a = mk(await bnPages(`https://fapi.binance.com/fapi/v1/klines?symbol=${s.fb}&interval=${BNI[tf.id]}`));
+      a = mk(await bnPages(`https://fapi.binance.com/fapi/v1/klines?symbol=${s.fb}&interval=${BNI[T.id]}`));
     }
     if (!a || !a.length) throw new Error("keine Daten");
     cmpC[k] = { t: Date.now(), d: a.map((o) => ({ ...o })) };
@@ -5717,6 +5718,131 @@ canvas {
   };
   $("#cmpok").onclick = () => $("#cmpp").classList.remove("on");
   $("#cmpre").onclick = () => cmpRun();
+
+  // Strategie-Suche: alle Kombinationen aus Chart-Zeitrahmen (1 Std bis Woche), MACD-Zeitrahmen (Chart / nächsthöher),
+  // Signal-Filter (alle / mit Trend / Nulllinie) und Ausstieg (Ziel/Stop / Gegensignal), Trades aller Märkte zusammen.
+  // Sortiert nach t-Wert; „robust“ nur, wenn Gesamt und beide Hälften die Edge-Prüfung bestehen.
+  const SS_TF = ["1h", "4h", "1D", "1W"];
+  let ssBusy = false,
+    ssRes = [];
+  async function ssRun() {
+    if (ssBusy || cmpBusy) return;
+    ssBusy = true;
+    const el = $("#cmpt"),
+      note = $("#cmpn");
+    $("#cmph").textContent = "Strategie-Suche · alle Märkte";
+    note.innerHTML = "";
+    try {
+      const tfs = SS_TF.map((id) => TFS.find((t) => t.id === id)).filter(Boolean),
+        D = {},
+        total = tfs.length * SYMS.length;
+      let done = 0,
+        lastTd = 0;
+      for (const T of tfs)
+        for (const s of SYMS) {
+          el.innerHTML = `<p class="m">Lade Kurse … ${done} von ${total} (${s.name}, ${T.l})</p>`;
+          // Twelve Data kostenlos: höchstens 8 Abfragen pro Minute – Abstand halten
+          if (s.td && tdKey && !cmpC[s.id + T.id]) {
+            const w = lastTd + 10000 - Date.now();
+            if (w > 0) {
+              el.innerHTML = `<p class="m">Lade Kurse … ${done} von ${total} (${s.name}, ${T.l}) – warte auf Twelve Data …</p>`;
+              await new Promise((r) => setTimeout(r, w));
+            }
+            lastTd = Date.now();
+          }
+          try {
+            D[T.id + s.id] = await cmpFetch(s, T);
+          } catch (e) {}
+          done++;
+        }
+      const combos = [];
+      for (const T of tfs) for (const up of [0, 1]) for (const f of [0, 1, 2]) for (const x of [0, 1]) combos.push({ T, up, f, x });
+      ssRes = [];
+      for (let ci = 0; ci < combos.length; ci++) {
+        const c = combos[ci];
+        if (ci % 4 === 0) {
+          el.innerHTML = `<p class="m">Rechne Variante ${ci + 1} von ${combos.length} …</p>`;
+          await new Promise((r) => setTimeout(r, 0));
+        }
+        // Einstellungen nur für diese Rechnung umstellen (ohne await dazwischen) und sofort zurücksetzen
+        const keep = [tf, mcUp, showMC, msF, msX, data];
+        let all = [],
+          h1 = [],
+          h2 = [],
+          sig = 0,
+          U = null;
+        try {
+          tf = c.T;
+          mcUp = !!c.up;
+          showMC = true;
+          msF = c.f;
+          msX = c.x;
+          U = c.up ? upTf() : null;
+          if (c.up && !U) continue;
+          for (const s of SYMS) {
+            const a = D[c.T.id + s.id];
+            if (!a || a.length < 60) continue;
+            data = a;
+            const cl = a.map((b) => b.c),
+              M = U ? macdUp(U) : macdOf(cl),
+              MS = msSignals(U ? M.c : M, U);
+            sig += MS.sg.length;
+            all = all.concat(MS.edge.R);
+            h1 = h1.concat(MS.h1.R);
+            h2 = h2.concat(MS.h2.R);
+          }
+        } finally {
+          [tf, mcUp, showMC, msF, msX, data] = keep;
+        }
+        const E = edgeOf(all),
+          H1 = edgeOf(h1),
+          H2 = edgeOf(h2);
+        ssRes.push({ ...c, U, sig, E, H1, H2, hit: all.length ? all.filter((r) => r > 0).length / all.length : null });
+      }
+      ssRes.sort((p, q) => (q.E.t == null ? -99 : q.E.t) - (p.E.t == null ? -99 : p.E.t));
+      el.innerHTML = ssTable(ssRes);
+      note.innerHTML = `<p class="m" style="margin-top:8px">${ssRes.length} Varianten, je Variante alle Märkte zusammen, nach Gebühren (0,1 % je Ein- und Ausstieg), sortiert nach t. „Treffer“ = Anteil der Trades mit Gewinn – allein nicht aussagekräftig: Bei Ziel/Stop (3 : 2 ATR) reichen 40 %, beim Gegensignal kann ein Drittel Treffer genügen, wenn die Gewinner groß sind. Entscheidend ist der t-Wert. „robust ✓“ = Gesamt <b>und</b> beide Hälften bestehen die Edge-Prüfung (t ≥ ${tFmt(EDGE_T)}, ≥ ${EDGE_N} Trades). Weil hier ${ssRes.length} Varianten gleichzeitig getestet werden, ist ein einzelnes ✓ ohne beide Hälften eher Zufall. Antippen einer Zeile stellt die Variante im Chart ein. Nur Rückblick – keine Anlageberatung.</p>`;
+    } finally {
+      ssBusy = false;
+    }
+  }
+  function ssTable(R) {
+    const pc = (v) => (v == null ? "–" : Math.round(v * 100) + " %"),
+      p2 = (v) => (v == null ? "–" : (v > 0 ? "+" : "") + (v * 100).toLocaleString("de-DE", { maximumFractionDigits: 2 }) + " %"),
+      tc = (E) => (!E.n ? "–" : `<span class="${E.n >= EDGE_N && E.t >= EDGE_T ? "up" : E.t < 0 ? "dn" : ""}">${tFmt(E.t)}</span>`),
+      verdict = (o) =>
+        o.E.ok && o.H1.ok && o.H2.ok
+          ? '<b class="up">robust ✓</b>'
+          : o.E.ok
+            ? '<b style="color:#f2c94c">✓ nur gesamt</b>'
+            : o.E.n < EDGE_N
+              ? '<span style="color:var(--mute)">zu wenige</span>'
+              : '<b class="dn">✗</b>';
+    return (
+      '<table class="cmpt sst"><tr><th>#</th><th>Chart</th><th>MACD</th><th>Signale</th><th>Ausstieg</th><th>Urteil</th><th>t</th><th>1. | 2. Hälfte</th><th>Trades</th><th>Treffer</th><th>Ø je Trade</th></tr>' +
+      R.map(
+        (o, i) =>
+          `<tr data-ss="${i}" style="cursor:pointer"><td>${i + 1}</td><td>${o.T.l}</td><td>${o.U ? o.U.l : "Chart"}</td><td>${MSF[o.f]}</td><td>${o.x ? "Gegensignal" : "Ziel/Stop"}</td><td>${verdict(o)}</td><td>${tc(o.E)}</td><td>${tc(o.H1)} | ${tc(o.H2)}</td><td>${o.E.n}</td><td>${pc(o.hit)}</td><td class="${o.E.avg == null ? "" : o.E.avg >= 0 ? "up" : "dn"}">${p2(o.E.avg)}</td></tr>`,
+      ).join("") +
+      "</table>"
+    );
+  }
+  $("#ssb").onclick = () => ssRun();
+  // Zeile antippen: Variante im Chart einstellen (über die normalen Knöpfe, damit alles gespeichert wird)
+  $("#cmpt").addEventListener("click", (e) => {
+    const tr = e.target.closest("tr[data-ss]");
+    if (!tr || ssBusy) return;
+    const o = ssRes[+tr.dataset.ss];
+    if (!o) return;
+    if (!showMC) $("#mcb").click();
+    if (!showMS) $("#msb").click();
+    if (tf.id !== o.T.id) $(`#tfs button[data-id="${o.T.id}"]`).click();
+    if (mcUp !== !!o.up) $("#mcf").click();
+    for (let k = 0; k < 3 && msF !== o.f; k++) $("#msf").click();
+    if (msX !== o.x) $("#msx").click();
+    $("#cmpp").classList.remove("on");
+    toast(`Eingestellt: ${o.T.l} · MACD ${o.U ? o.U.l : "Chart"} · ${MSF[o.f]} · ${o.x ? "Gegensignal" : "Ziel/Stop"}`);
+  });
   function indCalc() {
     if (!data.length) {
       IN = null;
