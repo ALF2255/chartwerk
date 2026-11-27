@@ -330,6 +330,26 @@ canvas {
 .cmpt th:first-child,
 .cmpt td:first-child {
   text-align: left;
+  /* Marktname bleibt beim seitlichen Wischen stehen */
+  position: sticky;
+  left: 0;
+  background: #182027;
+  z-index: 1;
+}
+.cmpt tr.cmpall td {
+  border-top: 2px solid #3a4752;
+  border-bottom: 0;
+}
+.cmpwipe {
+  display: none;
+  color: var(--mute);
+  font-size: 12px;
+  margin: -4px 0 6px;
+}
+@media (max-width: 700px) {
+  .cmpwipe {
+    display: block;
+  }
 }
 .cmpt th {
   color: #8d98a1;
@@ -1458,7 +1478,9 @@ canvas {
  </div>
  <div class="panel" id="cmpp" role="dialog" aria-label="Vergleich alle Märkte">
   <h2 id="cmph">Vergleich alle Märkte</h2>
+  <div class="cmpwipe">Tabelle seitlich wischen für weitere Spalten →</div>
   <div id="cmpt" style="overflow-x:auto"></div>
+  <div id="cmpn"></div>
   <div class="prow"><button class="chip" id="cmpre">Neu rechnen</button><button class="chip pri" id="cmpok">Fertig</button></div>
  </div>
  <div class="panel" id="obp" role="dialog" aria-label="Objektbaum">
@@ -4821,13 +4843,13 @@ canvas {
   // R = Ergebnis je Trade (nach Gebühren). t = Ø / (Streuung / √n): wie deutlich der Durchschnitt über null liegt.
   function edgeOf(R) {
     const n = R.length;
-    if (!n) return { n: 0, avg: null, t: null, ok: false };
+    if (!n) return { n: 0, avg: null, t: null, ok: false, R };
     const avg = R.reduce((a, b) => a + b, 0) / n;
     let v = 0;
     R.forEach((r) => (v += (r - avg) ** 2));
     const sd = n > 1 ? Math.sqrt(v / (n - 1)) : 0,
       t = sd > 0 ? avg / (sd / Math.sqrt(n)) : null;
-    return { n, avg, t, ok: n >= EDGE_N && t != null && t >= EDGE_T };
+    return { n, avg, t, ok: n >= EDGE_N && t != null && t >= EDGE_T, R };
   }
   const tFmt = (t) =>
     t == null
@@ -5495,17 +5517,35 @@ canvas {
         o = { err: String(e.message || e).slice(0, 40) };
       }
       rows.push([s, o]);
-      el.innerHTML = cmpTable(rows, p1, pc, cls) + (rows.length < SYMS.length ? '<p class="m">Lade weitere …</p>' : "");
+      el.innerHTML = cmpTable(rows, p1, pc, cls);
+      $("#cmpn").innerHTML = rows.length < SYMS.length ? '<p class="m">Lade weitere …</p>' : "";
     }
-    el.innerHTML =
-      cmpTable(rows, p1, pc, cls) +
-      `<p class="m" style="margin-top:8px">${msX ? "„Zusammen“ = alle Trades hintereinander (Gewinne wieder eingesetzt), „Halten“ = einfach kaufen ab dem ersten Signal. " : "Ziel = 3× ATR, Stop = 2× ATR; „vorher beendet“ = neues Signal kam vor Ziel oder Stop (Ausstieg zum Schlusskurs, zählt bei Edge mit). "}Divergenzen: Anteil, bei dem der Kurs 10 Kerzen später in Richtung der Divergenz lag, in Klammern die Grundrate. „Edge“ = Prüfung wie beim Bot: nach 0,1 % Gebühr je Ein- und Ausstieg, mindestens ${EDGE_N} abgeschlossene Trades und t ≥ ${tFmt(EDGE_T)} (✓ = Edge belegt, ✗ = kein Beleg, „zu wenige“ = unter ${EDGE_N} Trades). Die anderen Spalten ohne Gebühren. Nur Rückblick – kein Beleg für die Zukunft.</p>`;
+    el.innerHTML = cmpTable(rows, p1, pc, cls, true);
+    $("#cmpn").innerHTML =
+      `<p class="m" style="margin-top:8px">„Alle zusammen“ = Trades aller Märkte gemeinsam geprüft – reicht ein Markt allein nicht für ${EDGE_N} Trades, gibt es hier trotzdem ein Urteil über die Einstellung als Ganzes. ${msX ? "„Zusammen“ = alle Trades hintereinander (Gewinne wieder eingesetzt), „Halten“ = einfach kaufen ab dem ersten Signal. " : "Ziel = 3× ATR, Stop = 2× ATR; „vorher beendet“ = neues Signal kam vor Ziel oder Stop (Ausstieg zum Schlusskurs, zählt bei Edge mit). "}Divergenzen: Anteil, bei dem der Kurs 10 Kerzen später in Richtung der Divergenz lag, in Klammern die Grundrate. „Edge“ = Prüfung wie beim Bot: nach 0,1 % Gebühr je Ein- und Ausstieg, mindestens ${EDGE_N} abgeschlossene Trades und t ≥ ${tFmt(EDGE_T)} (✓ = Edge belegt, ✗ = kein Beleg, „zu wenige“ = unter ${EDGE_N} Trades). Die anderen Spalten ohne Gebühren. Nur Rückblick – kein Beleg für die Zukunft.</p>`;
     cmpBusy = false;
   }
-  function cmpTable(rows, p1, pc, cls) {
+  // Summenzeile: Trades aller Märkte zusammen durch die Edge-Prüfung
+  function cmpPooled(rows, msCols) {
+    const ok = rows.map((r) => r[1]).filter((o) => o && !o.err),
+      cat = (f) => edgeOf(ok.flatMap((o) => (f(o) && f(o).R) || [])),
+      sig = ok.reduce((a, o) => a + (msX ? (o.R || []).length : o.n || 0), 0);
+    let ms = "";
+    if (showMS) ms = `<td>${sig}</td><td>${edgeTxt(cat((o) => o.E), 1)}</td>` + "<td></td>".repeat(msCols - 2);
+    let dv = "";
+    if (showDV) {
+      const f = (d) => {
+        const E = cat((o) => o.D && o.D.st && o.D.st[d] && o.D.st[d].E);
+        return `<td>${edgeTxt(E, 1)} <span class="m">· ${E.n}×</span></td>`;
+      };
+      dv = f(-1) + f(1);
+    }
+    return `<tr class="cmpall"><td><b>Alle zusammen</b></td>${ms}${dv}</tr>`;
+  }
+  function cmpTable(rows, p1, pc, cls, done) {
     const th = msX
-      ? "<th>Signale</th><th>Ø je Signal</th><th>Zusammen</th><th>Halten</th><th>Bestes / Schlechtestes</th><th>Edge</th>"
-      : "<th>Signale</th><th>Ziel / Stop</th><th>Treffer</th><th>Edge</th>";
+      ? "<th>Signale</th><th>Edge</th><th>Ø je Signal</th><th>Zusammen</th><th>Halten</th><th>Bestes / Schlechtestes</th>"
+      : "<th>Signale</th><th>Edge</th><th>Treffer</th><th>Ziel / Stop</th>";
     return (
       `<table class="cmpt"><tr><th>Markt</th>${showMS ? th : ""}${showDV ? "<th>Div ▼</th><th>Div ▲</th>" : ""}</tr>` +
       rows
@@ -5517,10 +5557,10 @@ canvas {
               const R = o.R || [],
                 av = R.length ? R.reduce((x, y) => x + y, 0) / R.length : null,
                 cp = R.length ? R.reduce((x, y) => x * (1 + y), 1) - 1 : null;
-              ms = `<td>${R.length}${o.pos ? (o.pos > 0 ? ' <span class="up">▲</span>' : ' <span class="dn">▼</span>') : ""}</td><td class="${cls(av)}">${p1(av)}</td><td class="${cls(cp)}"><b>${p1(cp)}</b></td><td class="${cls(o.hold)}">${p1(o.hold)}</td><td>${R.length ? p1(Math.max(...R)) + " / " + p1(Math.min(...R)) : "–"}</td><td>${edgeTxt(o.E, 1)}</td>`;
+              ms = `<td>${R.length}${o.pos ? (o.pos > 0 ? ' <span class="up">▲</span>' : ' <span class="dn">▼</span>') : ""}</td><td>${edgeTxt(o.E, 1)}</td><td class="${cls(av)}">${p1(av)}</td><td class="${cls(cp)}"><b>${p1(cp)}</b></td><td class="${cls(o.hold)}">${p1(o.hold)}</td><td>${R.length ? p1(Math.max(...R)) + " / " + p1(Math.min(...R)) : "–"}</td>`;
             } else {
               const t = o.st.w + o.st.l;
-              ms = `<td>${o.n}</td><td>${o.st.w} / ${o.st.l}${o.st.o ? ` <span class="m">(+${o.st.o} vorher beendet)</span>` : ""}</td><td>${t ? pc(o.st.w / t) : "–"}</td><td>${edgeTxt(o.E, 1)}</td>`;
+              ms = `<td>${o.n}</td><td>${edgeTxt(o.E, 1)}</td><td>${t ? pc(o.st.w / t) : "–"}</td><td>${o.st.w} / ${o.st.l}${o.st.o ? ` <span class="m">(+${o.st.o} vorher beendet)</span>` : ""}</td>`;
             }
           }
           let dv = "";
@@ -5531,13 +5571,14 @@ canvas {
                 if (!q || !q.n) return "–";
                 const exp = d > 0 ? S.base : 1 - S.base,
                   h = q.h / q.n;
-                return `<span class="${h > exp ? "up" : "dn"}">${pc(h)}</span> <span class="m">(${pc(exp)}) · ${q.n}×</span> · ${edgeTxt(q.E, 1)}`;
+                return `${edgeTxt(q.E, 1)} · <span class="${h > exp ? "up" : "dn"}">${pc(h)}</span> <span class="m">(${pc(exp)}) · ${q.n}×</span>`;
               };
             dv = `<td>${f(-1)}</td><td>${f(1)}</td>`;
           }
           return `<tr><td>${s.name}</td>${ms}${dv}</tr>`;
         })
         .join("") +
+      (done ? cmpPooled(rows, msX ? 6 : 4) : "") +
       "</table>"
     );
   }
