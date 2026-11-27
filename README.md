@@ -36,6 +36,12 @@ Schalter „Wende nach dem Schließen“ im Gaps-Kasten: wie oft der Kurs 1 W / 
 liegt, von der er in die Lücke kam (also an der Lücke gedreht hat) – im Vergleich zum Zufall (wie oft der Kurs nach derselben
 Zeit überhaupt höher bzw. tiefer liegt). Im Chart ein Punkt am Schließ-Niveau: grün = nach 4 Wochen gewendet, rot = weitergelaufen.
 
+## Divergenzen
+
+Knopf **„Divergenzen“** (abschaltbar) und **„Div: RSI / MACD“**: Kurs macht ein höheres Hoch, der Indikator ein tieferes (▼ bärisch, rot) bzw. Kurs tieferes Tief, Indikator höheres (▲ bullisch, grün).
+Wendepunkte mit 5 Kerzen links/rechts, Abstand 5–60 Kerzen, erst 5 Kerzen nach dem zweiten Punkt bestätigt (kein Blick in die Zukunft). RSI: bärisch nur ab 50 aufwärts, bullisch nur bis 50; MACD: über bzw. unter null.
+Linien im Kurschart und im RSI- bzw. MACD-Fenster. Check in der Kopfzeile: wie oft der Kurs 10 Kerzen nach der Bestätigung in Richtung der Divergenz lag – verglichen mit der Grundrate aller Kerzen („sonst“) – und Ø Veränderung.
+
 ## Einstellungen für alle Märkte
 
 Im Layout-Fenster („Standard“ oben rechts): Häkchen **„Indikatoren & Zeiteinheit für alle Märkte gleich“** – beim Marktwechsel werden die aktuellen Indikatoren (RSI, MACD, Signale, Zickzack, MA …) und die Zeiteinheit mitgenommen; Zeichnungen bleiben je Markt. Knopf **„Jetzt auf alle Märkte übertragen“** für eine einmalige Übernahme. Einstellung gilt je Gerät.
