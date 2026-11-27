@@ -4652,7 +4652,32 @@ canvas {
     }
     return pos;
   }
-  function btRange(pos, a, b, fee = 0.001) {
+  // Edge-Prüfung wie beim Bot: Gebühren je Seite, mindestens EDGE_N abgeschlossene Trades und t-Wert ≥ EDGE_T
+  const FEE = 0.001,
+    EDGE_N = 30,
+    EDGE_T = 2.5;
+  // R = Ergebnis je Trade (nach Gebühren). t = Ø / (Streuung / √n): wie deutlich der Durchschnitt über null liegt.
+  function edgeOf(R) {
+    const n = R.length;
+    if (!n) return { n: 0, avg: null, t: null, ok: false };
+    const avg = R.reduce((a, b) => a + b, 0) / n;
+    let v = 0;
+    R.forEach((r) => (v += (r - avg) ** 2));
+    const sd = n > 1 ? Math.sqrt(v / (n - 1)) : 0,
+      t = sd > 0 ? avg / (sd / Math.sqrt(n)) : null;
+    return { n, avg, t, ok: n >= EDGE_N && t != null && t >= EDGE_T };
+  }
+  const tFmt = (t) => (t == null ? "–" : t.toLocaleString("de-DE", { minimumFractionDigits: 1, maximumFractionDigits: 1 }));
+  // Kurzurteil als HTML: Edge ✓ / kein Beleg / zu wenige Trades
+  function edgeTxt(E, short) {
+    if (!E || !E.n) return '<span style="color:var(--mute)">' + (short ? "–" : "keine Trades") + "</span>";
+    if (E.n < EDGE_N)
+      return `<span style="color:var(--mute)">${short ? "zu wenige" : `zu wenige Trades (${E.n} von ${EDGE_N})`}</span>`;
+    return E.ok
+      ? `<b class="up">${short ? "✓" : "Edge ✓"}</b> t ${tFmt(E.t)}`
+      : `<b class="dn">${short ? "✗" : "kein Beleg"}</b> t ${tFmt(E.t)}`;
+  }
+  function btRange(pos, a, b, fee = FEE) {
     let eq = 1,
       peak = 1,
       dd = 0,
@@ -4660,15 +4685,19 @@ canvas {
       wins = 0,
       tEq = 1,
       cur = pos[a - 1] || 0;
+    const R = [];
     for (let i = a; i <= b; i++) {
       const p = pos[i];
       if (p !== cur) {
+        // Ergebnis des alten Trades inkl. Ein- und Ausstiegsgebühr
+        const ex = eq * (1 - fee * Math.abs(cur));
         if (cur !== 0) {
           trades++;
-          if (eq / tEq > 1) wins++;
+          R.push(ex / tEq - 1);
+          if (ex / tEq > 1) wins++;
         }
         eq *= 1 - fee * Math.abs(p - cur);
-        tEq = eq;
+        tEq = ex;
         cur = p;
       }
       if (i < b) {
@@ -4677,7 +4706,7 @@ canvas {
         dd = Math.min(dd, eq / peak - 1);
       }
     }
-    return { res: eq - 1, dd, trades, wins, hold: data[b].c / data[a].c - 1, n: b - a };
+    return { res: eq - 1, dd, trades, wins, hold: data[b].c / data[a].c - 1, n: b - a, edge: edgeOf(R) };
   }
   function emaBT() {
     const n = data.length;
@@ -4958,7 +4987,8 @@ canvas {
     const n = data.length,
       A = T ? atrUp(T, 14) : atr(14),
       sg = [],
-      tr = [];
+      tr = [],
+      all = []; // all = Ergebnis jedes abgeschlossenen Trades (beide Ausstiegsarten), für die Edge-Prüfung
     let pos = 0,
       cur = null,
       stat = { w: 0, l: 0, o: 0 },
@@ -4969,12 +4999,7 @@ canvas {
       ah = [];
     for (let i = 1; i < n; i++) {
       const hv = M.h[i];
-      let avM = 0,
-        avH = 0;
-      if (am.length) {
-        avM = am.reduce((x, y) => x + y, 0) / am.length;
-        avH = ah.reduce((x, y) => x + y, 0) / ah.length;
-      }
+      const avH = ah.length ? ah.reduce((x, y) => x + y, 0) / ah.length : 0;
       if (hv != null) {
         const sg2 = hv > 0 ? 1 : hv < 0 ? -1 : 0;
         if (sg2 && sg2 !== sgn) {
@@ -5004,10 +5029,12 @@ canvas {
           stat.l++;
           cur.r = cur.d * (cur.sl / cur.e - 1);
           tr.push(cur.r);
+          all.push(cur.r);
           cur.xi = i;
         } else if (hitTP) {
           cur.done = "tp";
           stat.w++;
+          all.push(cur.d * (cur.tp / cur.e - 1));
         }
       }
       const raw =
@@ -5027,6 +5054,7 @@ canvas {
         stat.o++;
         cur.r = cur.d * (data[i].c / cur.e - 1);
         tr.push(cur.r);
+        all.push(cur.r);
         cur.xi = i;
       }
       let d = 0;
@@ -5051,6 +5079,8 @@ canvas {
           cur.r = cur.d * (data[i].c / cur.e - 1);
           tr.push(cur.r);
         }
+        // neues Signal vor Ziel/Stop: Trade wird zum Schlusskurs beendet und zählt mit
+        all.push(cur.d * (data[i].c / cur.e - 1));
       }
       const e = data[i].c,
         at = A[i] || Math.abs(e) * 0.01;
@@ -5059,7 +5089,8 @@ canvas {
       pos = d;
     }
     if (cur && !cur.done) cur.r = cur.d * (data[n - 1].c / cur.e - 1);
-    return { sg, cur, pos, stat, tr };
+    // Edge nur aus abgeschlossenen Trades, je Trade 2 × Gebühr (Ein- und Ausstieg)
+    return { sg, cur, pos, stat, tr, edge: edgeOf(all.map((r) => r - 2 * FEE)) };
   }
   /* Divergenzen: Kurs macht höheres Hoch / tieferes Tief, RSI bzw. MACD nicht. Wendepunkte mit 5 Kerzen links/rechts (erst nach 5 Kerzen bestätigt, kein Blick in die Zukunft).
    Check: wie oft lag der Kurs 10 Kerzen nach der Bestätigung in Richtung der Divergenz – verglichen mit allen Kerzen (Grundrate). */
@@ -5123,21 +5154,27 @@ canvas {
     // Check
     const C = data.map((b) => b.c);
     let up = 0,
-      tot = 0;
+      tot = 0,
+      sum = 0;
     for (let i = 0; i + DV_N < n; i++) {
       tot++;
+      sum += C[i + DV_N] / C[i] - 1;
       if (C[i + DV_N] > C[i]) up++;
     }
     const base = tot ? up / tot : 0.5,
-      st = { 1: { n: 0, h: 0, r: 0 }, [-1]: { n: 0, h: 0, r: 0 }, base };
+      st = { 1: { n: 0, h: 0, r: 0, R: [] }, [-1]: { n: 0, h: 0, r: 0, R: [] }, base, baseR: tot ? sum / tot : 0 };
     out.forEach((q) => {
       if (q.c + DV_N >= n) return;
       const r = C[q.c + DV_N] / C[q.c] - 1,
         s = st[q.d];
       s.n++;
       s.r += r;
+      // als Trade gelesen: Einstieg bei Bestätigung in Richtung der Divergenz, Ausstieg DV_N Kerzen später, 2 × Gebühr
+      s.R.push(q.d * r - 2 * FEE);
       if (q.d > 0 ? r > 0 : r < 0) s.h++;
     });
+    st[1].E = edgeOf(st[1].R);
+    st[-1].E = edgeOf(st[-1].R);
     return { list: out, st };
   }
   function dvDraw(w, i0, i1) {
@@ -5188,7 +5225,7 @@ canvas {
       const s = st && st[d];
       if (!s || !s.n) return "";
       const exp = d > 0 ? st.base : 1 - st.base;
-      return `${lb} ${s.n}× · danach ${DV_N} Kerzen ${d > 0 ? "höher" : "tiefer"}: <b>${pc(s.h / s.n)}</b> (sonst ${pc(exp)}) · Ø ${pr(s.r / s.n)}`;
+      return `${lb} ${s.n}× · danach ${DV_N} Kerzen ${d > 0 ? "höher" : "tiefer"}: <b>${pc(s.h / s.n)}</b> (sonst ${pc(exp)}) · Ø ${pr(s.r / s.n)} (sonst ${pr(st.baseR)}) · als Trade: ${edgeTxt(s.E)}`;
     };
     const a = one(-1, "▼"),
       b = one(1, "▲");
@@ -5255,6 +5292,7 @@ canvas {
         hold: f ? cl[cl.length - 1] / f.e - 1 : null,
         since: f ? a[f.i].t : null,
         pos: MS.cur && !MS.cur.done ? MS.cur.d : 0,
+        E: MS.edge,
         D,
       };
     } finally {
@@ -5296,13 +5334,13 @@ canvas {
     }
     el.innerHTML =
       cmpTable(rows, p1, pc, cls) +
-      `<p class="m" style="margin-top:8px">${msX ? "„Zusammen“ = alle Trades hintereinander (Gewinne wieder eingesetzt), „Halten“ = einfach kaufen ab dem ersten Signal. " : "Ziel = 3× ATR, Stop = 2× ATR. "}Divergenzen: Anteil, bei dem der Kurs 10 Kerzen später in Richtung der Divergenz lag, in Klammern die Grundrate. Ohne Gebühren, nur Rückblick – kein Beleg für die Zukunft.</p>`;
+      `<p class="m" style="margin-top:8px">${msX ? "„Zusammen“ = alle Trades hintereinander (Gewinne wieder eingesetzt), „Halten“ = einfach kaufen ab dem ersten Signal. " : "Ziel = 3× ATR, Stop = 2× ATR. "}Divergenzen: Anteil, bei dem der Kurs 10 Kerzen später in Richtung der Divergenz lag, in Klammern die Grundrate. „Edge“ = Prüfung wie beim Bot: nach 0,1 % Gebühr je Ein- und Ausstieg, mindestens ${EDGE_N} abgeschlossene Trades und t ≥ ${tFmt(EDGE_T)} (✓ = Edge belegt, ✗ = kein Beleg, „zu wenige“ = unter ${EDGE_N} Trades). Die anderen Spalten ohne Gebühren. Nur Rückblick – kein Beleg für die Zukunft.</p>`;
     cmpBusy = false;
   }
   function cmpTable(rows, p1, pc, cls) {
     const th = msX
-      ? "<th>Signale</th><th>Ø je Signal</th><th>Zusammen</th><th>Halten</th><th>Bestes / Schlechtestes</th>"
-      : "<th>Signale</th><th>Ziel / Stop</th><th>Treffer</th>";
+      ? "<th>Signale</th><th>Ø je Signal</th><th>Zusammen</th><th>Halten</th><th>Bestes / Schlechtestes</th><th>Edge</th>"
+      : "<th>Signale</th><th>Ziel / Stop</th><th>Treffer</th><th>Edge</th>";
     return (
       `<table class="cmpt"><tr><th>Markt</th>${showMS ? th : ""}${showDV ? "<th>Div ▼</th><th>Div ▲</th>" : ""}</tr>` +
       rows
@@ -5314,10 +5352,10 @@ canvas {
               const R = o.R || [],
                 av = R.length ? R.reduce((x, y) => x + y, 0) / R.length : null,
                 cp = R.length ? R.reduce((x, y) => x * (1 + y), 1) - 1 : null;
-              ms = `<td>${R.length}${o.pos ? (o.pos > 0 ? ' <span class="up">▲</span>' : ' <span class="dn">▼</span>') : ""}</td><td class="${cls(av)}">${p1(av)}</td><td class="${cls(cp)}"><b>${p1(cp)}</b></td><td class="${cls(o.hold)}">${p1(o.hold)}</td><td>${R.length ? p1(Math.max(...R)) + " / " + p1(Math.min(...R)) : "–"}</td>`;
+              ms = `<td>${R.length}${o.pos ? (o.pos > 0 ? ' <span class="up">▲</span>' : ' <span class="dn">▼</span>') : ""}</td><td class="${cls(av)}">${p1(av)}</td><td class="${cls(cp)}"><b>${p1(cp)}</b></td><td class="${cls(o.hold)}">${p1(o.hold)}</td><td>${R.length ? p1(Math.max(...R)) + " / " + p1(Math.min(...R)) : "–"}</td><td>${edgeTxt(o.E, 1)}</td>`;
             } else {
               const t = o.st.w + o.st.l;
-              ms = `<td>${o.n}</td><td>${o.st.w} / ${o.st.l}</td><td>${t ? pc(o.st.w / t) : "–"}</td>`;
+              ms = `<td>${o.n}</td><td>${o.st.w} / ${o.st.l}</td><td>${t ? pc(o.st.w / t) : "–"}</td><td>${edgeTxt(o.E, 1)}</td>`;
             }
           }
           let dv = "";
@@ -5328,7 +5366,7 @@ canvas {
                 if (!q || !q.n) return "–";
                 const exp = d > 0 ? S.base : 1 - S.base,
                   h = q.h / q.n;
-                return `<span class="${h > exp ? "up" : "dn"}">${pc(h)}</span> <span class="m">(${pc(exp)}) · ${q.n}×</span>`;
+                return `<span class="${h > exp ? "up" : "dn"}">${pc(h)}</span> <span class="m">(${pc(exp)}) · ${q.n}×</span> · ${edgeTxt(q.E, 1)}`;
               };
             dv = `<td>${f(-1)}</td><td>${f(1)}</td>`;
           }
@@ -5497,11 +5535,11 @@ canvas {
             ? ` · jetzt <b class="${c.r >= 0 ? "up" : "dn"}">${p1(c.r)}</b> (offen)`
             : ""
         : "";
-      return `<span>${head} · letztes Signal <b class="${c.d > 0 ? "up" : "dn"}">${c.d > 0 ? "LONG" : "SHORT"}</b> seit ${tfull(data[c.i].t)} bei ${fmt(c.e)} · halten bis Gegensignal, Notbremse ${fmt(c.sl)} (${pc(c.sl)})${now}${R.length ? ` <span class="m">· Check: ${R.length} Signale · Ø ${p1(avg)} je Signal · bestes ${p1(Math.max(...R))} · schlechtestes ${p1(Math.min(...R))}${last && !c.done ? " (inkl. offener Position)" : ""}</span>` : ""}</span>`;
+      return `<span>${head} · letztes Signal <b class="${c.d > 0 ? "up" : "dn"}">${c.d > 0 ? "LONG" : "SHORT"}</b> seit ${tfull(data[c.i].t)} bei ${fmt(c.e)} · halten bis Gegensignal, Notbremse ${fmt(c.sl)} (${pc(c.sl)})${now}${R.length ? ` <span class="m">· Check: ${R.length} Signale · Ø ${p1(avg)} je Signal · bestes ${p1(Math.max(...R))} · schlechtestes ${p1(Math.min(...R))}${last && !c.done ? " (inkl. offener Position)" : ""} · nach Gebühren: ${edgeTxt(MS.edge)}</span>` : ""}</span>`;
     }
     const done =
       c.done && last ? (c.done === "tp" ? " · Ziel erreicht" : c.done === "sl" ? " · Stop erreicht" : "") : "";
-    return `<span>${head} · letztes Signal <b class="${c.d > 0 ? "up" : "dn"}">${c.d > 0 ? "LONG" : "SHORT"}</b> seit ${tfull(data[c.i].t)} bei ${fmt(c.e)} · Ziel ${fmt(c.tp)} (${pc(c.tp)}) / Stop ${fmt(c.sl)} (${pc(c.sl)})${done}${tot ? ` <span class="m">· Check: ${st.w} Ziel / ${st.l} Stop (${Math.round((st.w / tot) * 100)} %)</span>` : ""}</span>`;
+    return `<span>${head} · letztes Signal <b class="${c.d > 0 ? "up" : "dn"}">${c.d > 0 ? "LONG" : "SHORT"}</b> seit ${tfull(data[c.i].t)} bei ${fmt(c.e)} · Ziel ${fmt(c.tp)} (${pc(c.tp)}) / Stop ${fmt(c.sl)} (${pc(c.sl)})${done}${tot ? ` <span class="m">· Check: ${st.w} Ziel / ${st.l} Stop (${Math.round((st.w / tot) * 100)} %, Gewinnschwelle ${Math.round((MS_SL / (MS_SL + MS_TP)) * 100)} %) · nach Gebühren: ${edgeTxt(MS.edge)}</span>` : ""}</span>`;
   }
   function paneDraw(w, i0, i1, ch) {
     const k = paneN();
@@ -6657,6 +6695,8 @@ canvas {
       `<div class="pgk"><span>Strategie</span><b class="${clF(B.res)}">${pcF(B.res)}</b></div>` +
       `<div class="pgk"><span>Einfach halten</span><b class="${clF(B.hold)}">${pcF(B.hold)}</b></div>` +
       `<div class="pgk"><span>Größter Rückgang</span><b class="dn">${pcF(B.dd)}</b></div>` +
+      `<div class="pgk"><span>Ø je Trade</span><b class="${B.edge.n ? clF(B.edge.avg) : ""}">${B.edge.n ? pcF(B.edge.avg) : "–"}</b></div>` +
+      `<div class="pgk"><span>Edge-Prüfung</span><b>${edgeTxt(B.edge)}</b></div>` +
       `<div class="pgk"><span>Zeitraum</span><b>${B.n} Kerzen · 0,1 % Gebühr</b></div>`;
   }
   function epUI() {
