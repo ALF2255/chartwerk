@@ -69,6 +69,17 @@ jeweils mit den Trades aller Märkte zusammen, nach Gebühren, sortiert nach t. 
 Edge-Prüfung bestehen. Eine Zeile antippen stellt die Variante im Chart ein. Dauert etwa 1–2 Minuten (Twelve Data höchstens
 alle 10 Sekunden abgefragt, Gratis-Limit 8/Min.).
 
+## Spot-Strategie (nur Kaufen und Verkaufen)
+
+Knopf **„Spot“** (für eigene Käufe, keine Shorts) zeigt KAUF- und VERKAUF-Schilder im Chart, **„Spot: …“** wählt die Regel:
+- **Überverkauft:** Kauf, wenn RSI 14 von unter 30 wieder darüber dreht; Verkauf, wenn er von über 70 wieder darunter dreht.
+- **Trendfolge:** Kauf, wenn die MACD-Linie über null kreuzt; Verkauf, wenn sie unter null kreuzt.
+- **Rücksetzer:** nur über EMA 200 (EMA 50 über EMA 200): Kauf, wenn RSI von unter 40 wieder darüber dreht; Verkauf bei RSI von über 70
+  nach unten oder Schluss unter EMA 200.
+
+**„Spot-Check“** vergleicht alle drei für den aktuellen Markt und Zeitrahmen mit „einfach halten“ (Rendite, Zeit im Markt, größter
+Rückgang, Edge-Prüfung nach Gebühren). Zeile antippen stellt die Regel ein.
+
 ## Handy
 
 Die Legende oben im Chart ist auf dem Handy kompakt (Kurs, EMA, MACD-Signal mit Edge-Urteil, letzte Divergenz);

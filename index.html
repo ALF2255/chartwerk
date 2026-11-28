@@ -1411,7 +1411,7 @@ canvas {
   .tools {
     grid-template-columns: 38px;
     gap: 3px;
-    padding: 6px 5px;
+    padding: 3px 5px;
   }
   .tools > .tb,
   .tools > .tg > .tb,
@@ -1454,6 +1454,9 @@ canvas {
   <button class="chip ic" id="msb" aria-pressed="true" title="BUY/SELL bei MACD-Kreuzung, Position mit Ziel und Stop (2×/3× ATR) und Check">MACD-Signale</button>
   <button class="chip ic" id="msf" title="Welche MACD-Signale: alle Kreuzungen / mit Trend (BUY nur bei MACD über null, SELL nur unter null, ohne Wackler) / nur Nulllinien-Durchgänge" style="padding:0 10px">Signale: alle</button>
   <button class="chip ic" id="msx" title="Ausstieg: bei Ziel oder Stop / erst beim Gegensignal (Stop bleibt als Notbremse)" style="padding:0 10px">Ausstieg: Ziel/Stop</button>
+  <button class="chip ic" id="spb" aria-pressed="false" title="Spot-Strategie nur für eigene Käufe: KAUF möglichst tief, VERKAUF möglichst hoch, keine Shorts">Spot</button>
+  <button class="chip ic" id="spm" title="Welche Spot-Regel: Überverkauft (RSI) / Trendfolge (MACD) / Rücksetzer im Aufwärtstrend" style="padding:0 10px">Spot: Rücksetzer</button>
+  <button class="chip ic" id="spc" title="Alle drei Spot-Regeln für diesen Markt gegen „einfach halten“ vergleichen" style="padding:0 10px">Spot-Check</button>
   <button class="chip ic" id="dvb" aria-pressed="true" title="Divergenzen: Kurs macht neues Hoch/Tief, RSI bzw. MACD nicht – mögliche Wende (mit Check)">Divergenzen</button>
   <button class="chip ic" id="dvs" title="Divergenzen aus RSI oder MACD" style="padding:0 10px">Div: RSI</button>
   <button class="chip ic" id="cmpb" title="Aktuelle Einstellung (MACD-Signale, Divergenzen) für alle Märkte durchrechnen" style="padding:0 10px">Vergleich alle Märkte</button>
@@ -1562,6 +1565,13 @@ canvas {
   <div id="cmpn"></div>
   <div class="prow"><button class="chip" id="ssb" title="Alle Kombinationen aus Zeitrahmen, MACD-Zeitrahmen, Signalen und Ausstieg prüfen">Alle Strategien durchspielen</button><button class="chip" id="ssm" aria-pressed="false" title="Strategie-Suche nur mit Bitcoin, Ethereum, Solana und Zcash">Nur Krypto</button></div>
   <div class="prow"><button class="chip" id="cmpre">Neu rechnen</button><button class="chip pri" id="cmpok">Fertig</button></div>
+ </div>
+ <div class="panel" id="spp" role="dialog" aria-label="Spot-Check">
+  <h2 id="sph">Spot-Check</h2>
+  <div class="cmpwipe">Tabelle seitlich wischen für weitere Spalten →</div>
+  <div id="spt" style="overflow-x:auto"></div>
+  <div id="spn"></div>
+  <div class="prow"><button class="chip pri" id="spok">Fertig</button></div>
  </div>
  <div class="panel" id="obp" role="dialog" aria-label="Objektbaum">
   <h2 id="obh">Objektbaum</h2>
@@ -4445,7 +4455,9 @@ canvas {
         ctx.fillText(t, tx, yy);
       });
     }
+    lblPlaced = [];
     msDraw(w, i0, i1);
+    spDraw(w, i0, i1);
     dvDraw(w, i0, i1);
     if (!hidden)
       drawings.forEach((d, k) => {
@@ -4538,7 +4550,8 @@ canvas {
             ? `<span><b style="color:#00e5ff">EMA${EP.len}</b> <b class="${emPos[i] > 0 ? "up" : emPos[i] < 0 ? "dn" : ""}">${emPos[i] > 0 ? "Long" : emPos[i] < 0 ? "Short" : "Flat"}</b></span>`
             : "") +
           msShort(i) +
-          dvShort(i)
+          dvShort(i) +
+          spShort(i)
         : legendFull(i));
     const h = $("#legend").offsetHeight;
     if (h !== lgH) {
@@ -4567,7 +4580,8 @@ canvas {
         ? `<span class="m"><b style="color:${zzo.c}">Zickzack</b> ${zzo.dev.toLocaleString("de-DE")} ${zzo.depth}</span>`
         : "") +
       msText(i) +
-      dvText(i)
+      dvText(i) +
+      spText(i)
     );
   }
 
@@ -5037,6 +5051,166 @@ canvas {
     showMS = localStorage.getItem("chartwerk:ms") !== "0";
     mcUp = localStorage.getItem("chartwerk:mcf") === "1";
   } catch (e) {}
+  /* Spot-Strategie (nur Long, für eigene Käufe): drei Regeln zur Auswahl, Kauf/Verkauf zum Schlusskurs der Signalkerze.
+     0 Überverkauft: Kauf, wenn RSI 14 von unter 30 wieder darüber dreht; Verkauf, wenn er von über 70 wieder darunter dreht.
+     1 Trendfolge: Kauf, wenn die MACD-Linie über null kreuzt; Verkauf, wenn sie unter null kreuzt.
+     2 Rücksetzer im Aufwärtstrend: nur über EMA 200 (und EMA 50 über EMA 200) Kauf, wenn RSI 14 von unter 40 wieder darüber dreht;
+       Verkauf, wenn RSI von über 70 wieder darunter dreht oder der Kurs unter EMA 200 schließt (Trendbruch). */
+  let showSP = false,
+    spM = 2;
+  const SPM = ["Überverkauft", "Trendfolge", "Rücksetzer"];
+  try {
+    showSP = localStorage.getItem("chartwerk:sp") === "1";
+    const v = localStorage.getItem("chartwerk:spm");
+    if (v === "0" || v === "1" || v === "2") spM = +v;
+  } catch (e) {}
+  function rsiW(cl, n = 14) {
+    const o = new Array(cl.length).fill(null);
+    let g = 0,
+      l = 0;
+    for (let i = 1; i < cl.length; i++) {
+      const d = cl[i] - cl[i - 1],
+        up = Math.max(d, 0),
+        dn = Math.max(-d, 0);
+      if (i <= n) {
+        g += up;
+        l += dn;
+        if (i === n) {
+          g /= n;
+          l /= n;
+          o[i] = l === 0 ? 100 : 100 - 100 / (1 + g / l);
+        }
+        continue;
+      }
+      g = (g * (n - 1) + up) / n;
+      l = (l * (n - 1) + dn) / n;
+      o[i] = l === 0 ? 100 : 100 - 100 / (1 + g / l);
+    }
+    return o;
+  }
+  function spCalc(mode) {
+    const n = data.length,
+      cl = data.map((b) => b.c),
+      R = rsiW(cl),
+      M = macdOf(cl),
+      E50 = emaA(cl, 50),
+      E200 = emaA(cl, 200),
+      T = [];
+    // gemeinsamer Start für alle drei Regeln (wenn auch EMA 200 steht) – so ist „Halten“ bei allen gleich und der Vergleich fair
+    const ready = (i) => R[i - 1] != null && M.m[i - 1] != null && E200[i] != null && E50[i] != null;
+    let cur = null,
+      i0 = null;
+    for (let i = 1; i < n; i++) {
+      if (!ready(i)) continue;
+      if (i0 == null) i0 = i;
+      const r0 = R[i - 1],
+        r1 = R[i],
+        upOut = (lv) => r0 != null && r1 != null && r0 < lv && r1 >= lv,
+        dnOut = (lv) => r0 != null && r1 != null && r0 > lv && r1 <= lv;
+      if (cur) {
+        let why = null;
+        if (mode === 0 && dnOut(70)) why = "überkauft";
+        else if (mode === 1 && M.m[i - 1] >= 0 && M.m[i] < 0) why = "MACD unter null";
+        else if (mode === 2) {
+          if (dnOut(70)) why = "überkauft";
+          else if (cl[i] < E200[i]) why = "Trendbruch";
+        }
+        if (why) {
+          cur.x = i;
+          cur.why = why;
+          cur.r = cl[i] / cur.e - 1 - 2 * FEE;
+          cur = null;
+        }
+        continue;
+      }
+      let buy = false;
+      if (mode === 0) buy = upOut(30);
+      else if (mode === 1) buy = M.m[i - 1] <= 0 && M.m[i] > 0;
+      else buy = cl[i] > E200[i] && E50[i] > E200[i] && upOut(40);
+      if (buy) {
+        cur = { i, e: cl[i], x: null };
+        T.push(cur);
+      }
+    }
+    if (cur) cur.r = cl[n - 1] / cur.e - 1 - 2 * FEE; // offene Position zum aktuellen Kurs (inkl. künftiger Verkaufsgebühr)
+    // Kapitalverlauf: investiert = Kursveränderung, sonst Bargeld. Vergleich: ab derselben Kerze einfach halten.
+    let eq = 1,
+      pk = 1,
+      dd = 0,
+      inMkt = 0,
+      hpk = 1,
+      hdd = 0;
+    const st = i0 == null ? n - 1 : i0;
+    for (let i = st + 1; i < n; i++) {
+      const q = T.find((t) => t.i < i && (t.x == null || t.x >= i));
+      if (q) {
+        eq *= cl[i] / cl[i - 1];
+        inMkt++;
+        if (q.i === i - 1) eq *= 1 - FEE;
+        if (q.x === i) eq *= 1 - FEE;
+      }
+      pk = Math.max(pk, eq);
+      dd = Math.min(dd, eq / pk - 1);
+      const h = cl[i] / cl[st];
+      hpk = Math.max(hpk, h);
+      hdd = Math.min(hdd, h / hpk - 1);
+    }
+    const done = T.filter((q) => q.x != null),
+      mid = Math.floor(n / 2);
+    return {
+      T,
+      cur,
+      E: edgeOf(done.map((q) => q.r)),
+      H1: edgeOf(done.filter((q) => q.x < mid).map((q) => q.r)),
+      H2: edgeOf(done.filter((q) => q.x >= mid).map((q) => q.r)),
+      res: eq - 1,
+      hold: cl[n - 1] / cl[st] - 1,
+      dd,
+      hdd,
+      inMkt: n - 1 - st > 0 ? inMkt / (n - 1 - st) : 0,
+      from: data[st] ? data[st].t : null,
+    };
+  }
+  function spShort(i) {
+    if (!showSP || !IN || !IN.sp) return "";
+    const S = IN.sp,
+      q = S.T.filter((t) => t.i <= i).pop(),
+      open = q && (q.x == null || q.x > i);
+    const r = open ? data[i].c / q.e - 1 : null;
+    return `<span><b style="color:#00bfa5">Spot ${SPM[spM]}</b> ${
+      open
+        ? `<b class="up">investiert</b> seit ${dShort(data[q.i].t)} <b class="${r >= 0 ? "up" : "dn"}">${r >= 0 ? "+" : ""}${(r * 100).toLocaleString("de-DE", { maximumFractionDigits: 1 })} %</b>`
+        : '<span style="color:var(--mute)">warten auf Kauf</span>'
+    }</span>`;
+  }
+  function spText(i) {
+    if (!showSP || !IN || !IN.sp) return "";
+    const S = IN.sp,
+      p1 = (v) => (v >= 0 ? "+" : "") + Math.round(v * 100).toLocaleString("de-DE") + " %";
+    return (
+      spShort(i).replace(/<\/span>$/, "") +
+      ` <span class="m">· Check: ${S.E.n} Verkäufe · Treffer ${S.E.n ? Math.round((S.E.R.filter((r) => r > 0).length / S.E.n) * 100) : "–"} % · Strategie ${p1(S.res)} gegen Halten ${p1(S.hold)} · ${edgeTxt(S.E)}</span></span>`
+    );
+  }
+  // Spot-Check: alle drei Regeln für den aktuellen Markt und Zeitrahmen gegen „einfach halten“
+  function spCheck() {
+    const p1 = (v) => (v == null ? "–" : (v >= 0 ? "+" : "") + Math.round(v * 100).toLocaleString("de-DE") + " %"),
+      p2 = (v) => (v == null ? "–" : (v >= 0 ? "+" : "") + (v * 100).toLocaleString("de-DE", { maximumFractionDigits: 1 }) + " %"),
+      tc = (E) => (!E.n ? "–" : `<span class="${E.n >= EDGE_N && E.t >= EDGE_T ? "up" : E.t < 0 ? "dn" : ""}">${tFmt(E.t)}</span>`),
+      rows = [0, 1, 2].map((m) => [m, spCalc(m)]);
+    $("#sph").textContent = `Spot-Check · ${sym.name} · ${tf.l}`;
+    $("#spt").innerHTML =
+      '<table class="cmpt"><tr><th>Regel</th><th>Verkäufe</th><th>Treffer</th><th>Ø je Trade</th><th>Edge</th><th>1. | 2. Hälfte</th><th>Strategie</th><th>Halten</th><th>Im Markt</th><th>Größter Rückgang</th></tr>' +
+      rows
+        .map(
+          ([m, S]) =>
+            `<tr data-spm="${m}" style="cursor:pointer${m === spM ? ";background:#1f2a33" : ""}"><td>${m === spM ? "▸ " : ""}${SPM[m]}</td><td>${S.E.n}${S.cur ? ' <span class="m">+1 offen</span>' : ""}</td><td>${S.E.n ? Math.round((S.E.R.filter((r) => r > 0).length / S.E.n) * 100) + " %" : "–"}</td><td class="${S.E.avg == null ? "" : S.E.avg >= 0 ? "up" : "dn"}">${p2(S.E.avg)}</td><td>${edgeTxt(S.E, 1)}</td><td>${tc(S.H1)} | ${tc(S.H2)}</td><td class="${S.res >= S.hold ? "up" : "dn"}"><b>${p1(S.res)}</b></td><td>${p1(S.hold)}</td><td>${Math.round(S.inMkt * 100)} %</td><td>${p1(S.dd)} <span class="m">(Halten ${p1(S.hdd)})</span></td></tr>`,
+        )
+        .join("") +
+      "</table>";
+    $("#spn").innerHTML = `<p class="m" style="margin-top:8px">Nur Kaufen und Verkaufen (Spot), keine Shorts, 0,1 % Gebühr je Kauf und Verkauf. „Strategie“ = alle Käufe nacheinander, Gewinne wieder eingesetzt, dazwischen Bargeld; grün, wenn besser als „Halten“ (ab derselben Kerze kaufen und liegen lassen). „Im Markt“ = Anteil der Zeit investiert, „Größter Rückgang“ = tiefster Einbruch vom Höchststand. Eine Regel, die weniger bringt als Halten, kann trotzdem sinnvoll sein, wenn sie den Rückgang deutlich kleiner hält. Edge wie beim Bot (t ≥ ${tFmt(EDGE_T)}, mind. ${EDGE_N} Verkäufe). Zeile antippen = Regel im Chart einstellen. Nur Rückblick – keine Anlageberatung.</p>`;
+    $("#spp").classList.add("on");
+  }
   function indSave() {
     try {
       localStorage.setItem("chartwerk:rsi", showRSI ? "1" : "0");
@@ -5047,6 +5221,8 @@ canvas {
       localStorage.setItem("chartwerk:msx", String(msX));
       localStorage.setItem("chartwerk:dv", showDV ? "1" : "0");
       localStorage.setItem("chartwerk:dvs", String(dvSrc));
+      localStorage.setItem("chartwerk:sp", showSP ? "1" : "0");
+      localStorage.setItem("chartwerk:spm", String(spM));
     } catch (e) {}
   }
   const RSI_N = 14,
@@ -5873,7 +6049,7 @@ canvas {
       M = T ? macdUp(T) : macdOf(data.map((b) => b.c)),
       MS = msSignals(T ? M.c : M, T),
       MC = T ? macdOf(data.map((b) => b.c)) : M;
-    IN = { rsi: R.r, rsig: R.s, m: M.m, g: M.g, h: M.h, T, ms: MS, dv: dvCalc(R.r, MC) };
+    IN = { rsi: R.r, rsig: R.s, m: M.m, g: M.g, h: M.h, T, ms: MS, dv: dvCalc(R.r, MC), sp: showSP ? spCalc(spM) : null };
   }
   function indUI() {
     $("#rsib").setAttribute("aria-pressed", showRSI);
@@ -5883,6 +6059,9 @@ canvas {
     $("#dvs").style.display = showDV ? "" : "none";
     $("#dvs").textContent = "Div: " + (dvSrc ? "MACD" : "RSI");
     $("#cmpb").style.display = showMS || showDV ? "" : "none";
+    $("#spb").setAttribute("aria-pressed", showSP);
+    $("#spm").style.display = $("#spc").style.display = showSP ? "" : "none";
+    $("#spm").textContent = "Spot: " + SPM[spM];
     $("#msf").style.display = showMS ? "" : "none";
     $("#msf").textContent = "Signale: " + MSF[msF];
     $("#msx").style.display = showMS ? "" : "none";
@@ -5901,8 +6080,10 @@ canvas {
     else if (k === "msx") msX = 1 - msX;
     else if (k === "dv") showDV = !showDV;
     else if (k === "dvs") dvSrc = 1 - dvSrc;
+    else if (k === "sp") showSP = !showSP;
+    else if (k === "spm") spM = (spM + 1) % 3;
     indSave();
-    if (k === "mcf" || k === "msf" || k === "mc" || k === "msx" || k === "dvs") indCalc();
+    if (k === "mcf" || k === "msf" || k === "mc" || k === "msx" || k === "dvs" || k === "sp" || k === "spm") indCalc();
     clampView();
     ui();
     draw();
@@ -5915,25 +6096,24 @@ canvas {
   $("#msx").onclick = () => indTog("msx");
   $("#dvb").onclick = () => indTog("dv");
   $("#dvs").onclick = () => indTog("dvs");
-  function msDraw(w, i0, i1) {
-    if (!showMS || !IN) return;
-    const MS = IN.ms;
-    // Alle Schilder (BUY/SELL und EXIT/STOP) sammeln und ohne Überlappung platzieren:
-    // liegt ein Schild auf einem anderen, rückt es weiter vom Kerzendocht weg (über der Kerze nach oben, darunter nach unten).
-    const L = [];
-    MS.sg.forEach((q) => {
-      if (q.i >= i0 && q.i <= i1) {
-        const b = data[q.i],
-          up = q.d > 0; // BUY unter der Kerze, SELL darüber
-        L.push({ x: x(q.i), ay: up ? y(b.l) : y(b.h), below: up, t: up ? "BUY" : "SELL", bg: up ? "rgba(38,166,154,.95)" : "rgba(239,83,80,.95)", arrow: up ? UP : DN, f: 10, h: 16, gap: 16 });
-      }
-      if (msX && q.xi != null && q.xi >= i0 && q.xi <= i1) {
-        const b = data[q.xi],
-          below = q.d < 0; // Ausstieg auf der Gegenseite des Einstiegs-Schilds
-        L.push({ x: x(q.xi), ay: below ? y(b.l) : y(b.h), below, t: (q.done === "sl" ? "STOP " : "EXIT ") + (q.r >= 0 ? "+" : "") + Math.round(q.r * 100) + "%", bg: q.done === "sl" ? "rgba(120,72,76,.95)" : "rgba(101,112,121,.95)", f: 9, h: 14, gap: 14 });
-      }
-    });
-    const placed = [],
+  $("#spb").onclick = () => indTog("sp");
+  $("#spm").onclick = () => indTog("spm");
+  $("#spc").onclick = () => spCheck();
+  $("#spok").onclick = () => $("#spp").classList.remove("on");
+  $("#spt").addEventListener("click", (e) => {
+    const tr = e.target.closest("tr[data-spm]");
+    if (!tr) return;
+    spM = +tr.dataset.spm;
+    indSave();
+    indCalc();
+    ui();
+    draw();
+    spCheck();
+  });
+  // Schilder im Kurschart ohne Überlappung platzieren (gemeinsam für MACD-Signale und Spot-Strategie, je Bild neu)
+  let lblPlaced = [];
+  function drawLbls(L) {
+    const placed = lblPlaced,
       hit = (r) => placed.some((p) => r.x0 < p.x1 + 2 && r.x1 > p.x0 - 2 && r.y0 < p.y1 + 2 && r.y1 > p.y0 - 2);
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
@@ -5969,6 +6149,47 @@ canvas {
       ctx.fillStyle = "#fff";
       ctx.fillText(o.t, o.x, yy);
     });
+  }
+  function spDraw(w, i0, i1) {
+    if (!showSP || !IN || !IN.sp) return;
+    const L = [];
+    IN.sp.T.forEach((q) => {
+      if (q.i >= i0 && q.i <= i1)
+        L.push({ x: x(q.i), ay: y(data[q.i].l), below: true, t: "KAUF", bg: "rgba(0,150,136,.95)", arrow: "#00bfa5", f: 10, h: 16, gap: 16 });
+      if (q.x != null && q.x >= i0 && q.x <= i1)
+        L.push({
+          x: x(q.x),
+          ay: y(data[q.x].h),
+          below: false,
+          t: "VERKAUF " + (q.r >= 0 ? "+" : "") + Math.round(q.r * 100) + "%",
+          bg: q.r >= 0 ? "rgba(41,98,255,.95)" : "rgba(120,72,76,.95)",
+          arrow: "#2962ff",
+          f: 9,
+          h: 15,
+          gap: 15,
+        });
+    });
+    drawLbls(L);
+  }
+  function msDraw(w, i0, i1) {
+    if (!showMS || !IN) return;
+    const MS = IN.ms;
+    // Alle Schilder (BUY/SELL und EXIT/STOP) sammeln und ohne Überlappung platzieren:
+    // liegt ein Schild auf einem anderen, rückt es weiter vom Kerzendocht weg (über der Kerze nach oben, darunter nach unten).
+    const L = [];
+    MS.sg.forEach((q) => {
+      if (q.i >= i0 && q.i <= i1) {
+        const b = data[q.i],
+          up = q.d > 0; // BUY unter der Kerze, SELL darüber
+        L.push({ x: x(q.i), ay: up ? y(b.l) : y(b.h), below: up, t: up ? "BUY" : "SELL", bg: up ? "rgba(38,166,154,.95)" : "rgba(239,83,80,.95)", arrow: up ? UP : DN, f: 10, h: 16, gap: 16 });
+      }
+      if (msX && q.xi != null && q.xi >= i0 && q.xi <= i1) {
+        const b = data[q.xi],
+          below = q.d < 0; // Ausstieg auf der Gegenseite des Einstiegs-Schilds
+        L.push({ x: x(q.xi), ay: below ? y(b.l) : y(b.h), below, t: (q.done === "sl" ? "STOP " : "EXIT ") + (q.r >= 0 ? "+" : "") + Math.round(q.r * 100) + "%", bg: q.done === "sl" ? "rgba(120,72,76,.95)" : "rgba(101,112,121,.95)", f: 9, h: 14, gap: 14 });
+      }
+    });
+    drawLbls(L);
     const c = MS.cur;
     if (c && !c.done) {
       const x0 = Math.max(0, x(c.i));
@@ -6737,6 +6958,7 @@ canvas {
         mcb: showMC,
         msb: showMS,
         dvb: showDV,
+        spb: showSP,
       },
     };
     if (L.tf === nw.tf && JSON.stringify(L.ind) === JSON.stringify(nw.ind)) return;
@@ -6763,6 +6985,7 @@ canvas {
       if ("mcb" in i) showMC = !!i.mcb;
       if ("msb" in i) showMS = !!i.msb;
       if ("dvb" in i) showDV = !!i.dvb;
+      if ("spb" in i) showSP = !!i.spb;
       try {
         localStorage.setItem("chartwerk:tr", showTR ? "1" : "0");
         localStorage.setItem("chartwerk:zn", showZN ? "1" : "0");
@@ -6829,6 +7052,7 @@ canvas {
     mcb: showMC,
     msb: showMS,
     dvb: showDV,
+    spb: showSP,
   });
   // Aktuelle Indikatoren + Zeiteinheit ins aktive Layout eines Marktes schreiben (ohne Zeichnungen)
   function layPut(sid) {
@@ -7080,6 +7304,7 @@ canvas {
         mcb: showMC,
         msb: showMS,
         dvb: showDV,
+        spb: showSP,
       },
     });
     setLays(sym.id, a);
@@ -8275,6 +8500,7 @@ canvas {
     ["mcb", "MACD mit Farbwechsel (eigenes Fenster)"],
     ["msb", "MACD-Signale BUY/SELL mit Ziel/Stop"],
     ["dvb", "Divergenzen (RSI/MACD)"],
+    ["spb", "Spot-Strategie (nur Kauf/Verkauf)"],
   ];
   const EYE = (on) =>
     '<svg viewBox="0 0 22 22"><path d="M2 11s3.5-6 9-6 9 6 9 6-3.5 6-9 6-9-6-9-6z"/><circle cx="11" cy="11" r="2.5"/>' +
