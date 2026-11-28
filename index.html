@@ -349,7 +349,7 @@ canvas {
   font-size: 12px;
   margin: -4px 0 6px;
 }
-@media (max-width: 700px) {
+@media (max-width: 1100px) {
   .cmpwipe {
     display: block;
   }
@@ -5258,12 +5258,13 @@ canvas {
       rows = SPM.map((_, m) => [m, spCalc(m)]);
     $("#sph").textContent = `Spot-Check · ${sym.name} · ${tf.l}`;
     $("#spt").innerHTML =
-      '<table class="cmpt"><tr><th>Regel</th><th>Verkäufe</th><th>Treffer</th><th>Ø je Trade</th><th>Edge</th><th>1. | 2. Hälfte</th><th>Strategie</th><th>Halten</th><th>Im Markt</th><th>Größter Rückgang</th></tr>' +
+      // wichtigste Spalten zuerst (Strategie gegen Halten, Rückgang), damit sie auch auf schmalen Bildschirmen ohne Wischen sichtbar sind
+      '<table class="cmpt"><tr><th>Regel</th><th>Strategie</th><th>Halten</th><th>Größter Rückgang</th><th>Verkäufe</th><th>Treffer</th><th>Ø je Trade</th><th>Edge</th><th>1. | 2. Hälfte</th><th>Im Markt</th></tr>' +
       rows
         .map(([m, S]) =>
           S.na
             ? `<tr data-spm="${m}" style="cursor:pointer${m === spM ? ";background:#1f2a33" : ""}"><td>${m === spM ? "▸ " : ""}${SPM[m]}</td><td colspan="9"><span class="m">${S.na}</span></td></tr>`
-            : `<tr data-spm="${m}" style="cursor:pointer${m === spM ? ";background:#1f2a33" : ""}"><td>${m === spM ? "▸ " : ""}${SPM[m]}</td><td>${S.E.n}${S.cur ? ' <span class="m">+1 offen</span>' : ""}</td><td>${S.E.n ? Math.round((S.E.R.filter((r) => r > 0).length / S.E.n) * 100) + " %" : "–"}</td><td class="${S.E.avg == null ? "" : S.E.avg >= 0 ? "up" : "dn"}">${p2(S.E.avg)}</td><td>${edgeTxt(S.E, 1)}</td><td>${tc(S.H1)} | ${tc(S.H2)}</td><td class="${S.res >= S.hold ? "up" : "dn"}"><b>${p1(S.res)}</b></td><td>${p1(S.hold)}</td><td>${Math.round(S.inMkt * 100)} %</td><td>${p1(S.dd)} <span class="m">(Halten ${p1(S.hdd)})</span></td></tr>`,
+            : `<tr data-spm="${m}" style="cursor:pointer${m === spM ? ";background:#1f2a33" : ""}"><td>${m === spM ? "▸ " : ""}${SPM[m]}</td><td class="${S.res >= S.hold ? "up" : "dn"}"><b>${p1(S.res)}</b></td><td>${p1(S.hold)}</td><td>${p1(S.dd)} <span class="m">(Halten ${p1(S.hdd)})</span></td><td>${S.E.n}${S.cur ? ' <span class="m">+1 offen</span>' : ""}</td><td>${S.E.n ? Math.round((S.E.R.filter((r) => r > 0).length / S.E.n) * 100) + " %" : "–"}</td><td class="${S.E.avg == null ? "" : S.E.avg >= 0 ? "up" : "dn"}">${p2(S.E.avg)}</td><td>${edgeTxt(S.E, 1)}</td><td>${tc(S.H1)} | ${tc(S.H2)}</td><td>${Math.round(S.inMkt * 100)} %</td></tr>`,
         )
         .join("") +
       "</table>";
