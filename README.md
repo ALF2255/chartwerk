@@ -84,7 +84,8 @@ Knopf **„Spot“** (für eigene Käufe, keine Shorts) zeigt KAUF- und VERKAUF-
   schwächer werdende Zyklen an, für alle Märkte (am besten Tag oder Woche).
 
 **„Staffel“** (Schalter, gilt für alle Spot-Regeln): beim Kaufsignal nur 1/3 kaufen, je 1/3 per Limit bei −15 % und −30 % unter dem
-ersten Kaufkurs nachkaufen (Schild NACHKAUF), verkauft wird alles. Legende zeigt gekaufte Teile und Ø-Einstandspreis.
+ersten Kaufkurs nachkaufen (Schild NACHKAUF), verkauft wird alles. Dritte Stufe „Rest bei +10 %“: nicht gekaufte Teile werden
+gekauft, sobald der Kurs 10 % über dem ersten Kauf schließt (Schild REST) – damit bleibt bei sofortigem Anstieg kein Geld liegen. Legende zeigt gekaufte Teile und Ø-Einstandspreis.
 
 **„Spot-Check“** vergleicht alle Regeln für den aktuellen Markt und Zeitrahmen mit „einfach halten“ (Rendite, Zeit im Markt, größter
 Rückgang, Edge-Prüfung nach Gebühren). Zeile antippen stellt die Regel ein.
