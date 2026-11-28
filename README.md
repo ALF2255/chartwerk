@@ -182,3 +182,6 @@ Für Echtzeitkurse bei Silber einen kostenlosen Schlüssel von twelvedata.com im
 ## Updates
 
 Neue Version von `index.html` im Repository hochladen und ersetzen. Die App holt sie sich beim nächsten Start.
+Die Versionsnummer steht klein neben „Chartwerk“ (antippen zeigt Version und Stand). Bei jeder Änderung `VERSION` in
+`index.html` und den Cache-Namen `chartwerk-vNN` in `sw.js` auf dieselbe Zahl hochzählen – so sieht man nach dem Neuladen sofort,
+ob die neue Version läuft.
