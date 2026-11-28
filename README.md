@@ -76,8 +76,14 @@ Knopf **„Spot“** (für eigene Käufe, keine Shorts) zeigt KAUF- und VERKAUF-
 - **Trendfolge:** Kauf, wenn die MACD-Linie über null kreuzt; Verkauf, wenn sie unter null kreuzt.
 - **Rücksetzer:** nur über EMA 200 (EMA 50 über EMA 200): Kauf, wenn RSI von unter 40 wieder darüber dreht; Verkauf bei RSI von über 70
   nach unten oder Schluss unter EMA 200.
+- **Zyklus** (nur Bitcoin): Kauf ab dem Tief-Fenster des Halving-Zyklus, wenn RSI von unter 40 wieder darüber dreht; Verkauf nur im
+  Hoch-Fenster (bei RSI von über 70 nach unten, spätestens am Fensterende), dazwischen halten. Nur zwei vollständige Zyklen in den
+  Daten – Orientierung, kein Beleg.
+- **Bewertung:** Mayer-Multiple (Kurs ÷ Durchschnitt 200 Tage) im Vergleich zu seinen eigenen Werten der letzten bis zu 4 Jahre:
+  Kauf, wenn es zu den tiefsten 10 % gehört und wieder steigt; Verkauf bei den höchsten 5 %, wenn es wieder fällt. Passt sich an
+  schwächer werdende Zyklen an, für alle Märkte (am besten Tag oder Woche).
 
-**„Spot-Check“** vergleicht alle drei für den aktuellen Markt und Zeitrahmen mit „einfach halten“ (Rendite, Zeit im Markt, größter
+**„Spot-Check“** vergleicht alle Regeln für den aktuellen Markt und Zeitrahmen mit „einfach halten“ (Rendite, Zeit im Markt, größter
 Rückgang, Edge-Prüfung nach Gebühren). Zeile antippen stellt die Regel ein.
 
 ## Handy

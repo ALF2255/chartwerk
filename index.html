@@ -1455,8 +1455,8 @@ canvas {
   <button class="chip ic" id="msf" title="Welche MACD-Signale: alle Kreuzungen / mit Trend (BUY nur bei MACD über null, SELL nur unter null, ohne Wackler) / nur Nulllinien-Durchgänge" style="padding:0 10px">Signale: alle</button>
   <button class="chip ic" id="msx" title="Ausstieg: bei Ziel oder Stop / erst beim Gegensignal (Stop bleibt als Notbremse)" style="padding:0 10px">Ausstieg: Ziel/Stop</button>
   <button class="chip ic" id="spb" aria-pressed="false" title="Spot-Strategie nur für eigene Käufe: KAUF möglichst tief, VERKAUF möglichst hoch, keine Shorts">Spot</button>
-  <button class="chip ic" id="spm" title="Welche Spot-Regel: Überverkauft (RSI) / Trendfolge (MACD) / Rücksetzer im Aufwärtstrend" style="padding:0 10px">Spot: Rücksetzer</button>
-  <button class="chip ic" id="spc" title="Alle drei Spot-Regeln für diesen Markt gegen „einfach halten“ vergleichen" style="padding:0 10px">Spot-Check</button>
+  <button class="chip ic" id="spm" title="Welche Spot-Regel: Überverkauft (RSI) / Trendfolge (MACD) / Rücksetzer im Aufwärtstrend / Zyklus (nur Bitcoin) / Bewertung (Mayer-Multiple)" style="padding:0 10px">Spot: Rücksetzer</button>
+  <button class="chip ic" id="spc" title="Alle Spot-Regeln für diesen Markt gegen „einfach halten“ vergleichen" style="padding:0 10px">Spot-Check</button>
   <button class="chip ic" id="dvb" aria-pressed="true" title="Divergenzen: Kurs macht neues Hoch/Tief, RSI bzw. MACD nicht – mögliche Wende (mit Check)">Divergenzen</button>
   <button class="chip ic" id="dvs" title="Divergenzen aus RSI oder MACD" style="padding:0 10px">Div: RSI</button>
   <button class="chip ic" id="cmpb" title="Aktuelle Einstellung (MACD-Signale, Divergenzen) für alle Märkte durchrechnen" style="padding:0 10px">Vergleich alle Märkte</button>
@@ -5055,14 +5055,21 @@ canvas {
      0 Überverkauft: Kauf, wenn RSI 14 von unter 30 wieder darüber dreht; Verkauf, wenn er von über 70 wieder darunter dreht.
      1 Trendfolge: Kauf, wenn die MACD-Linie über null kreuzt; Verkauf, wenn sie unter null kreuzt.
      2 Rücksetzer im Aufwärtstrend: nur über EMA 200 (und EMA 50 über EMA 200) Kauf, wenn RSI 14 von unter 40 wieder darüber dreht;
-       Verkauf, wenn RSI von über 70 wieder darunter dreht oder der Kurs unter EMA 200 schließt (Trendbruch). */
+       Verkauf, wenn RSI von über 70 wieder darunter dreht oder der Kurs unter EMA 200 schließt (Trendbruch).
+     3 Zyklus (nur Bitcoin): Kauf ab dem Tief-Fenster des Halving-Zyklus (ab Tag CYB[0] nach dem Halving), sobald RSI 14 von unter 40
+       wieder darüber dreht; Verkauf nur im Hoch-Fenster (Tag CYT[0] bis CYT[1] + 90), wenn RSI von über 70 wieder darunter dreht –
+       spätestens am Ende des Fensters. Dazwischen halten. Nur zwei vollständige Zyklen in den Daten → Orientierung, kein Beleg.
+     4 Bewertung: Mayer-Multiple (Kurs / Durchschnitt 200 Tage) im Vergleich zu seinen eigenen Werten der letzten bis zu 4 Jahre.
+       Kauf, wenn es zu den tiefsten 10 % gehört und wieder steigt; Verkauf, wenn es zu den höchsten 5 % gehört und wieder fällt.
+       Passt sich an schwächer werdende Zyklen an und gilt für alle Märkte. */
   let showSP = false,
     spM = 2;
-  const SPM = ["Überverkauft", "Trendfolge", "Rücksetzer"];
+  const SPM = ["Überverkauft", "Trendfolge", "Rücksetzer", "Zyklus", "Bewertung"],
+    SPN = SPM.length;
   try {
     showSP = localStorage.getItem("chartwerk:sp") === "1";
     const v = localStorage.getItem("chartwerk:spm");
-    if (v === "0" || v === "1" || v === "2") spM = +v;
+    if (/^[0-4]$/.test(v || "")) spM = +v;
   } catch (e) {}
   function rsiW(cl, n = 14) {
     const o = new Array(cl.length).fill(null);
@@ -5096,8 +5103,48 @@ canvas {
       E50 = emaA(cl, 50),
       E200 = emaA(cl, 200),
       T = [];
-    // gemeinsamer Start für alle drei Regeln (wenn auch EMA 200 steht) – so ist „Halten“ bei allen gleich und der Vergleich fair
-    const ready = (i) => R[i - 1] != null && M.m[i - 1] != null && E200[i] != null && E50[i] != null;
+    // Bewertung: Mayer-Multiple und sein Rang unter den Werten der letzten bis zu 4 Jahre (mind. 1 Jahr)
+    const bpd = 24 / tf.h,
+      nMA = Math.max(5, Math.round(200 * bpd)),
+      nLook = Math.round(1460 * bpd),
+      nMin = Math.round(365 * bpd),
+      MY = new Array(n).fill(null),
+      PCT = new Array(n).fill(null);
+    if (mode === 4) {
+      let sum = 0;
+      for (let i = 0; i < n; i++) {
+        sum += cl[i];
+        if (i >= nMA) sum -= cl[i - nMA];
+        if (i >= nMA - 1) MY[i] = cl[i] / (sum / nMA);
+      }
+      for (let i = 0; i < n; i++) {
+        if (MY[i] == null) continue;
+        let lo = 0,
+          cnt = 0;
+        for (let j = Math.max(0, i - nLook); j < i; j++)
+          if (MY[j] != null) {
+            cnt++;
+            if (MY[j] < MY[i]) lo++;
+          }
+        if (cnt >= nMin) PCT[i] = lo / cnt;
+      }
+    }
+    const isBTC = sym.id === "BTC",
+      cyDay = (t) => {
+        const H = HALV.filter((q) => q[0] <= t).pop();
+        return H ? Math.floor((t - H[0]) / DAY) : null;
+      };
+    // ab wann die Regel rechnen kann; „Halten“ startet je Regel an derselben Kerze wie die Regel (fairer Vergleich je Zeile)
+    const ready = (i) =>
+      mode === 4
+        ? PCT[i] != null && PCT[i - 1] != null
+        : mode === 2
+          ? R[i - 1] != null && E200[i] != null && E50[i] != null
+          : mode === 1
+            ? M.m[i - 1] != null
+            : mode === 3
+              ? isBTC && R[i - 1] != null
+              : R[i - 1] != null;
     let cur = null,
       i0 = null;
     for (let i = 1; i < n; i++) {
@@ -5114,7 +5161,11 @@ canvas {
         else if (mode === 2) {
           if (dnOut(70)) why = "überkauft";
           else if (cl[i] < E200[i]) why = "Trendbruch";
-        }
+        } else if (mode === 3) {
+          const d = cyDay(data[i].t);
+          if (d != null && d >= CYT[0] && d <= CYT[1] + 90 && dnOut(70)) why = "Hoch-Fenster, überkauft";
+          else if (d != null && d > CYT[1] + 90 && d < CYB[0]) why = "Hoch-Fenster vorbei";
+        } else if (mode === 4 && PCT[i] >= 0.95 && MY[i] < MY[i - 1]) why = "Bewertung sehr hoch";
         if (why) {
           cur.x = i;
           cur.why = why;
@@ -5126,7 +5177,11 @@ canvas {
       let buy = false;
       if (mode === 0) buy = upOut(30);
       else if (mode === 1) buy = M.m[i - 1] <= 0 && M.m[i] > 0;
-      else buy = cl[i] > E200[i] && E50[i] > E200[i] && upOut(40);
+      else if (mode === 2) buy = cl[i] > E200[i] && E50[i] > E200[i] && upOut(40);
+      else if (mode === 3) {
+        const d = cyDay(data[i].t);
+        buy = d != null && d >= CYB[0] && upOut(40);
+      } else buy = PCT[i] <= 0.1 && MY[i] > MY[i - 1];
       if (buy) {
         cur = { i, e: cl[i], x: null };
         T.push(cur);
@@ -5169,12 +5224,14 @@ canvas {
       hdd,
       inMkt: n - 1 - st > 0 ? inMkt / (n - 1 - st) : 0,
       from: data[st] ? data[st].t : null,
+      na: mode === 3 && !isBTC ? "nur für Bitcoin" : i0 == null ? "zu wenig Kursdaten für diese Regel" : "",
     };
   }
   function spShort(i) {
     if (!showSP || !IN || !IN.sp) return "";
-    const S = IN.sp,
-      q = S.T.filter((t) => t.i <= i).pop(),
+    const S = IN.sp;
+    if (S.na) return `<span><b style="color:#00bfa5">Spot ${SPM[spM]}</b> <span style="color:var(--mute)">${S.na}</span></span>`;
+    const q = S.T.filter((t) => t.i <= i).pop(),
       open = q && (q.x == null || q.x > i);
     const r = open ? data[i].c / q.e - 1 : null;
     return `<span><b style="color:#00bfa5">Spot ${SPM[spM]}</b> ${
@@ -5187,24 +5244,26 @@ canvas {
     if (!showSP || !IN || !IN.sp) return "";
     const S = IN.sp,
       p1 = (v) => (v >= 0 ? "+" : "") + Math.round(v * 100).toLocaleString("de-DE") + " %";
+    if (S.na) return spShort(i);
     return (
       spShort(i).replace(/<\/span>$/, "") +
       ` <span class="m">· Check: ${S.E.n} Verkäufe · Treffer ${S.E.n ? Math.round((S.E.R.filter((r) => r > 0).length / S.E.n) * 100) : "–"} % · Strategie ${p1(S.res)} gegen Halten ${p1(S.hold)} · ${edgeTxt(S.E)}</span></span>`
     );
   }
-  // Spot-Check: alle drei Regeln für den aktuellen Markt und Zeitrahmen gegen „einfach halten“
+  // Spot-Check: alle Spot-Regeln für den aktuellen Markt und Zeitrahmen gegen „einfach halten“
   function spCheck() {
     const p1 = (v) => (v == null ? "–" : (v >= 0 ? "+" : "") + Math.round(v * 100).toLocaleString("de-DE") + " %"),
       p2 = (v) => (v == null ? "–" : (v >= 0 ? "+" : "") + (v * 100).toLocaleString("de-DE", { maximumFractionDigits: 1 }) + " %"),
       tc = (E) => (!E.n ? "–" : `<span class="${E.n >= EDGE_N && E.t >= EDGE_T ? "up" : E.t < 0 ? "dn" : ""}">${tFmt(E.t)}</span>`),
-      rows = [0, 1, 2].map((m) => [m, spCalc(m)]);
+      rows = SPM.map((_, m) => [m, spCalc(m)]);
     $("#sph").textContent = `Spot-Check · ${sym.name} · ${tf.l}`;
     $("#spt").innerHTML =
       '<table class="cmpt"><tr><th>Regel</th><th>Verkäufe</th><th>Treffer</th><th>Ø je Trade</th><th>Edge</th><th>1. | 2. Hälfte</th><th>Strategie</th><th>Halten</th><th>Im Markt</th><th>Größter Rückgang</th></tr>' +
       rows
-        .map(
-          ([m, S]) =>
-            `<tr data-spm="${m}" style="cursor:pointer${m === spM ? ";background:#1f2a33" : ""}"><td>${m === spM ? "▸ " : ""}${SPM[m]}</td><td>${S.E.n}${S.cur ? ' <span class="m">+1 offen</span>' : ""}</td><td>${S.E.n ? Math.round((S.E.R.filter((r) => r > 0).length / S.E.n) * 100) + " %" : "–"}</td><td class="${S.E.avg == null ? "" : S.E.avg >= 0 ? "up" : "dn"}">${p2(S.E.avg)}</td><td>${edgeTxt(S.E, 1)}</td><td>${tc(S.H1)} | ${tc(S.H2)}</td><td class="${S.res >= S.hold ? "up" : "dn"}"><b>${p1(S.res)}</b></td><td>${p1(S.hold)}</td><td>${Math.round(S.inMkt * 100)} %</td><td>${p1(S.dd)} <span class="m">(Halten ${p1(S.hdd)})</span></td></tr>`,
+        .map(([m, S]) =>
+          S.na
+            ? `<tr data-spm="${m}" style="cursor:pointer${m === spM ? ";background:#1f2a33" : ""}"><td>${m === spM ? "▸ " : ""}${SPM[m]}</td><td colspan="9"><span class="m">${S.na}</span></td></tr>`
+            : `<tr data-spm="${m}" style="cursor:pointer${m === spM ? ";background:#1f2a33" : ""}"><td>${m === spM ? "▸ " : ""}${SPM[m]}</td><td>${S.E.n}${S.cur ? ' <span class="m">+1 offen</span>' : ""}</td><td>${S.E.n ? Math.round((S.E.R.filter((r) => r > 0).length / S.E.n) * 100) + " %" : "–"}</td><td class="${S.E.avg == null ? "" : S.E.avg >= 0 ? "up" : "dn"}">${p2(S.E.avg)}</td><td>${edgeTxt(S.E, 1)}</td><td>${tc(S.H1)} | ${tc(S.H2)}</td><td class="${S.res >= S.hold ? "up" : "dn"}"><b>${p1(S.res)}</b></td><td>${p1(S.hold)}</td><td>${Math.round(S.inMkt * 100)} %</td><td>${p1(S.dd)} <span class="m">(Halten ${p1(S.hdd)})</span></td></tr>`,
         )
         .join("") +
       "</table>";
@@ -6081,7 +6140,7 @@ canvas {
     else if (k === "dv") showDV = !showDV;
     else if (k === "dvs") dvSrc = 1 - dvSrc;
     else if (k === "sp") showSP = !showSP;
-    else if (k === "spm") spM = (spM + 1) % 3;
+    else if (k === "spm") spM = (spM + 1) % SPN;
     indSave();
     if (k === "mcf" || k === "msf" || k === "mc" || k === "msx" || k === "dvs" || k === "sp" || k === "spm") indCalc();
     clampView();
