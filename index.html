@@ -5130,8 +5130,10 @@ canvas {
     // Schwelle für „großer Rutsch“ und „echte Erholung“: 3,5 × Schwankung je Woche der letzten bis zu 2 Jahre, begrenzt auf 12–45 %
     const Dof = (i) => {
       const a = Math.max(1, i - W + 1),
-        m = i - a + 1,
-        mu = (s1[i] - s1[a - 1]) / m,
+        m = i - a + 1;
+      // zu Beginn der Daten (unter 8 Wochen) ist die Schwankung noch nicht messbar → vorsichtig die größte Schwelle
+      if (m < Math.max(8, Math.round(8 * bpw))) return 0.45;
+      const mu = (s1[i] - s1[a - 1]) / m,
         v = Math.max(0, (s2[i] - s2[a - 1]) / m - mu * mu);
       return Math.min(0.45, Math.max(0.12, 3.5 * Math.sqrt(v * bpw)));
     };
@@ -5150,13 +5152,8 @@ canvas {
     for (let i = 1; i < n; i++) {
       const b = data[i],
         c = cl[i];
-      if (i < nW) {
-        if (b.h > H) {
-          H = b.h;
-          hi = i;
-        }
-        continue;
-      }
+      // Fibs werden ab der ersten Kerze gesucht (sonst fehlt z. B. das Tief Feb. 2018 am Datenanfang);
+      // gehandelt wird erst ab nW (siehe ready in spCalc)
       if (ph === 0) {
         if (b.h > H) {
           H = b.h;
