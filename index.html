@@ -1456,6 +1456,7 @@ canvas {
   <button class="chip ic" id="msx" title="Ausstieg: bei Ziel oder Stop / erst beim Gegensignal (Stop bleibt als Notbremse)" style="padding:0 10px">Ausstieg: Ziel/Stop</button>
   <button class="chip ic" id="spb" aria-pressed="false" title="Spot-Strategie nur für eigene Käufe: KAUF möglichst tief, VERKAUF möglichst hoch, keine Shorts">Spot</button>
   <button class="chip ic" id="spm" title="Welche Spot-Regel: Überverkauft (RSI) / Trendfolge (MACD) / Rücksetzer im Aufwärtstrend / Zyklus (nur Bitcoin) / Bewertung (Mayer-Multiple)" style="padding:0 10px">Spot: Rücksetzer</button>
+  <button class="chip ic" id="sps" title="Staffelkauf: 1/3 beim Kaufsignal, 1/3 bei −15 %, 1/3 bei −30 % unter dem ersten Kaufkurs – senkt den Einstandspreis, wenn der Boden noch nicht erreicht ist" style="padding:0 10px">Staffel: aus</button>
   <button class="chip ic" id="spc" title="Alle Spot-Regeln für diesen Markt gegen „einfach halten“ vergleichen" style="padding:0 10px">Spot-Check</button>
   <button class="chip ic" id="dvb" aria-pressed="true" title="Divergenzen: Kurs macht neues Hoch/Tief, RSI bzw. MACD nicht – mögliche Wende (mit Check)">Divergenzen</button>
   <button class="chip ic" id="dvs" title="Divergenzen aus RSI oder MACD" style="padding:0 10px">Div: RSI</button>
@@ -5063,13 +5064,15 @@ canvas {
        Kauf, wenn es zu den tiefsten 10 % gehört und wieder steigt; Verkauf, wenn es zu den höchsten 5 % gehört und wieder fällt.
        Passt sich an schwächer werdende Zyklen an und gilt für alle Märkte. */
   let showSP = false,
-    spM = 2;
+    spM = 2,
+    spS = false; // Staffelkauf
   const SPM = ["Überverkauft", "Trendfolge", "Rücksetzer", "Zyklus", "Bewertung"],
     SPN = SPM.length;
   try {
     showSP = localStorage.getItem("chartwerk:sp") === "1";
     const v = localStorage.getItem("chartwerk:spm");
     if (/^[0-4]$/.test(v || "")) spM = +v;
+    spS = localStorage.getItem("chartwerk:sps") === "1";
   } catch (e) {}
   function rsiW(cl, n = 14) {
     const o = new Array(cl.length).fill(null);
@@ -5187,23 +5190,60 @@ canvas {
         T.push(cur);
       }
     }
-    if (cur) cur.r = cl[n - 1] / cur.e - 1 - 2 * FEE; // offene Position zum aktuellen Kurs (inkl. künftiger Verkaufsgebühr)
-    // Kapitalverlauf: investiert = Kursveränderung, sonst Bargeld. Vergleich: ab derselben Kerze einfach halten.
-    let eq = 1,
+    // Staffelkauf (Schalter): je Signal 1/3 sofort, 1/3 per Limit bei −15 %, 1/3 bei −30 % unter dem ersten Kaufkurs,
+    // solange die Position offen ist. Verkauft wird immer alles. Ohne Staffel: alles beim Signal.
+    const parts = spS ? 3 : 1,
+      lv = [1, 0.85, 0.7];
+    T.forEach((q) => {
+      q.fills = [{ i: q.i, p: q.e }];
+      if (parts > 1) {
+        const end = q.x != null ? q.x : n - 1;
+        for (let k = 1; k < parts; k++) {
+          const L = q.e * lv[k];
+          for (let j = q.i + 1; j <= end; j++)
+            if (data[j].l <= L) {
+              q.fills.push({ i: j, p: Math.min(L, data[j].o) }); // Limit-Kauf; öffnet die Kerze schon tiefer, zum Eröffnungskurs
+              break;
+            }
+        }
+      }
+      // Ø-Einstandspreis bei gleichen Beträgen je Teil
+      q.avg = q.fills.length / q.fills.reduce((a, f) => a + 1 / f.p, 0);
+      q.part = q.fills.length / parts;
+      const px = q.x != null ? cl[q.x] : cl[n - 1];
+      q.r = px / q.avg - 1 - 2 * FEE; // Ergebnis auf den eingesetzten Betrag
+    });
+    // Kapitalverlauf mit Bargeld und Stück: beim Signal wird das Budget in 1 bzw. 3 gleiche Teile geteilt.
+    // Vergleich: ab derselben Kerze einfach halten.
+    let cash = 1,
+      units = 0,
+      slot = 0,
+      eq = 1,
       pk = 1,
       dd = 0,
       inMkt = 0,
       hpk = 1,
       hdd = 0;
-    const st = i0 == null ? n - 1 : i0;
-    for (let i = st + 1; i < n; i++) {
-      const q = T.find((t) => t.i < i && (t.x == null || t.x >= i));
-      if (q) {
-        eq *= cl[i] / cl[i - 1];
-        inMkt++;
-        if (q.i === i - 1) eq *= 1 - FEE;
-        if (q.x === i) eq *= 1 - FEE;
+    const st = i0 == null ? n - 1 : i0,
+      evBuy = {},
+      evSell = {};
+    T.forEach((q) => {
+      q.fills.forEach((f, k) => (evBuy[f.i] = (evBuy[f.i] || []).concat([{ q, f, first: k === 0 }])));
+      if (q.x != null) evSell[q.x] = q;
+    });
+    for (let i = st; i < n; i++) {
+      (evBuy[i] || []).forEach(({ f, first }) => {
+        if (first) slot = cash / parts;
+        const amt = Math.min(slot, cash);
+        units += (amt * (1 - FEE)) / f.p;
+        cash -= amt;
+      });
+      if (evSell[i]) {
+        cash += units * cl[i] * (1 - FEE);
+        units = 0;
       }
+      eq = cash + units * cl[i];
+      if (i > st && units > 0) inMkt++;
       pk = Math.max(pk, eq);
       dd = Math.min(dd, eq / pk - 1);
       const h = cl[i] / cl[st];
@@ -5233,10 +5273,13 @@ canvas {
     if (S.na) return `<span><b style="color:#00bfa5">Spot ${SPM[spM]}</b> <span style="color:var(--mute)">${S.na}</span></span>`;
     const q = S.T.filter((t) => t.i <= i).pop(),
       open = q && (q.x == null || q.x > i);
-    const r = open ? data[i].c / q.e - 1 : null;
+    const fl = open ? q.fills.filter((f) => f.i <= i) : [],
+      avg = open ? fl.length / fl.reduce((a, f) => a + 1 / f.p, 0) : null,
+      r = open ? data[i].c / avg - 1 : null,
+      part = spS && open ? ` ${fl.length}/3 gekauft · Ø ${fmt(avg)}` : "";
     return `<span><b style="color:#00bfa5">Spot ${SPM[spM]}</b> ${
       open
-        ? `<b class="up">investiert</b> seit ${dShort(data[q.i].t)} <b class="${r >= 0 ? "up" : "dn"}">${r >= 0 ? "+" : ""}${(r * 100).toLocaleString("de-DE", { maximumFractionDigits: 1 })} %</b>`
+        ? `<b class="up">investiert</b> seit ${dShort(data[q.i].t)}${part} <b class="${r >= 0 ? "up" : "dn"}">${r >= 0 ? "+" : ""}${(r * 100).toLocaleString("de-DE", { maximumFractionDigits: 1 })} %</b>`
         : '<span style="color:var(--mute)">warten auf Kauf</span>'
     }</span>`;
   }
@@ -5256,7 +5299,7 @@ canvas {
       p2 = (v) => (v == null ? "–" : (v >= 0 ? "+" : "") + (v * 100).toLocaleString("de-DE", { maximumFractionDigits: 1 }) + " %"),
       tc = (E) => (!E.n ? "–" : `<span class="${E.n >= EDGE_N && E.t >= EDGE_T ? "up" : E.t < 0 ? "dn" : ""}">${tFmt(E.t)}</span>`),
       rows = SPM.map((_, m) => [m, spCalc(m)]);
-    $("#sph").textContent = `Spot-Check · ${sym.name} · ${tf.l}`;
+    $("#sph").textContent = `Spot-Check · ${sym.name} · ${tf.l}${spS ? " · Staffelkauf" : ""}`;
     $("#spt").innerHTML =
       // wichtigste Spalten zuerst (Strategie gegen Halten, Rückgang), damit sie auch auf schmalen Bildschirmen ohne Wischen sichtbar sind
       '<table class="cmpt"><tr><th>Regel</th><th>Strategie</th><th>Halten</th><th>Größter Rückgang</th><th>Verkäufe</th><th>Treffer</th><th>Ø je Trade</th><th>Edge</th><th>1. | 2. Hälfte</th><th>Im Markt</th></tr>' +
@@ -5268,7 +5311,7 @@ canvas {
         )
         .join("") +
       "</table>";
-    $("#spn").innerHTML = `<p class="m" style="margin-top:8px">Nur Kaufen und Verkaufen (Spot), keine Shorts, 0,1 % Gebühr je Kauf und Verkauf. „Strategie“ = alle Käufe nacheinander, Gewinne wieder eingesetzt, dazwischen Bargeld; grün, wenn besser als „Halten“ (ab derselben Kerze kaufen und liegen lassen). „Im Markt“ = Anteil der Zeit investiert, „Größter Rückgang“ = tiefster Einbruch vom Höchststand. Eine Regel, die weniger bringt als Halten, kann trotzdem sinnvoll sein, wenn sie den Rückgang deutlich kleiner hält. Edge wie beim Bot (t ≥ ${tFmt(EDGE_T)}, mind. ${EDGE_N} Verkäufe). Zeile antippen = Regel im Chart einstellen. Nur Rückblick – keine Anlageberatung.</p>`;
+    $("#spn").innerHTML = `<p class="m" style="margin-top:8px">Nur Kaufen und Verkaufen (Spot), keine Shorts, 0,1 % Gebühr je Kauf und Verkauf. „Strategie“ = alle Käufe nacheinander, Gewinne wieder eingesetzt, dazwischen Bargeld; grün, wenn besser als „Halten“ (ab derselben Kerze kaufen und liegen lassen). „Im Markt“ = Anteil der Zeit investiert, „Größter Rückgang“ = tiefster Einbruch vom Höchststand. Eine Regel, die weniger bringt als Halten, kann trotzdem sinnvoll sein, wenn sie den Rückgang deutlich kleiner hält. ${spS ? "Staffelkauf an: 1/3 beim Signal, je 1/3 per Limit bei −15 % und −30 % unter dem ersten Kaufkurs; „Ø je Trade“ bezieht sich auf den Ø-Einstandspreis, „Strategie“ auf das ganze Budget (nicht gekaufte Teile bleiben Bargeld)." : "Mit „Staffel“ lässt sich vergleichen, ob Kaufen in drei Teilen besser gewesen wäre."} Edge wie beim Bot (t ≥ ${tFmt(EDGE_T)}, mind. ${EDGE_N} Verkäufe). Zeile antippen = Regel im Chart einstellen. Nur Rückblick – keine Anlageberatung.</p>`;
     $("#spp").classList.add("on");
   }
   function indSave() {
@@ -5283,6 +5326,7 @@ canvas {
       localStorage.setItem("chartwerk:dvs", String(dvSrc));
       localStorage.setItem("chartwerk:sp", showSP ? "1" : "0");
       localStorage.setItem("chartwerk:spm", String(spM));
+      localStorage.setItem("chartwerk:sps", spS ? "1" : "0");
     } catch (e) {}
   }
   const RSI_N = 14,
@@ -6120,7 +6164,9 @@ canvas {
     $("#dvs").textContent = "Div: " + (dvSrc ? "MACD" : "RSI");
     $("#cmpb").style.display = showMS || showDV ? "" : "none";
     $("#spb").setAttribute("aria-pressed", showSP);
-    $("#spm").style.display = $("#spc").style.display = showSP ? "" : "none";
+    $("#spm").style.display = $("#spc").style.display = $("#sps").style.display = showSP ? "" : "none";
+    $("#sps").textContent = "Staffel: " + (spS ? "1/3 · −15 % · −30 %" : "aus");
+    $("#sps").setAttribute("aria-pressed", spS);
     $("#spm").textContent = "Spot: " + SPM[spM];
     $("#msf").style.display = showMS ? "" : "none";
     $("#msf").textContent = "Signale: " + MSF[msF];
@@ -6142,8 +6188,9 @@ canvas {
     else if (k === "dvs") dvSrc = 1 - dvSrc;
     else if (k === "sp") showSP = !showSP;
     else if (k === "spm") spM = (spM + 1) % SPN;
+    else if (k === "sps") spS = !spS;
     indSave();
-    if (k === "mcf" || k === "msf" || k === "mc" || k === "msx" || k === "dvs" || k === "sp" || k === "spm") indCalc();
+    if (k === "mcf" || k === "msf" || k === "mc" || k === "msx" || k === "dvs" || k === "sp" || k === "spm" || k === "sps") indCalc();
     clampView();
     ui();
     draw();
@@ -6158,6 +6205,10 @@ canvas {
   $("#dvs").onclick = () => indTog("dvs");
   $("#spb").onclick = () => indTog("sp");
   $("#spm").onclick = () => indTog("spm");
+  $("#sps").onclick = () => {
+    indTog("sps");
+    if ($("#spp").classList.contains("on")) spCheck();
+  };
   $("#spc").onclick = () => spCheck();
   $("#spok").onclick = () => $("#spp").classList.remove("on");
   $("#spt").addEventListener("click", (e) => {
@@ -6215,7 +6266,11 @@ canvas {
     const L = [];
     IN.sp.T.forEach((q) => {
       if (q.i >= i0 && q.i <= i1)
-        L.push({ x: x(q.i), ay: y(data[q.i].l), below: true, t: "KAUF", bg: "rgba(0,150,136,.95)", arrow: "#00bfa5", f: 10, h: 16, gap: 16 });
+        L.push({ x: x(q.i), ay: y(data[q.i].l), below: true, t: spS ? "KAUF 1/3" : "KAUF", bg: "rgba(0,150,136,.95)", arrow: "#00bfa5", f: 10, h: 16, gap: 16 });
+      (q.fills || []).slice(1).forEach((f, k) => {
+        if (f.i >= i0 && f.i <= i1)
+          L.push({ x: x(f.i), ay: y(data[f.i].l), below: true, t: `NACHKAUF ${k + 2}/3`, bg: "rgba(0,121,107,.95)", arrow: "#00bfa5", f: 9, h: 15, gap: 15 });
+      });
       if (q.x != null && q.x >= i0 && q.x <= i1)
         L.push({
           x: x(q.x),
