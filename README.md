@@ -82,6 +82,11 @@ Knopf **„Spot“** (für eigene Käufe, keine Shorts) zeigt KAUF- und VERKAUF-
 - **Bewertung:** Mayer-Multiple (Kurs ÷ Durchschnitt 200 Tage) im Vergleich zu seinen eigenen Werten der letzten bis zu 4 Jahre:
   Kauf, wenn es zu den tiefsten 10 % gehört und wieder steigt; Verkauf bei den höchsten 5 %, wenn es wieder fällt. Passt sich an
   schwächer werdende Zyklen an, für alle Märkte (am besten Tag oder Woche).
+- **★ Fib (eigene Strategie):** die eigene Fib-Methode des Nutzers als Regel. Fib vom Zyklus-Hoch zum ersten großen Tief danach
+  (gestrichelt im Chart: Fib 0, Fib 1, 0,65 von unten, 1,236). Verkauf, wenn die erste Erholung unter der 0,65 scheitert oder ein
+  Schluss unter der 1,236 den Fib bricht; Kauf, wenn der Kurs nach einem Rutsch unter das erste Tief wieder darüber schließt
+  (KAUF · Boden) oder 4 Wochen über der 0,65 schließt (KAUF · bestätigt). Hoch und Tief sucht ein Zickzack ohne Blick in die Zukunft,
+  Schwelle 3,5 × Wochen-Schwankung (12–45 %) – er kann andere Punkte wählen als von Hand gezogen. Am besten im Wochenchart.
 
 **„Staffel“** (Schalter, gilt für alle Spot-Regeln): beim Kaufsignal nur 1/3 kaufen, je 1/3 per Limit bei −15 % und −30 % unter dem
 ersten Kaufkurs nachkaufen (Schild NACHKAUF), verkauft wird alles. Dritte Stufe „Rest bei +10 %“: nicht gekaufte Teile werden
