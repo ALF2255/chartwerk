@@ -97,7 +97,7 @@ Knopf **„Spot“** (für eigene Käufe, keine Shorts) zeigt KAUF- und VERKAUF-
   Schalter „Fibs: Zickzack / meine“: statt des Zickzacks rechnet die Regel mit den selbst gezogenen Fibonacci-Zeichnungen dieses
   Marktes (Hoch vor Tief); jeder gilt ab der Kerze nach seinem Tief. Im Rückblick geschönt (nachträglich gezogen), für den aktuellen
   Plan aber genau richtig. Der Zickzack verlangt nach dem ersten Tief eine Erholung von mindestens 15 % (Gold 2026: 3.944 statt 4.404).
-  Schalter „Fib-Stopp: 3 Wochen / 1 Woche“ (Standard 3 Wochen): verkauft wird erst nach drei Wochenschlüssen in Folge unter der 1,236 –
+  Schalter „Fib-Stopp: 1 / 2 / 3 Wochen“ (Standard 3 Wochen): verkauft wird erst nach so vielen Wochenschlüssen in Folge unter der 1,236 –
   ein knapper einzelner Schluss darunter ist oft nur ein Test der Marke (Gold Nov. 2026: 3.533 unter 3.554, Woche darauf 3.654).
 
 **„Staffel“** (Schalter, gilt für alle Spot-Regeln): beim Kaufsignal nur 1/3 kaufen, je 1/3 per Limit bei −15 % und −30 % unter dem
