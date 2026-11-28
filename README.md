@@ -175,6 +175,8 @@ Im Vollbild ist die Knopfleiste ausgeblendet. Oben im Chart neben Instrument und
 4. Auf dem zweiten Gerät denselben Schlüssel eintragen. Ab dann gleicht die App automatisch ab.
 
 Der Schlüssel bleibt nur auf deinen Geräten. Die Zeichnungen liegen in einem geheimen Gist in deinem GitHub-Konto.
+Abgeglichen werden Zeichnungen, Layouts und Einstellungen – auch RSI/MACD/Signale, die Spot-Regel mit allen Schaltern
+(Staffel, Fibs, Fib-Größe, Stopp-Linie, Fib-Stopp, Fib-Boden) und „für alle Märkte gleich“. Es gilt jeweils die zuletzt geänderte Einstellung.
 
 ## Silber
 

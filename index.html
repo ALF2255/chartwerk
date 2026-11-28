@@ -1682,8 +1682,10 @@ canvas {
 <script>
 {
   const $ = (s) => document.querySelector(s);
+  // Einstellungen, die beim Abgleich zwischen Geräten mitgehen (Schlüssel „chartwerk:…“)
+  const SYNC_IND = ["rsi", "mc", "ms", "mcf", "msf", "msx", "dv", "dvs", "sp", "spm", "sps", "spf", "spq", "spxn", "spz", "spsl", "allsame"];
   // Version: bei jeder Änderung zusammen mit dem Cache-Namen in sw.js („chartwerk-vNN“) hochzählen
-  const VERSION = 36,
+  const VERSION = 37,
     VDATE = "28.11.2026";
   const SYMS = [
     { id: "BTC", name: "Bitcoin", pair: "BTC/USD", p: 95000, v: 0.03, m: 0, bn: "BTCUSDT" },
@@ -5559,6 +5561,35 @@ canvas {
       localStorage.setItem("chartwerk:spxn", String(spXN));
       localStorage.setItem("chartwerk:spz", spZ ? "1" : "0");
       localStorage.setItem("chartwerk:spsl", spSL ? "1" : "0");
+      // Indikator-/Spot-Einstellungen werden mit abgeglichen (Handy ↔ Tablet ↔ PC)
+      localStorage.setItem("chartwerk:us", Date.now());
+    } catch (e) {}
+    try {
+      queueSync();
+    } catch (e) {}
+  }
+  // beim Abgleich übernommene Einstellungen neu einlesen
+  function indLoad() {
+    try {
+      const g = (k) => localStorage.getItem("chartwerk:" + k);
+      msF = [0, 1, 2].includes(+g("msf")) ? +g("msf") : 0;
+      msX = g("msx") === "1" ? 1 : 0;
+      showRSI = g("rsi") !== "0";
+      showMC = g("mc") !== "0";
+      showMS = g("ms") !== "0";
+      mcUp = g("mcf") === "1";
+      showDV = g("dv") !== "0";
+      dvSrc = g("dvs") === "1" ? 1 : 0;
+      showSP = g("sp") === "1";
+      if (/^[0-5]$/.test(g("spm") || "")) spM = +g("spm");
+      spS = Math.max(0, Math.min(2, +g("sps") || 0));
+      spF = g("spf") === "1";
+      spQ = g("spq") === "1";
+      spXN = /^[1-4]$/.test(g("spxn") || "") ? +g("spxn") : 3;
+      spZ = g("spz") === "1";
+      spSL = g("spsl") === "1";
+      allSame = g("allsame") === "1";
+      $("#lyall").checked = allSame;
     } catch (e) {}
   }
   const RSI_N = 14,
@@ -7498,6 +7529,10 @@ canvas {
     allSame = e.target.checked;
     try {
       localStorage.setItem("chartwerk:allsame", allSame ? "1" : "0");
+      localStorage.setItem("chartwerk:us", Date.now());
+    } catch (x) {}
+    try {
+      queueSync();
     } catch (x) {}
     if (allSame) {
       SYMS.forEach((q) => layPut(q.id));
@@ -9538,6 +9573,7 @@ canvas {
         lockAll,
         zz: zzo,
         tpl: { fib: tplGet("fib"), chan: tplGet("chan"), fan: tplGet("fan") },
+        ind: Object.fromEntries(SYNC_IND.map((k) => [k, lsGet("chartwerk:" + k)]).filter(([, v]) => v != null)),
       },
     };
   }
@@ -9583,6 +9619,18 @@ canvas {
   }
   function applySettings(rs) {
     try {
+      // Indikatoren & Spot-Einstellungen (RSI, MACD, Spot-Regel, Staffel, Fib-Schalter, „für alle Märkte gleich“)
+      if (rs.ind && typeof rs.ind === "object") {
+        SYNC_IND.forEach((k) => {
+          if (typeof rs.ind[k] === "string") localStorage.setItem("chartwerk:" + k, rs.ind[k]);
+        });
+        indLoad();
+        try {
+          indCalc();
+          ui();
+          draw();
+        } catch (e) {}
+      }
       if (rs.tpl && typeof rs.tpl === "object")
         ["fib", "chan", "fan"].forEach((k) => {
           if (Array.isArray(rs.tpl[k])) localStorage.setItem("chartwerk:tpl:" + k, JSON.stringify(rs.tpl[k]));
