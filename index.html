@@ -1467,6 +1467,7 @@ canvas {
   <button class="chip ic" id="spm" title="Welche Spot-Regel: Überverkauft (RSI) / Trendfolge (MACD) / Rücksetzer im Aufwärtstrend / Zyklus (nur Bitcoin) / Bewertung (Mayer-Multiple) / ★ Fib (deine eigene Methode)" style="padding:0 10px">Spot: Rücksetzer</button>
   <button class="chip ic" id="sps" title="Staffelkauf: aus / 1/3 beim Kaufsignal, 1/3 bei −15 %, 1/3 bei −30 % unter dem ersten Kaufkurs / zusätzlich Rest kaufen, wenn der Kurs 10 % über dem ersten Kauf schließt" style="padding:0 10px">Staffel: aus</button>
   <button class="chip ic" id="spq" title="Nur für ★ Fib (eigene): Fibs vom Zickzack suchen lassen oder deine selbst gezogenen Fibonacci-Zeichnungen (Hoch → Tief) nehmen" style="padding:0 10px">Fibs: Zickzack</button>
+  <button class="chip ic" id="spx" title="Nur für ★ Fib (eigene): verkaufen schon nach 1 Wochenschluss unter der 1,236 oder erst nach 2 in Folge" style="padding:0 10px">Fib-Stopp: 2 Wochen</button>
   <button class="chip ic" id="spf" title="Nur für ★ Fib (eigene): KAUF · Boden nur, wenn der Kurs auch über der 200-Tage-Linie schließt" style="padding:0 10px">Fib-Boden: ohne 200 T</button>
   <button class="chip ic" id="spc" title="Alle Spot-Regeln für diesen Markt gegen „einfach halten“ vergleichen" style="padding:0 10px">Spot-Check</button>
   <button class="chip ic" id="dvb" aria-pressed="true" title="Divergenzen: Kurs macht neues Hoch/Tief, RSI bzw. MACD nicht – mögliche Wende (mit Check)">Divergenzen</button>
@@ -5100,6 +5101,7 @@ canvas {
        Zickzack ohne Blick in die Zukunft; seine Schwelle richtet sich nach der Schwankung des Marktes (3,5 × Wochen-Schwankung, 12–45 %). */
   let showSP = false,
     spM = 2,
+    spX2 = true, // Fib-Regel: Stopp erst nach 2 Wochenschlüssen unter der 1,236 (false: schon nach 1)
     spQ = false, // Fib-Regel: Quelle der Fibs – false Zickzack, true selbst gezogene Fibs
     spF = false, // Fib-Regel: Boden-Kauf zusätzlich nur über der 200-Tage-Linie
     spS = 0; // Staffelkauf: 0 aus, 1 Limits −15/−30 %, 2 zusätzlich Rest kaufen, wenn der Kurs 10 % über dem ersten Kauf schließt
@@ -5113,6 +5115,7 @@ canvas {
     spS = Math.max(0, Math.min(2, +localStorage.getItem("chartwerk:sps") || 0));
     spF = localStorage.getItem("chartwerk:spf") === "1";
     spQ = localStorage.getItem("chartwerk:spq") === "1";
+    spX2 = localStorage.getItem("chartwerk:spx2") !== "0";
   } catch (e) {}
   function rsiW(cl, n = 14) {
     const o = new Array(cl.length).fill(null);
@@ -5147,6 +5150,7 @@ canvas {
       W = Math.max(10, Math.round(104 * bpw)),
       nW = Math.max(5, Math.round(26 * bpw)),
       hold = Math.max(1, Math.round(4 * bpw)),
+      brk2 = Math.max(2, Math.round(2 * bpw)),
       s1 = [0],
       s2 = [0];
     for (let i = 1; i < n; i++) {
@@ -5173,7 +5177,10 @@ canvas {
       const b = data[i],
         c = cl[i];
       st.RH = Math.max(st.RH, b.h);
-      if (c < f.x) sell[i] = "1,236 gebrochen";
+      // Bruch der 1,236: je nach Schalter schon 1 Wochenschluss darunter oder erst 2 Wochenschlüsse in Folge
+      // (der Kurs testet die Marke oft zweimal – ein knapper einzelner Schluss darunter ist häufig ein Fehlsignal)
+      st.xb = c < f.x ? (st.xb || 0) + 1 : 0;
+      if (st.xb >= (spX2 ? brk2 : 1)) sell[i] = spX2 ? "1,236 zweimal gebrochen" : "1,236 gebrochen";
       else if (!st.below && st.RH < f.k && c <= st.RH * (1 - f.D / 2)) sell[i] = "Erholung unter 0,65 gescheitert";
       const ok = (j) => cl[j] >= f.L && (!spF || (ma200[j] != null && cl[j] >= ma200[j]));
       if (c < f.L) st.below = true;
@@ -5474,7 +5481,7 @@ canvas {
       p2 = (v) => (v == null ? "–" : (v >= 0 ? "+" : "") + (v * 100).toLocaleString("de-DE", { maximumFractionDigits: 1 }) + " %"),
       tc = (E) => (!E.n ? "–" : `<span class="${E.n >= EDGE_N && E.t >= EDGE_T ? "up" : E.t < 0 ? "dn" : ""}">${tFmt(E.t)}</span>`),
       rows = SPM.map((_, m) => [m, spCalc(m)]);
-    $("#sph").textContent = `Spot-Check · ${sym.name} · ${tf.l}${spS ? " · Staffelkauf" + (spS === 2 ? " + Rest bei +10 %" : "") : ""}${spF ? " · Fib-Boden nur über 200 T" : ""}${spQ ? " · meine Fibs" : ""}`;
+    $("#sph").textContent = `Spot-Check · ${sym.name} · ${tf.l}${spS ? " · Staffelkauf" + (spS === 2 ? " + Rest bei +10 %" : "") : ""}${spF ? " · Fib-Boden nur über 200 T" : ""}${spQ ? " · meine Fibs" : ""}${spX2 ? " · Fib-Stopp 2 Wochen" : " · Fib-Stopp 1 Woche"}`;
     $("#spt").innerHTML =
       // wichtigste Spalten zuerst (Strategie gegen Halten, Rückgang), damit sie auch auf schmalen Bildschirmen ohne Wischen sichtbar sind
       '<table class="cmpt"><tr><th>Regel</th><th>Strategie</th><th>Halten</th><th>Größter Rückgang</th><th>Verkäufe</th><th>Treffer</th><th>Ø je Trade</th><th>Edge</th><th>1. | 2. Hälfte</th><th>Im Markt</th></tr>' +
@@ -5486,7 +5493,7 @@ canvas {
         )
         .join("") +
       "</table>";
-    $("#spn").innerHTML = `<p class="m" style="margin-top:8px">Nur Kaufen und Verkaufen (Spot), keine Shorts, 0,1 % Gebühr je Kauf und Verkauf. „Strategie“ = alle Käufe nacheinander, Gewinne wieder eingesetzt, dazwischen Bargeld; grün, wenn besser als „Halten“ (ab derselben Kerze kaufen und liegen lassen). „Im Markt“ = Anteil der Zeit investiert, „Größter Rückgang“ = tiefster Einbruch vom Höchststand. Eine Regel, die weniger bringt als Halten, kann trotzdem sinnvoll sein, wenn sie den Rückgang deutlich kleiner hält. ${spS ? `Staffelkauf an: 1/3 beim Signal, je 1/3 per Limit bei −15 % und −30 % unter dem ersten Kaufkurs${spS === 2 ? ", nicht gekaufte Teile werden gekauft, sobald der Kurs 10 % über dem ersten Kauf schließt" : ""}; „Ø je Trade“ bezieht sich auf den Ø-Einstandspreis, „Strategie“ auf das ganze Budget (nicht gekaufte Teile bleiben Bargeld).` : "Mit „Staffel“ lässt sich vergleichen, ob Kaufen in drei Teilen besser gewesen wäre."} Edge wie beim Bot (t ≥ ${tFmt(EDGE_T)}, mind. ${EDGE_N} Verkäufe). <b>★ Fib (eigene)</b> ist deine eigene Methode, als Regel nachgebaut: Fib vom Zyklus-Hoch zum ersten großen Tief; Verkauf, wenn die erste Erholung unter der 0,65 (von unten) scheitert oder ein Schluss unter der 1,236 den Fib bricht; Kauf, wenn der Kurs nach einem Rutsch unter das erste Tief wieder darüber schließt (Boden) oder 4 Wochen über der 0,65 schließt (bestätigt)${spF ? "; Schalter an: Boden-Kauf erst, wenn der Kurs auch über der 200-Tage-Linie schließt" : ""}. ${spQ ? "Fibs: deine eigenen Fibonacci-Zeichnungen in diesem Markt, bei denen das Hoch vor dem Tief liegt; jeder gilt ab der Kerze nach seinem Tief. Achtung: im Rückblick geschönt, weil die Fibs nachträglich gezogen wurden – aussagekräftig ist das vor allem für den aktuellen Plan." : "Hoch und Tief sucht ein Zickzack ohne Blick in die Zukunft – es kann andere Punkte wählen als dein Auge (Schalter „Fibs: meine“ nimmt deine gezogenen Fibs); am besten im Wochenchart prüfen."} Zeile antippen = Regel im Chart einstellen. Nur Rückblick – keine Anlageberatung.</p>`;
+    $("#spn").innerHTML = `<p class="m" style="margin-top:8px">Nur Kaufen und Verkaufen (Spot), keine Shorts, 0,1 % Gebühr je Kauf und Verkauf. „Strategie“ = alle Käufe nacheinander, Gewinne wieder eingesetzt, dazwischen Bargeld; grün, wenn besser als „Halten“ (ab derselben Kerze kaufen und liegen lassen). „Im Markt“ = Anteil der Zeit investiert, „Größter Rückgang“ = tiefster Einbruch vom Höchststand. Eine Regel, die weniger bringt als Halten, kann trotzdem sinnvoll sein, wenn sie den Rückgang deutlich kleiner hält. ${spS ? `Staffelkauf an: 1/3 beim Signal, je 1/3 per Limit bei −15 % und −30 % unter dem ersten Kaufkurs${spS === 2 ? ", nicht gekaufte Teile werden gekauft, sobald der Kurs 10 % über dem ersten Kauf schließt" : ""}; „Ø je Trade“ bezieht sich auf den Ø-Einstandspreis, „Strategie“ auf das ganze Budget (nicht gekaufte Teile bleiben Bargeld).` : "Mit „Staffel“ lässt sich vergleichen, ob Kaufen in drei Teilen besser gewesen wäre."} Edge wie beim Bot (t ≥ ${tFmt(EDGE_T)}, mind. ${EDGE_N} Verkäufe). <b>★ Fib (eigene)</b> ist deine eigene Methode, als Regel nachgebaut: Fib vom Zyklus-Hoch zum ersten großen Tief; Verkauf, wenn die erste Erholung unter der 0,65 (von unten) scheitert oder ${spX2 ? "zwei Wochenschlüsse in Folge" : "ein Wochenschluss"} unter der 1,236 den Fib brechen; Kauf, wenn der Kurs nach einem Rutsch unter das erste Tief wieder darüber schließt (Boden) oder 4 Wochen über der 0,65 schließt (bestätigt)${spF ? "; Schalter an: Boden-Kauf erst, wenn der Kurs auch über der 200-Tage-Linie schließt" : ""}. ${spQ ? "Fibs: deine eigenen Fibonacci-Zeichnungen in diesem Markt, bei denen das Hoch vor dem Tief liegt; jeder gilt ab der Kerze nach seinem Tief. Achtung: im Rückblick geschönt, weil die Fibs nachträglich gezogen wurden – aussagekräftig ist das vor allem für den aktuellen Plan." : "Hoch und Tief sucht ein Zickzack ohne Blick in die Zukunft – es kann andere Punkte wählen als dein Auge (Schalter „Fibs: meine“ nimmt deine gezogenen Fibs); am besten im Wochenchart prüfen."} Zeile antippen = Regel im Chart einstellen. Nur Rückblick – keine Anlageberatung.</p>`;
     $("#spp").classList.add("on");
   }
   function indSave() {
@@ -5504,6 +5511,7 @@ canvas {
       localStorage.setItem("chartwerk:sps", String(spS));
       localStorage.setItem("chartwerk:spf", spF ? "1" : "0");
       localStorage.setItem("chartwerk:spq", spQ ? "1" : "0");
+      localStorage.setItem("chartwerk:spx2", spX2 ? "1" : "0");
     } catch (e) {}
   }
   const RSI_N = 14,
@@ -6344,7 +6352,9 @@ canvas {
     $("#spm").style.display = $("#spc").style.display = $("#sps").style.display = showSP ? "" : "none";
     $("#sps").textContent = "Staffel: " + ["aus", "1/3 · −15 % · −30 %", "1/3 · −15 % · −30 % · Rest bei +10 %"][spS];
     $("#sps").setAttribute("aria-pressed", spS > 0);
-    $("#spf").style.display = $("#spq").style.display = showSP && spM === SPOWN ? "" : "none";
+    $("#spf").style.display = $("#spq").style.display = $("#spx").style.display = showSP && spM === SPOWN ? "" : "none";
+    $("#spx").textContent = "Fib-Stopp: " + (spX2 ? "2 Wochen" : "1 Woche");
+    $("#spx").setAttribute("aria-pressed", spX2);
     $("#spq").textContent = "Fibs: " + (spQ ? "meine" : "Zickzack");
     $("#spq").setAttribute("aria-pressed", spQ);
     $("#spf").textContent = "Fib-Boden: " + (spF ? "nur über 200 T" : "ohne 200 T");
@@ -6373,8 +6383,9 @@ canvas {
     else if (k === "sps") spS = (spS + 1) % 3;
     else if (k === "spf") spF = !spF;
     else if (k === "spq") spQ = !spQ;
+    else if (k === "spx") spX2 = !spX2;
     indSave();
-    if (k === "mcf" || k === "msf" || k === "mc" || k === "msx" || k === "dvs" || k === "sp" || k === "spm" || k === "sps" || k === "spf" || k === "spq") indCalc();
+    if (k === "mcf" || k === "msf" || k === "mc" || k === "msx" || k === "dvs" || k === "sp" || k === "spm" || k === "sps" || k === "spf" || k === "spq" || k === "spx") indCalc();
     clampView();
     ui();
     draw();
@@ -6391,6 +6402,10 @@ canvas {
   $("#spm").onclick = () => indTog("spm");
   $("#sps").onclick = () => {
     indTog("sps");
+    if ($("#spp").classList.contains("on")) spCheck();
+  };
+  $("#spx").onclick = () => {
+    indTog("spx");
     if ($("#spp").classList.contains("on")) spCheck();
   };
   $("#spq").onclick = () => {
