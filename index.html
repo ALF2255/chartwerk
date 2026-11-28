@@ -3477,9 +3477,12 @@ canvas {
       f = s / p;
     return (f < 1.5 ? 1 : f < 3 ? 2 : f < 7 ? 5 : 10) * p;
   }
-  function tlabel(t) {
+  function tlabel(t, gapH = 0) {
     const d = new Date(t);
     if (tf.id === "1M") return d.toLocaleDateString("de-DE", { month: "short", year: "2-digit", timeZone: "UTC" });
+    // liegen die Beschriftungen Monate auseinander (weit herausgezoomt), Monat + Jahr statt Tag + Monat –
+    // sonst wirkt die Achse ohne Jahr wie rückwärts laufend (z. B. „2. Juli, 24. Juni, …“ im Jahresabstand)
+    if (tf.h >= 24 && gapH >= 24 * 90) return d.toLocaleDateString("de-DE", { month: "short", year: "2-digit" });
     if (tf.h >= 24) return d.toLocaleDateString("de-DE", { day: "numeric", month: "short" });
     return d.getHours() < tf.h
       ? d.toLocaleDateString("de-DE", { day: "2-digit", month: "2-digit" })
@@ -3969,7 +3972,7 @@ canvas {
       seg(xx, TOP - 24, xx, H - BX);
       if (xx > 30 && xx < w - 30) {
         ctx.fillStyle = MUTE;
-        ctx.fillText(tlabel(data[i].t), xx, H - 8);
+        ctx.fillText(tlabel(data[i].t, ev * tf.h * (sym.m && tf.h < 168 ? 7 / 5 : 1)), xx, H - 8);
       }
     }
     ctx.strokeStyle = "#2a333a";
@@ -5441,7 +5444,7 @@ canvas {
       rows
         .map(([m, S]) =>
           S.na
-            ? `<tr data-spm="${m}" style="cursor:pointer${m === spM ? ";background:#1f2a33" : ""}"><td>${m === spM ? "▸ " : ""}${SPM[m]}${m === SPOWN ? ' <span class="own">★ eigene Strategie</span>' : ""}</td><td colspan="9"><span class="m">${S.na}</span></td></tr>`
+            ? `<tr data-spm="${m}" style="cursor:pointer${m === spM ? ";background:#1f2a33" : ""}"><td>${m === spM ? "▸ " : ""}${SPM[m]}${m === SPOWN ? ' <span class="own">★ eigene Strategie</span>' : ""}</td><td colspan="9" style="text-align:left"><span class="m">${S.na}</span></td></tr>`
             : `<tr data-spm="${m}" style="cursor:pointer${m === spM ? ";background:#1f2a33" : ""}"><td>${m === spM ? "▸ " : ""}${SPM[m]}${m === SPOWN ? ' <span class="own">★ eigene Strategie</span>' : ""}</td><td class="${S.res >= S.hold ? "up" : "dn"}"><b>${p1(S.res)}</b></td><td>${p1(S.hold)}</td><td>${p1(S.dd)} <span class="m">(Halten ${p1(S.hdd)})</span></td><td>${S.E.n}${S.cur ? ' <span class="m">+1 offen</span>' : ""}</td><td>${S.E.n ? Math.round((S.E.R.filter((r) => r > 0).length / S.E.n) * 100) + " %" : "–"}</td><td class="${S.E.avg == null ? "" : S.E.avg >= 0 ? "up" : "dn"}">${p2(S.E.avg)}</td><td>${edgeTxt(S.E, 1)}</td><td>${tc(S.H1)} | ${tc(S.H2)}</td><td>${Math.round(S.inMkt * 100)} %</td></tr>`,
         )
         .join("") +
