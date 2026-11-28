@@ -94,6 +94,9 @@ Knopf **„Spot“** (für eigene Käufe, keine Shorts) zeigt KAUF- und VERKAUF-
   (KAUF · Boden) oder 4 Wochen über der 0,65 schließt (KAUF · bestätigt). Hoch und Tief sucht ein Zickzack ohne Blick in die Zukunft,
   Schwelle 3,5 × Wochen-Schwankung (12–45 %) – er kann andere Punkte wählen als von Hand gezogen. Am besten im Wochenchart.
   Schalter „Fib-Boden: nur über 200 T“: der Boden-Kauf zählt erst, wenn der Kurs zusätzlich über der 200-Tage-Linie schließt.
+  Schalter „Fibs: Zickzack / meine“: statt des Zickzacks rechnet die Regel mit den selbst gezogenen Fibonacci-Zeichnungen dieses
+  Marktes (Hoch vor Tief); jeder gilt ab der Kerze nach seinem Tief. Im Rückblick geschönt (nachträglich gezogen), für den aktuellen
+  Plan aber genau richtig. Der Zickzack verlangt nach dem ersten Tief eine Erholung von mindestens 15 % (Gold 2026: 3.944 statt 4.404).
 
 **„Staffel“** (Schalter, gilt für alle Spot-Regeln): beim Kaufsignal nur 1/3 kaufen, je 1/3 per Limit bei −15 % und −30 % unter dem
 ersten Kaufkurs nachkaufen (Schild NACHKAUF), verkauft wird alles. Dritte Stufe „Rest bei +10 %“: nicht gekaufte Teile werden
