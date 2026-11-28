@@ -176,7 +176,8 @@ Im Vollbild ist die Knopfleiste ausgeblendet. Oben im Chart neben Instrument und
 
 Der Schlüssel bleibt nur auf deinen Geräten. Die Zeichnungen liegen in einem geheimen Gist in deinem GitHub-Konto.
 Abgeglichen werden Zeichnungen, Layouts und Einstellungen – auch RSI/MACD/Signale, die Spot-Regel mit allen Schaltern
-(Staffel, Fibs, Fib-Größe, Stopp-Linie, Fib-Stopp, Fib-Boden) und „für alle Märkte gleich“. Es gilt jeweils die zuletzt geänderte Einstellung.
+(Staffel, Fibs, Fib-Größe, Stopp-Linie, Fib-Stopp, Fib-Boden), die übrigen Indikator-Schalter (EMA, Zonen, Trend, Szenarien,
+Prognose, Marktwetten, Liquidationen, Hoch/Tief-Wetten, Gaps, Zyklus), die eigene EMA-Strategie je Markt und „für alle Märkte gleich“. Es gilt jeweils die zuletzt geänderte Einstellung.
 
 ## Silber
 

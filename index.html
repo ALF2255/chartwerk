@@ -1683,9 +1683,22 @@ canvas {
 {
   const $ = (s) => document.querySelector(s);
   // Einstellungen, die beim Abgleich zwischen Geräten mitgehen (Schlüssel „chartwerk:…“)
-  const SYNC_IND = ["rsi", "mc", "ms", "mcf", "msf", "msx", "dv", "dvs", "sp", "spm", "sps", "spf", "spq", "spxn", "spz", "spsl", "allsame"];
+  const SYNC_IND = ["rsi", "mc", "ms", "mcf", "msf", "msx", "dv", "dvs", "sp", "spm", "sps", "spf", "spq", "spxn", "spz", "spsl", "allsame",
+    "ema", "zn", "tr", "sc", "pg", "mw", "lq", "ht", "gp", "cy", "gpw", "gpmin", "ssk"];
+  // dazu je Markt die eigene EMA-Strategie („EMA-Strategie einstellen und optimieren“)
+  const syncKeys = () => SYNC_IND.concat(SYMS.map((s) => "emap:" + s.id));
+  const indSnap = () => {
+    const o = {};
+    syncKeys().forEach((k) => {
+      try {
+        const v = localStorage.getItem("chartwerk:" + k);
+        if (v != null) o[k] = v;
+      } catch (e) {}
+    });
+    return o;
+  };
   // Version: bei jeder Änderung zusammen mit dem Cache-Namen in sw.js („chartwerk-vNN“) hochzählen
-  const VERSION = 37,
+  const VERSION = 38,
     VDATE = "28.11.2026";
   const SYMS = [
     { id: "BTC", name: "Bitcoin", pair: "BTC/USD", p: 95000, v: 0.03, m: 0, bn: "BTCUSDT" },
@@ -9573,7 +9586,7 @@ canvas {
         lockAll,
         zz: zzo,
         tpl: { fib: tplGet("fib"), chan: tplGet("chan"), fan: tplGet("fan") },
-        ind: Object.fromEntries(SYNC_IND.map((k) => [k, lsGet("chartwerk:" + k)]).filter(([, v]) => v != null)),
+        ind: indSnap(),
       },
     };
   }
@@ -9621,15 +9634,21 @@ canvas {
     try {
       // Indikatoren & Spot-Einstellungen (RSI, MACD, Spot-Regel, Staffel, Fib-Schalter, „für alle Märkte gleich“)
       if (rs.ind && typeof rs.ind === "object") {
-        SYNC_IND.forEach((k) => {
-          if (typeof rs.ind[k] === "string") localStorage.setItem("chartwerk:" + k, rs.ind[k]);
+        let ch = false;
+        syncKeys().forEach((k) => {
+          if (typeof rs.ind[k] === "string" && localStorage.getItem("chartwerk:" + k) !== rs.ind[k]) {
+            localStorage.setItem("chartwerk:" + k, rs.ind[k]);
+            ch = true;
+          }
         });
-        indLoad();
-        try {
-          indCalc();
-          ui();
-          draw();
-        } catch (e) {}
+        localStorage.setItem("chartwerk:indh", JSON.stringify(indSnap()));
+        // geänderte Einstellungen vom anderen Gerät: neu laden, damit alle Anzeigen sie sicher übernehmen
+        if (ch) {
+          try {
+            toast("Einstellungen vom anderen Gerät übernommen");
+          } catch (e) {}
+          setTimeout(() => location.reload(), 900);
+        }
       }
       if (rs.tpl && typeof rs.tpl === "object")
         ["fib", "chan", "fan"].forEach((k) => {
@@ -9666,6 +9685,14 @@ canvas {
     }
     syncing = true;
     syncErr = "";
+    // lokal geänderte Indikator-/Strategie-Einstellungen erkennen → als neueste Einstellungen hochladen
+    try {
+      const h = JSON.stringify(indSnap());
+      if (h !== localStorage.getItem("chartwerk:indh")) {
+        localStorage.setItem("chartwerk:indh", h);
+        localStorage.setItem("chartwerk:us", Date.now());
+      }
+    } catch (e) {}
     syncUI();
     try {
       const ids = await findGists();
