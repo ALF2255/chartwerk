@@ -42,6 +42,12 @@ Knopf **„Divergenzen“** (abschaltbar) und **„Div: RSI / MACD“**: Kurs ma
 Wendepunkte mit 5 Kerzen links/rechts, Abstand 5–60 Kerzen, erst 5 Kerzen nach dem zweiten Punkt bestätigt (kein Blick in die Zukunft). RSI: bärisch nur ab 50 aufwärts, bullisch nur bis 50; MACD: über bzw. unter null.
 Linien im Kurschart und im RSI- bzw. MACD-Fenster. Check in der Kopfzeile: wie oft der Kurs 10 Kerzen nach der Bestätigung in Richtung der Divergenz lag – verglichen mit der Grundrate aller Kerzen („sonst“) – und Ø Veränderung.
 
+## 200-Tage-Linie
+
+Schalter „MA 200 T“: Durchschnitt der letzten 200 Tage (bei Gold, Silber, Öl und Devisen 200 Handelstage), passend zum Zeitrahmen
+umgerechnet – im Wochenchart z. B. 29 Wochen bei Krypto, 40 Wochen bei Gold. Die Legende zeigt den Wert und wie weit der Kurs
+darüber oder darunter liegt. Auf 1 Std und 4 Std reichen die Daten oft nicht für die volle Länge.
+
 ## Vergleich alle Märkte
 
 Knopf **„Vergleich alle Märkte“** (sichtbar, wenn MACD-Signale oder Divergenzen an sind): rechnet die aktuelle Einstellung (Zeiteinheit, MACD-TF, Signale, Ausstieg, Divergenzen) für jeden Markt durch und zeigt eine Tabelle –

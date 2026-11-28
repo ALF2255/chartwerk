@@ -1444,6 +1444,7 @@ canvas {
   <div class="quote"><span id="pair">BTC/USD</span><b id="last">–</b><em id="chg"></em></div>
   <div class="row"><button class="chip src" id="src"><i></i><span>Prüfe Verbindung…</span></button><button class="chip" id="curb" title="Währung umschalten: Dollar / Euro">$ Dollar</button><div class="row" id="tfs"></div>
   <button class="chip ic" id="ma" aria-pressed="true">MA 20/50</button>
+  <button class="chip ic" id="ma2b" aria-pressed="true" title="Durchschnitt der letzten 200 Tage (Gold: 200 Handelstage), passend zum Zeitrahmen umgerechnet">MA 200 T</button>
   <button class="chip ic" id="emb" aria-pressed="true" title="EMA mit Long-/Short-Signal und Check">EMA 12</button>
   <button class="chip ic" id="ems" title="EMA-Strategie einstellen und optimieren" aria-label="EMA-Einstellungen" style="padding:0 10px"><svg viewBox="0 0 22 22" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M3 5h9M3 11h13M3 17h9"/><circle cx="15.5" cy="5" r="2"/><circle cx="15.5" cy="17" r="2"/></svg></button>
   <button class="chip ic" id="zzb" aria-pressed="true">Zickzack</button>
@@ -1818,6 +1819,9 @@ canvas {
     sel = -1,
     undo = [],
     showMA = true,
+    showMA2 = true, // 200-Tage-Linie
+    ma200 = [],
+    ma200n = 200,
     showZZ = true,
     zz = [];
   const ZZDEF = {
@@ -4204,11 +4208,13 @@ canvas {
       }
       ctx.textAlign = "left";
     }
-    if (showMA)
+    if (showMA || showMA2)
       [
-        [ma20, "#f2c94c"],
-        [ma50, "#b78cff"],
+        [showMA ? ma20 : null, "#f2c94c"],
+        [showMA ? ma50 : null, "#b78cff"],
+        [showMA2 ? ma200 : null, "#ff8a65"],
       ].forEach(([a, c]) => {
+        if (!a) return;
         ctx.strokeStyle = c;
         ctx.lineWidth = 1.4;
         ctx.beginPath();
@@ -4576,6 +4582,13 @@ canvas {
       (showMA
         ? `<span class="m"><b style="color:#f2c94c">MA20</b> ${ma20[i] != null ? fmt(ma20[i]) : "–"} <b style="color:#b78cff">MA50</b> ${ma50[i] != null ? fmt(ma50[i]) : "–"}</span>`
         : "") +
+      (showMA2
+        ? `<span class="m"><b style="color:#ff8a65">MA 200 T</b> ${
+            ma200[i] != null
+              ? fmt(ma200[i]) + ` (Kurs ${data[i].c >= ma200[i] ? "+" : ""}${((data[i].c / ma200[i] - 1) * 100).toLocaleString("de-DE", { maximumFractionDigits: 1 })} %)`
+              : `– (zu wenig Daten für ${ma200n} Kerzen)`
+          }</span>`
+        : "") +
       (showLQ && LQS[sym.id] && LQ[sym.id]
         ? `<span class="m"><b style="color:#5ec962">Liquidationen</b> ${LQ[sym.id].err ? "nicht erreichbar" : "geschätzt, " + (sym.m ? "nur Binance-Trader, " : "") + "letzte 20 Tage, Binance Futures"}</span>`
         : "") +
@@ -4808,6 +4821,7 @@ canvas {
     $("#magbd").textContent = ["", "•", "••"][magnet];
     $("#mag").title = ["Magnet aus", "Magnet schwach", "Magnet stark"][magnet];
     $("#zzb").setAttribute("aria-pressed", showZZ);
+    $("#ma2b").setAttribute("aria-pressed", showMA2);
     $("#pgb").setAttribute("aria-pressed", showPG);
     $("#scb").setAttribute("aria-pressed", showSC);
     $("#znb").setAttribute("aria-pressed", showZN);
@@ -6708,6 +6722,9 @@ canvas {
   function recalc() {
     ma20 = sma(20);
     ma50 = sma(50);
+    // 200 Tage in Kerzen dieses Zeitrahmens; Gold & Co. handeln 5 Tage je Woche → 200 Handelstage
+    ma200n = Math.max(2, Math.round(200 * (24 / tf.h) * (sym.m && tf.h >= 168 ? 7 / 5 : 1)));
+    ma200 = sma(ma200n);
     zz = calcZZ();
     epLoad();
     ema12 = ema(EP.len);
@@ -7205,6 +7222,7 @@ canvas {
       ind: {
         ma: showMA,
         zzb: showZZ,
+        ma2b: showMA2,
         trb: showTR,
         znb: showZN,
         pgb: showPG,
@@ -7233,6 +7251,7 @@ canvas {
       if ("gpb" in i) showGP = !!i.gpb;
       if ("ma" in i) showMA = !!i.ma;
       if ("zzb" in i) showZZ = !!i.zzb;
+      if ("ma2b" in i) showMA2 = !!i.ma2b;
       if ("trb" in i) showTR = !!i.trb;
       if ("znb" in i) showZN = !!i.znb;
       if ("pgb" in i) showPG = !!i.pgb;
@@ -7299,6 +7318,7 @@ canvas {
   const indNow = () => ({
     ma: showMA,
     zzb: showZZ,
+        ma2b: showMA2,
     trb: showTR,
     znb: showZN,
     pgb: showPG,
@@ -7551,6 +7571,7 @@ canvas {
       ind: {
         ma: showMA,
         zzb: showZZ,
+        ma2b: showMA2,
         trb: showTR,
         znb: showZN,
         pgb: showPG,
@@ -7649,6 +7670,11 @@ canvas {
   };
   $("#ma").onclick = () => {
     showMA = !showMA;
+    ui();
+    draw();
+  };
+  $("#ma2b").onclick = () => {
+    showMA2 = !showMA2;
     ui();
     draw();
   };
@@ -8746,6 +8772,7 @@ canvas {
   };
   const IND = [
     ["ma", "MA 20/50"],
+    ["ma2b", "MA 200 Tage"],
     ["zzb", "Zickzack"],
     ["cyb", "Halving-Zyklus (Bitcoin)"],
     ["lqb", "Liquidations-Heatmap (BTC, Gold, Silber, Öl)"],
