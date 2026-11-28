@@ -1475,7 +1475,8 @@ canvas {
   <button class="chip ic" id="sps" title="Staffelkauf: aus / 1/3 beim Kaufsignal, 1/3 bei −15 %, 1/3 bei −30 % unter dem ersten Kaufkurs / zusätzlich Rest kaufen, wenn der Kurs 10 % über dem ersten Kauf schließt" style="padding:0 10px">Staffel: aus</button>
   <button class="chip ic" id="spq" title="Nur für ★ Fib (eigene): Fibs vom Zickzack suchen lassen oder deine selbst gezogenen Fibonacci-Zeichnungen (Hoch → Tief) nehmen" style="padding:0 10px">Fibs: Zickzack</button>
   <button class="chip ic" id="spz" title="Nur für ★ Fib (eigene): Zyklus = nur große Bewegungen (wie im Wochenchart, Fristen in Wochen) / Chart = eigene, kleinere Fibs je Zeitrahmen (Fristen in Kerzen)" style="padding:0 10px">Fib-Größe: Zyklus</button>
-  <button class="chip ic" id="spx" title="Nur für ★ Fib (eigene): verkaufen nach 1, 2 oder 3 Wochenschlüssen in Folge unter der 1,236 bzw. beim Abverkauf unter die 0,5 (antippen wechselt)" style="padding:0 10px">Fib-Stopp: 3 Wochen</button>
+  <button class="chip ic" id="spsl" title="Nur für ★ Fib (eigene): Stopp-Linie 1,236 oder 1,618 (mehr Luft für stärker schwankende Charts, z. B. Tageschart)" style="padding:0 10px">Stopp-Linie: 1,236</button>
+  <button class="chip ic" id="spx" title="Nur für ★ Fib (eigene): verkaufen nach 1, 2 oder 3 Wochenschlüssen in Folge unter der Stopp-Linie (1,236 bzw. 1,618) oder beim Abverkauf unter die 0,5 (antippen wechselt)" style="padding:0 10px">Fib-Stopp: 3 Wochen</button>
   <button class="chip ic" id="spf" title="Nur für ★ Fib (eigene): KAUF · Boden nur, wenn der Kurs auch über der 200-Tage-Linie schließt" style="padding:0 10px">Fib-Boden: ohne 200 T</button>
   <button class="chip ic" id="spc" title="Alle Spot-Regeln für diesen Markt gegen „einfach halten“ vergleichen" style="padding:0 10px">Spot-Check</button>
   <button class="chip ic" id="dvb" aria-pressed="true" title="Divergenzen: Kurs macht neues Hoch/Tief, RSI bzw. MACD nicht – mögliche Wende (mit Check)">Divergenzen</button>
@@ -1682,7 +1683,7 @@ canvas {
 {
   const $ = (s) => document.querySelector(s);
   // Version: bei jeder Änderung zusammen mit dem Cache-Namen in sw.js („chartwerk-vNN“) hochzählen
-  const VERSION = 34,
+  const VERSION = 35,
     VDATE = "28.11.2026";
   const SYMS = [
     { id: "BTC", name: "Bitcoin", pair: "BTC/USD", p: 95000, v: 0.03, m: 0, bn: "BTCUSDT" },
@@ -5113,6 +5114,7 @@ canvas {
        Zickzack ohne Blick in die Zukunft; seine Schwelle richtet sich nach der Schwankung des Marktes (3,5 × Wochen-Schwankung, 12–45 %). */
   let showSP = false,
     spM = 2,
+    spSL = false, // Fib-Regel: Stopp-Linie 1,618 statt 1,236
     spZ = false, // Fib-Regel: Fib-Größe – false Zyklus (große Bewegungen, Fristen in Wochen), true Chart (kleinere Fibs je Zeitrahmen)
     spXN = 3, // Fib-Regel: Verkauf (1,236-Bruch, Abverkauf unter 0,5) erst nach 1, 2 oder 3 Wochenschlüssen in Folge
     spQ = false, // Fib-Regel: Quelle der Fibs – false Zickzack, true selbst gezogene Fibs
@@ -5129,9 +5131,11 @@ canvas {
     spF = localStorage.getItem("chartwerk:spf") === "1";
     spQ = localStorage.getItem("chartwerk:spq") === "1";
     spZ = localStorage.getItem("chartwerk:spz") === "1";
+    spSL = localStorage.getItem("chartwerk:spsl") === "1";
     const xn = localStorage.getItem("chartwerk:spxn");
     spXN = /^[123]$/.test(xn || "") ? +xn : localStorage.getItem("chartwerk:spx2") === "0" ? 1 : 3;
   } catch (e) {}
+  const slTxt = () => (spSL ? "1,618" : "1,236");
   const wkTxt = (k) => (spZ ? k + (k > 1 ? " Kerzen" : " Kerze") : k + (k > 1 ? " Wochen" : " Woche"));
   function rsiW(cl, n = 14) {
     const o = new Array(cl.length).fill(null);
@@ -5167,6 +5171,7 @@ canvas {
       nW = Math.max(5, Math.round(26 * bpw)),
       // Schalter „Fib-Größe“: Zyklus = große Bewegungen, Schwelle nach Wochen-Schwankung, Fristen in Wochen;
       // Chart = eigene, kleinere Fibs je Zeitrahmen, Schwelle nach Tages-Schwankung (ab Tageschart: je Kerze), Fristen in Kerzen
+      SL = spSL ? 1.618 : 1.236, // Stopp-Linie (Schalter): 1,236 oder bei stärker schwankenden Charts 1,618
       sc = spZ ? Math.max(1, 24 / tf.h) : bpw,
       cnt = spZ ? 1 : bpw,
       hold = Math.max(1, Math.round(4 * cnt)),
@@ -5204,7 +5209,7 @@ canvas {
       // Abverkauf: war der Kurs schon über der 0,5 und schließt wieder darunter → Verkauf (Fib bleibt gültig bis zum nächsten,
       // daher greift das auch nach der Bestätigung, z. B. 2022 mit dem Fib 2021: Rückfall unter 46.830)
       st.mb = st.a5 && c < f.m ? (st.mb || 0) + 1 : 0;
-      if (st.xb >= need) sell[i] = spXN > 1 ? `1,236 ${spXN}× gebrochen` : "1,236 gebrochen";
+      if (st.xb >= need) sell[i] = spXN > 1 ? `${slTxt()} ${spXN}× gebrochen` : `${slTxt()} gebrochen`;
       else if (st.mb >= need) {
         sell[i] = "Abverkauf unter 0,5";
         st.a5 = false;
@@ -5240,7 +5245,7 @@ canvas {
         .filter((f) => f.hi < f.li && f.H > f.L && f.li >= 0 && f.li < n - 1)
         .sort((a, b) => a.li - b.li);
       U.forEach((f, j) => {
-        Object.assign(f, { k: f.L + 0.65 * (f.H - f.L), m: f.L + 0.5 * (f.H - f.L), x: f.H - 1.236 * (f.H - f.L), D: Dof(Math.max(1, f.li)), end: null });
+        Object.assign(f, { k: f.L + 0.65 * (f.H - f.L), m: f.L + 0.5 * (f.H - f.L), x: f.H - SL * (f.H - f.L), xl: slTxt(), D: Dof(Math.max(1, f.li)), end: null });
         F.push(f);
         const st = { RH: -Infinity, below: false, up: 0 },
           to = j + 1 < U.length ? U[j + 1].li + 1 : n;
@@ -5282,7 +5287,7 @@ canvas {
         // schon ein Zwischenstopp im Absturz als „erstes Tief“, z. B. Gold 2026: 4.404 statt 3.944)
         if (c >= L * (1 + Math.max(D, spZ ? 0.04 : 0.15))) {
           if (f) f.end = i; // vorheriger Fib gilt bis hierher
-          f = { H, hi, L, li, i0: i, k: L + 0.65 * (H - L), m: L + 0.5 * (H - L), x: H - 1.236 * (H - L), D, end: null };
+          f = { H, hi, L, li, i0: i, k: L + 0.65 * (H - L), m: L + 0.5 * (H - L), x: H - SL * (H - L), xl: slTxt(), D, end: null };
           F.push(f);
           ph = 2;
           fst = { RH: b.h, below: false, up: 0 };
@@ -5521,7 +5526,7 @@ canvas {
       p2 = (v) => (v == null ? "–" : (v >= 0 ? "+" : "") + (v * 100).toLocaleString("de-DE", { maximumFractionDigits: 1 }) + " %"),
       tc = (E) => (!E.n ? "–" : `<span class="${E.n >= EDGE_N && E.t >= EDGE_T ? "up" : E.t < 0 ? "dn" : ""}">${tFmt(E.t)}</span>`),
       rows = SPM.map((_, m) => [m, spCalc(m)]);
-    $("#sph").textContent = `Spot-Check · ${sym.name} · ${tf.l}${spS ? " · Staffelkauf" + (spS === 2 ? " + Rest bei +10 %" : "") : ""}${spF ? " · Fib-Boden nur über 200 T" : ""}${spQ ? " · meine Fibs" : ""}${" · Fib-Stopp " + wkTxt(spXN)}${spZ ? " · Fib-Größe Chart" : ""}`;
+    $("#sph").textContent = `Spot-Check · ${sym.name} · ${tf.l}${spS ? " · Staffelkauf" + (spS === 2 ? " + Rest bei +10 %" : "") : ""}${spF ? " · Fib-Boden nur über 200 T" : ""}${spQ ? " · meine Fibs" : ""}${" · Fib-Stopp " + wkTxt(spXN)}${spZ ? " · Fib-Größe Chart" : ""}${spSL ? " · Stopp 1,618" : ""}`;
     $("#spt").innerHTML =
       // wichtigste Spalten zuerst (Strategie gegen Halten, Rückgang), damit sie auch auf schmalen Bildschirmen ohne Wischen sichtbar sind
       '<table class="cmpt"><tr><th>Regel</th><th>Strategie</th><th>Halten</th><th>Größter Rückgang</th><th>Verkäufe</th><th>Treffer</th><th>Ø je Trade</th><th>Edge</th><th>1. | 2. Hälfte</th><th>Im Markt</th></tr>' +
@@ -5533,7 +5538,7 @@ canvas {
         )
         .join("") +
       "</table>";
-    $("#spn").innerHTML = `<p class="m" style="margin-top:8px">Nur Kaufen und Verkaufen (Spot), keine Shorts, 0,1 % Gebühr je Kauf und Verkauf. „Strategie“ = alle Käufe nacheinander, Gewinne wieder eingesetzt, dazwischen Bargeld; grün, wenn besser als „Halten“ (ab derselben Kerze kaufen und liegen lassen). „Im Markt“ = Anteil der Zeit investiert, „Größter Rückgang“ = tiefster Einbruch vom Höchststand. Eine Regel, die weniger bringt als Halten, kann trotzdem sinnvoll sein, wenn sie den Rückgang deutlich kleiner hält. ${spS ? `Staffelkauf an: 1/3 beim Signal, je 1/3 per Limit bei −15 % und −30 % unter dem ersten Kaufkurs${spS === 2 ? ", nicht gekaufte Teile werden gekauft, sobald der Kurs 10 % über dem ersten Kauf schließt" : ""}; „Ø je Trade“ bezieht sich auf den Ø-Einstandspreis, „Strategie“ auf das ganze Budget (nicht gekaufte Teile bleiben Bargeld).` : "Mit „Staffel“ lässt sich vergleichen, ob Kaufen in drei Teilen besser gewesen wäre."} Edge wie beim Bot (t ≥ ${tFmt(EDGE_T)}, mind. ${EDGE_N} Verkäufe). <b>★ Fib (eigene)</b> ist deine eigene Methode, als Regel nachgebaut: Fib vom Hoch zum ersten großen Tief danach, gültig bis zum nächsten Fib; Verkauf beim Abverkauf unter die 0,5 (nachdem der Kurs darüber war), wenn die erste Erholung unter der 0,5 scheitert oder wenn ${spXN > 1 ? spXN + (spZ ? " Schlüsse" : " Wochenschlüsse") + " in Folge" : spZ ? "ein Schluss" : "ein Wochenschluss"} unter der 1,236 den Fib brechen (beim Abverkauf zählen ebenso ${wkTxt(spXN)}); Kauf, wenn der Kurs nach einem Rutsch unter das erste Tief wieder darüber schließt (Boden) oder ${spZ ? "4 Kerzen" : "4 Wochen"} über der 0,65 schließt (bestätigt)${spZ ? "; Fib-Größe „Chart“: kleinere Fibs nach der Schwankung dieses Zeitrahmens, mehr Trades" : ""}${spF ? "; Schalter an: Boden-Kauf erst, wenn der Kurs auch über der 200-Tage-Linie schließt" : ""}. ${spQ ? "Fibs: deine eigenen Fibonacci-Zeichnungen in diesem Markt, bei denen das Hoch vor dem Tief liegt; jeder gilt ab der Kerze nach seinem Tief. Achtung: im Rückblick geschönt, weil die Fibs nachträglich gezogen wurden – aussagekräftig ist das vor allem für den aktuellen Plan." : "Hoch und Tief sucht ein Zickzack ohne Blick in die Zukunft – es kann andere Punkte wählen als dein Auge (Schalter „Fibs: meine“ nimmt deine gezogenen Fibs); am besten im Wochenchart prüfen."} Zeile antippen = Regel im Chart einstellen. Nur Rückblick – keine Anlageberatung.</p>`;
+    $("#spn").innerHTML = `<p class="m" style="margin-top:8px">Nur Kaufen und Verkaufen (Spot), keine Shorts, 0,1 % Gebühr je Kauf und Verkauf. „Strategie“ = alle Käufe nacheinander, Gewinne wieder eingesetzt, dazwischen Bargeld; grün, wenn besser als „Halten“ (ab derselben Kerze kaufen und liegen lassen). „Im Markt“ = Anteil der Zeit investiert, „Größter Rückgang“ = tiefster Einbruch vom Höchststand. Eine Regel, die weniger bringt als Halten, kann trotzdem sinnvoll sein, wenn sie den Rückgang deutlich kleiner hält. ${spS ? `Staffelkauf an: 1/3 beim Signal, je 1/3 per Limit bei −15 % und −30 % unter dem ersten Kaufkurs${spS === 2 ? ", nicht gekaufte Teile werden gekauft, sobald der Kurs 10 % über dem ersten Kauf schließt" : ""}; „Ø je Trade“ bezieht sich auf den Ø-Einstandspreis, „Strategie“ auf das ganze Budget (nicht gekaufte Teile bleiben Bargeld).` : "Mit „Staffel“ lässt sich vergleichen, ob Kaufen in drei Teilen besser gewesen wäre."} Edge wie beim Bot (t ≥ ${tFmt(EDGE_T)}, mind. ${EDGE_N} Verkäufe). <b>★ Fib (eigene)</b> ist deine eigene Methode, als Regel nachgebaut: Fib vom Hoch zum ersten großen Tief danach, gültig bis zum nächsten Fib; Verkauf beim Abverkauf unter die 0,5 (nachdem der Kurs darüber war), wenn die erste Erholung unter der 0,5 scheitert oder wenn ${spXN > 1 ? spXN + (spZ ? " Schlüsse" : " Wochenschlüsse") + " in Folge" : spZ ? "ein Schluss" : "ein Wochenschluss"} unter der ${slTxt()} den Fib brechen (beim Abverkauf zählen ebenso ${wkTxt(spXN)}); Kauf, wenn der Kurs nach einem Rutsch unter das erste Tief wieder darüber schließt (Boden) oder ${spZ ? "4 Kerzen" : "4 Wochen"} über der 0,65 schließt (bestätigt)${spZ ? "; Fib-Größe „Chart“: kleinere Fibs nach der Schwankung dieses Zeitrahmens, mehr Trades" : ""}${spF ? "; Schalter an: Boden-Kauf erst, wenn der Kurs auch über der 200-Tage-Linie schließt" : ""}. ${spQ ? "Fibs: deine eigenen Fibonacci-Zeichnungen in diesem Markt, bei denen das Hoch vor dem Tief liegt; jeder gilt ab der Kerze nach seinem Tief. Achtung: im Rückblick geschönt, weil die Fibs nachträglich gezogen wurden – aussagekräftig ist das vor allem für den aktuellen Plan." : "Hoch und Tief sucht ein Zickzack ohne Blick in die Zukunft – es kann andere Punkte wählen als dein Auge (Schalter „Fibs: meine“ nimmt deine gezogenen Fibs); am besten im Wochenchart prüfen."} Zeile antippen = Regel im Chart einstellen. Nur Rückblick – keine Anlageberatung.</p>`;
     $("#spp").classList.add("on");
   }
   function indSave() {
@@ -5553,6 +5558,7 @@ canvas {
       localStorage.setItem("chartwerk:spq", spQ ? "1" : "0");
       localStorage.setItem("chartwerk:spxn", String(spXN));
       localStorage.setItem("chartwerk:spz", spZ ? "1" : "0");
+      localStorage.setItem("chartwerk:spsl", spSL ? "1" : "0");
     } catch (e) {}
   }
   const RSI_N = 14,
@@ -6393,7 +6399,9 @@ canvas {
     $("#spm").style.display = $("#spc").style.display = $("#sps").style.display = showSP ? "" : "none";
     $("#sps").textContent = "Staffel: " + ["aus", "1/3 · −15 % · −30 %", "1/3 · −15 % · −30 % · Rest bei +10 %"][spS];
     $("#sps").setAttribute("aria-pressed", spS > 0);
-    $("#spf").style.display = $("#spq").style.display = $("#spx").style.display = $("#spz").style.display = showSP && spM === SPOWN ? "" : "none";
+    $("#spf").style.display = $("#spq").style.display = $("#spx").style.display = $("#spz").style.display = $("#spsl").style.display = showSP && spM === SPOWN ? "" : "none";
+    $("#spsl").textContent = "Stopp-Linie: " + slTxt();
+    $("#spsl").setAttribute("aria-pressed", spSL);
     $("#spz").textContent = "Fib-Größe: " + (spZ ? "Chart" : "Zyklus");
     $("#spz").setAttribute("aria-pressed", spZ);
     $("#spx").textContent = "Fib-Stopp: " + wkTxt(spXN);
@@ -6428,8 +6436,9 @@ canvas {
     else if (k === "spq") spQ = !spQ;
     else if (k === "spx") spXN = (spXN % 3) + 1;
     else if (k === "spz") spZ = !spZ;
+    else if (k === "spsl") spSL = !spSL;
     indSave();
-    if (k === "mcf" || k === "msf" || k === "mc" || k === "msx" || k === "dvs" || k === "sp" || k === "spm" || k === "sps" || k === "spf" || k === "spq" || k === "spx" || k === "spz") indCalc();
+    if (k === "mcf" || k === "msf" || k === "mc" || k === "msx" || k === "dvs" || k === "sp" || k === "spm" || k === "sps" || k === "spf" || k === "spq" || k === "spx" || k === "spz" || k === "spsl") indCalc();
     clampView();
     ui();
     draw();
@@ -6446,6 +6455,10 @@ canvas {
   $("#spm").onclick = () => indTog("spm");
   $("#sps").onclick = () => {
     indTog("sps");
+    if ($("#spp").classList.contains("on")) spCheck();
+  };
+  $("#spsl").onclick = () => {
+    indTog("spsl");
     if ($("#spp").classList.contains("on")) spCheck();
   };
   $("#spz").onclick = () => {
@@ -6538,7 +6551,7 @@ canvas {
           [f.k, "#26a69a", "0,65 ↑"],
           [f.m, "#c0a060", "0,5"],
           [f.L, "#8d98a1", "Fib 1"],
-          [f.x, "#ef5350", "1,236"],
+          [f.x, "#ef5350", f.xl || "1,236"],
         ].forEach(([v, col, lb]) => {
           const yy = Math.round(y(v)) + 0.5;
           ctx.strokeStyle = ctx.fillStyle = col;
