@@ -102,7 +102,7 @@ Knopf **„Spot“** (für eigene Käufe, keine Shorts) zeigt KAUF- und VERKAUF-
   4–45 %), Fristen in Kerzen – mehr Fibs und mehr Trades, eher Swing-Trading.
   Schalter „Stopp-Linie: 1,236 / 1,618“: verkauft wird beim Bruch der 1,236 (Standard) oder erst der 1,618 – mehr Luft für
   stärker schwankende Charts wie den Tageschart.
-  Schalter „Fib-Stopp: 1 / 2 / 3 Wochen“ (Standard 3 Wochen): verkauft wird erst nach so vielen Wochenschlüssen in Folge unter der 1,236 –
+  Schalter „Fib-Stopp: 1 / 2 / 3 / 4 Wochen“ (Standard 3 Wochen): verkauft wird erst nach so vielen Wochenschlüssen in Folge unter der 1,236 –
   ein knapper einzelner Schluss darunter ist oft nur ein Test der Marke (Gold Nov. 2026: 3.533 unter 3.554, Woche darauf 3.654).
 
 **„Staffel“** (Schalter, gilt für alle Spot-Regeln): beim Kaufsignal nur 1/3 kaufen, je 1/3 per Limit bei −15 % und −30 % unter dem
